@@ -1,0 +1,11 @@
+{
+  "name": "Bangkok Plus Size OOTD - Live Selling & Inventory Reconciliation Portal",
+  "description": "Comprehensive live selling order reconciliation and inventory management system for Bangkok Plus Size OOTD. Automates post-live order reconciliation, resolves live-chat and messenger adjustments, prevents duplicate entries and purchase discrepancies, and ensures only reconciled orders are invoiced.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
