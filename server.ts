@@ -175,10 +175,10 @@ let graphSyncStats = {
   syncCount: 0,
   onAirVideoId: process.env.FB_LIVE_VIDEO_ID || 'Not connected yet',
   broadcastStatus: 'READY_TO_SYNC',
-  lastStatusCheck: process.env.FB_PAGE_ACCESS_TOKEN
+  lastStatusCheck: (process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN)
     ? 'Live Graph API v22.0 Token Detected — Ready to sync morning broadcast'
     : 'Awaiting Facebook Live Video ID / Page Access Token or Meta Webhook events',
-  mode: process.env.FB_PAGE_ACCESS_TOKEN ? 'live_graph_api' : 'awaiting_credentials',
+  mode: (process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN) ? 'live_graph_api' : 'awaiting_credentials',
 };
 
 function saveRuntimeState() {
@@ -984,8 +984,8 @@ app.post('/api/facebook/live-sync', async (req, res) => {
     graphSyncStats.onAirVideoId = cleanVid;
   }
 
-  const fbToken = (accessToken && String(accessToken).trim()) || process.env.FB_PAGE_ACCESS_TOKEN;
-  const pageId = (fbPageId && String(fbPageId).trim()) || process.env.FB_PAGE_ID || 'me';
+  const fbToken = (accessToken && String(accessToken).trim()) || process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
+  const pageId = (fbPageId && String(fbPageId).trim()) || process.env.FB_PAGE_ID || process.env.META_PAGE_ID || 'me';
 
   graphSyncStats.lastSyncAt = nowIso;
   graphSyncStats.syncCount += 1;
@@ -1268,8 +1268,8 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
     });
   }
 
-  // If FB_PAGE_ACCESS_TOKEN is configured, dispatch real outbound Graph API v22.0 Send API request
-  const fbToken = process.env.FB_PAGE_ACCESS_TOKEN;
+  // If FB_PAGE_ACCESS_TOKEN or META_PAGE_ACCESS_TOKEN is configured, dispatch real outbound Graph API v22.0 Send API request
+  const fbToken = process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
   if (fbToken && thread.psid) {
     try {
       await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
@@ -1688,7 +1688,11 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}
+
+export default app;
