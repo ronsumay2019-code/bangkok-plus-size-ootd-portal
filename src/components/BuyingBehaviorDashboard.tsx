@@ -103,7 +103,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
               {analytics.duplicateDetections.totalDuplicatesBlocked} Blocked
             </div>
             <p className="text-[11px] text-neutral-400 mt-1">
-              Saved à¸¿{analytics.duplicateDetections.preventedOverspendThb.toLocaleString()} THB double-buy
+              Saved ฿{analytics.duplicateDetections.preventedOverspendThb.toLocaleString()} THB double-buy
             </p>
           </div>
 
@@ -115,7 +115,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
             <div className="text-2xl font-bold text-purple-300 font-mono">
               3XL (42%)
             </div>
-            <p className="text-[11px] text-neutral-400 mt-1">Core plus-size sweet spot: 2XLâ€“4XL</p>
+            <p className="text-[11px] text-neutral-400 mt-1">Core plus-size sweet spot: 2XL–4XL</p>
           </div>
         </div>
       </div>
@@ -153,7 +153,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
           </div>
 
           <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800 text-[11px] text-neutral-400 leading-relaxed">
-            ðŸ’¡ <strong>Inventory Insight:</strong> 3XL and 2XL account for <strong>74%</strong> of all live claims. When visiting Bangkok suppliers, prioritize 3XL and 4XL bundles; XL is currently over-supplied relative to live demand.
+            💡 <strong>Inventory Insight:</strong> 3XL and 2XL account for <strong>74%</strong> of all live claims. When visiting Bangkok suppliers, prioritize 3XL and 4XL bundles; XL is currently over-supplied relative to live demand.
           </div>
         </div>
 
@@ -188,7 +188,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
           </div>
 
           <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800 text-[11px] text-neutral-400 leading-relaxed">
-            ðŸ’¡ <strong>Channel Behavioral Gap:</strong> <strong>22%</strong> of all live session orders now originate or amend through <strong>Page Business Messenger</strong> and VIP personal channels. Isolating live comment parsing alone misses almost a quarter of store buying demand!
+            💡 <strong>Channel Behavioral Gap:</strong> <strong>22%</strong> of all live session orders now originate or amend through <strong>Page Business Messenger</strong> and VIP personal channels. Isolating live comment parsing alone misses almost a quarter of store buying demand!
           </div>
         </div>
       </div>
@@ -211,7 +211,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
               <div className="text-xl font-bold text-purple-300 font-mono mt-0.5">
                 {analytics.modificationStats.sizeChanges} requests
               </div>
-              <span className="text-[11px] text-neutral-400">Mostly sizing up (2XL â†’ 3XL)</span>
+              <span className="text-[11px] text-neutral-400">Mostly sizing up (2XL → 3XL)</span>
             </div>
 
             <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800">
@@ -240,7 +240,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
           </div>
 
           <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800 text-[11px] text-neutral-400">
-            <strong>Timing Breakdown:</strong> {analytics.modificationStats.channelBreakdown.liveChat} occurred in live chat during the live Â· {analytics.modificationStats.channelBreakdown.messenger} occurred via Business Messenger post-live.
+            <strong>Timing Breakdown:</strong> {analytics.modificationStats.channelBreakdown.liveChat} occurred in live chat during the live · {analytics.modificationStats.channelBreakdown.messenger} occurred via Business Messenger post-live.
           </div>
         </div>
 
@@ -260,7 +260,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
                 <div>
                   <strong className="text-white font-mono">{spot.itemCode}</strong>
                   <div className="text-neutral-400 text-[11px] mt-0.5">
-                    {spot.demand} demanded Â· only {spot.stock} available on rack
+                    {spot.demand} demanded · only {spot.stock} available on rack
                   </div>
                 </div>
 
@@ -269,7 +269,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
                     SHORT {spot.shortage} pcs
                   </span>
                   <div className="text-[10px] text-neutral-500 font-mono mt-0.5">
-                    â‚±{spot.lostRevenuePhp.toLocaleString()} lost sales
+                    ₱{spot.lostRevenuePhp.toLocaleString()} lost sales
                   </div>
                 </div>
               </div>
@@ -277,7 +277,7 @@ export const BuyingBehaviorDashboard: React.FC<BuyingBehaviorDashboardProps> = (
           </div>
 
           <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800 text-[11px] text-neutral-400 leading-relaxed">
-            ðŸ›¡ï¸ <strong>Zero-Refund Invoicing Guarantee:</strong> All {analytics.hotspotShortages.length} shortage hotspots were automatically excluded from billing. Customers were not billed for unavailable pieces, resulting in <strong>zero refund overhead</strong>.
+            🛡️ <strong>Zero-Refund Invoicing Guarantee:</strong> All {analytics.hotspotShortages.length} shortage hotspots were automatically excluded from billing. Customers were not billed for unavailable pieces, resulting in <strong>zero refund overhead</strong>.
           </div>
         </div>
       </div>

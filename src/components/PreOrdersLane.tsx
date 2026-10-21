@@ -193,7 +193,7 @@ export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
           <div className="p-3.5 bg-purple-950/20 border border-purple-900/30 rounded-xl">
             <span className="text-purple-300 text-[11px] block">Pre-Order Gross PHP</span>
             <div className="text-2xl font-bold font-mono text-purple-200 mt-1">
-              â‚±{totalValuePhp.toLocaleString()}
+              ₱{totalValuePhp.toLocaleString()}
             </div>
             <span className="text-[10px] text-purple-400/80">Active pre-order value</span>
           </div>
@@ -299,7 +299,7 @@ export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
                     <span className="text-neutral-500">&bull;</span>
                     <span>Qty: <strong className="text-white font-mono">{item.quantity}</strong></span>
                     <span className="text-neutral-500">&bull;</span>
-                    <span className="font-mono text-emerald-400 font-bold">â‚±{(item.statedUnitPricePhp || 0) * item.quantity}</span>
+                    <span className="font-mono text-emerald-400 font-bold">₱{(item.statedUnitPricePhp || 0) * item.quantity}</span>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-400 mt-2">

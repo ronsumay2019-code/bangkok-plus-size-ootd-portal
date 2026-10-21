@@ -36,7 +36,7 @@ export const StrategicAnalysisModal: React.FC<StrategicAnalysisModalProps> = ({
                 Executive Audit Report
               </span>
               <span className="text-xs text-neutral-400 font-mono">
-                Bangkok Plus Size OOTD Â· Workflow 2026-10-19.10
+                Bangkok Plus Size OOTD · Workflow 2026-10-19.10
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight mt-1">
@@ -118,7 +118,7 @@ export const StrategicAnalysisModal: React.FC<StrategicAnalysisModalProps> = ({
                 </li>
                 <li className="flex items-start gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>Clock Lag Alignment:</strong> Calibrate broadcast creation lag (2â€“5 mins) before matching comments.</span>
+                  <span><strong>Clock Lag Alignment:</strong> Calibrate broadcast creation lag (2–5 mins) before matching comments.</span>
                 </li>
                 <li className="flex items-start gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
@@ -213,16 +213,16 @@ export const StrategicAnalysisModal: React.FC<StrategicAnalysisModalProps> = ({
           </strong>
           <ul className="space-y-1.5 text-neutral-300">
             <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">â€¢</span>
+              <span className="text-amber-400 font-bold">•</span>
               <span><strong>Real-time Rolling Demand Board during Live:</strong> Keep the "Ordered vs on the rack" view visible to the host on air. When BP02 reaches 2 orders for 2 rack pieces, the host immediately calls "Last piece na po!", stopping overselling at the source.</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">â€¢</span>
+              <span className="text-amber-400 font-bold">•</span>
               <span><strong>Replay Review Timestamp Anchoring:</strong> In Replay Studio, every customer claim is timestamp-linked to the host's spoken words. One-click verification prevents pricing disputes or memory slips.</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">â€¢</span>
-              <span><strong>AI Speech & Video Multimodal Verification:</strong> Gemini transcribe automatically turns host audio into structured price logs (e.g. `[BP01: â‚±1,890 for Maricel]`), providing an independent audit layer.</span>
+              <span className="text-amber-400 font-bold">•</span>
+              <span><strong>AI Speech & Video Multimodal Verification:</strong> Gemini transcribe automatically turns host audio into structured price logs (e.g. `[BP01: ₱1,890 for Maricel]`), providing an independent audit layer.</span>
             </li>
           </ul>
         </div>

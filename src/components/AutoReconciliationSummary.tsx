@@ -95,7 +95,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
               Consolidated Reconciliation & Gated Invoicing Summary
             </h2>
             <p className="text-xs text-neutral-400">
-              Live Session: <strong className="text-neutral-200">{summary.liveTitle}</strong> Â· Bangkok Store Buying
+              Live Session: <strong className="text-neutral-200">{summary.liveTitle}</strong> · Bangkok Store Buying
             </p>
           </div>
 
@@ -136,7 +136,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
               <DollarSign className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="text-2xl font-bold text-emerald-400 font-mono">
-              â‚±{summary.projectedRevenuePhp.toLocaleString()}
+              ₱{summary.projectedRevenuePhp.toLocaleString()}
             </div>
             <div className="text-[11px] text-neutral-500 mt-1 flex items-center justify-between">
               <span>{summary.invoicingQueue.eligibleInvoicesCount} Invoicable Bags</span>
@@ -151,11 +151,11 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
               <Coins className="w-4 h-4 text-amber-400" />
             </div>
             <div className="text-2xl font-bold text-amber-300 font-mono">
-              à¸¿{summary.totalPurchasedCostThb.toLocaleString()} <span className="text-xs text-neutral-400">THB</span>
+              ฿{summary.totalPurchasedCostThb.toLocaleString()} <span className="text-xs text-neutral-400">THB</span>
             </div>
             <div className="text-[11px] text-neutral-500 mt-1 flex items-center justify-between">
-              <span>Rate: 1 THB = â‚±{summary.phpPerThbRate ?? 1.62}</span>
-              <span className="text-amber-400">â‰ˆ â‚±{Math.round(summary.totalPurchasedCostThb * (summary.phpPerThbRate || 1.62)).toLocaleString()}</span>
+              <span>Rate: 1 THB = ₱{summary.phpPerThbRate ?? 1.62}</span>
+              <span className="text-amber-400">≈ ₱{Math.round(summary.totalPurchasedCostThb * (summary.phpPerThbRate || 1.62)).toLocaleString()}</span>
             </div>
           </div>
 
@@ -166,7 +166,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
               <Sparkles className="w-4 h-4 text-rose-400" />
             </div>
             <div className="text-2xl font-bold text-rose-400 font-mono">
-              â‚±{(summary.estimatedGrossProfitPhp || 0).toLocaleString()}
+              ₱{(summary.estimatedGrossProfitPhp || 0).toLocaleString()}
             </div>
             <div className="text-[11px] text-neutral-500 mt-1">
               Live Session Margin: {summary.projectedRevenuePhp > 0 ? Math.round(((summary.estimatedGrossProfitPhp || 0) / summary.projectedRevenuePhp) * 100) : 0}%
@@ -187,7 +187,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
             </div>
             <div className="text-[11px] text-neutral-500 mt-1 flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full ${accuracy.isPassing ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span>{accuracy.isPassing ? 'Owner Target Met âœ“' : 'Shortage Discrepancy'}</span>
+              <span>{accuracy.isPassing ? 'Owner Target Met ✓' : 'Shortage Discrepancy'}</span>
             </div>
           </div>
         </div>
@@ -197,13 +197,13 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
           <div className="mt-4 p-3 bg-neutral-950/70 border border-neutral-800 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
             <div className="flex items-center gap-2">
               <span className="text-neutral-400">Tied-Up Extra Stock:</span>
-              <strong className="text-purple-300 font-mono">à¸¿{summary.extraStockCostThb.toLocaleString()} THB</strong>
+              <strong className="text-purple-300 font-mono">฿{summary.extraStockCostThb.toLocaleString()} THB</strong>
               <span className="text-neutral-500">(Surplus inventory to list on catalogue)</span>
             </div>
 
             <div className="flex items-center gap-2">
               <span className="text-neutral-400">Lost Sales From Shortage:</span>
-              <strong className="text-rose-400 font-mono">â‚±{summary.projectedLostSalesPhp.toLocaleString()} PHP</strong>
+              <strong className="text-rose-400 font-mono">₱{summary.projectedLostSalesPhp.toLocaleString()} PHP</strong>
               <span className="text-neutral-500">(Oversold demand unfulfilled at store)</span>
             </div>
           </div>
@@ -308,7 +308,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                         )}
                       </div>
                       <div className="text-xs text-neutral-400 mt-0.5">
-                        {bag.lines.length} Line items Â· {bag.totalPiecesGot} pcs verified
+                        {bag.lines.length} Line items · {bag.totalPiecesGot} pcs verified
                       </div>
                     </div>
                   </div>
@@ -316,7 +316,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <div className="font-bold text-sm text-emerald-400 font-mono">
-                        â‚±{bag.subtotalPhp.toLocaleString()}
+                        ₱{bag.subtotalPhp.toLocaleString()}
                       </div>
                       <div className="text-[10px] text-neutral-500">
                         {bag.invoiceStatus === 'invoiced' ? (
@@ -368,9 +368,9 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                                   <span className="text-neutral-600">0</span>
                                 )}
                               </td>
-                              <td className="p-2.5 text-neutral-300 font-mono">â‚±{l.unitPricePhp.toLocaleString()}</td>
+                              <td className="p-2.5 text-neutral-300 font-mono">₱{l.unitPricePhp.toLocaleString()}</td>
                               <td className="p-2.5 text-emerald-400 font-mono font-bold">
-                                â‚±{(l.got * l.unitPricePhp).toLocaleString()}
+                                ₱{(l.got * l.unitPricePhp).toLocaleString()}
                               </td>
                               <td className="p-2.5">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -428,7 +428,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
             </h3>
           </div>
           <span className="text-xs text-neutral-400 font-mono">
-            à¸¿{summary.totalPurchasedCostThb.toLocaleString()} THB Total
+            ฿{summary.totalPurchasedCostThb.toLocaleString()} THB Total
           </span>
         </div>
 
@@ -451,7 +451,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                 return (
                   <tr key={v.key} className="hover:bg-neutral-800/30">
                     <td className="p-3">
-                      <strong className="text-white">{code}</strong> Â· {size} {colour}
+                      <strong className="text-white">{code}</strong> · {size} {colour}
                     </td>
                     <td className="p-3 text-neutral-300">{v.approvedDemand} pcs</td>
                     <td className="p-3 text-emerald-400 font-bold">{v.purchasedCount ?? 'Pending'} pcs</td>
@@ -467,20 +467,20 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                           ? `SHORT ${v.shortCount}`
                           : v.extraCount > 0
                           ? `EXTRA ${v.extraCount}`
-                          : 'BALANCED âœ“'}
+                          : 'BALANCED ✓'}
                       </span>
                     </td>
-                    <td className="p-3 text-neutral-300">à¸¿{v.unitCostThb ?? 0}</td>
+                    <td className="p-3 text-neutral-300">฿{v.unitCostThb ?? 0}</td>
                     <td className="p-3 text-amber-300 font-bold">
-                      à¸¿{((v.purchasedCount || 0) * (v.unitCostThb || 0)).toLocaleString()}
+                      ฿{((v.purchasedCount || 0) * (v.unitCostThb || 0)).toLocaleString()}
                     </td>
                     <td className="p-3 text-neutral-400">
                       {v.extraCostThb ? (
-                        <span className="text-purple-300">à¸¿{v.extraCostThb.toLocaleString()} extra</span>
+                        <span className="text-purple-300">฿{v.extraCostThb.toLocaleString()} extra</span>
                       ) : v.lostSalesPhp ? (
-                        <span className="text-rose-400">â‚±{v.lostSalesPhp.toLocaleString()} lost</span>
+                        <span className="text-rose-400">₱{v.lostSalesPhp.toLocaleString()} lost</span>
                       ) : (
-                        'â€”'
+                        '—'
                       )}
                     </td>
                   </tr>

@@ -389,14 +389,14 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                 disabled={isTranscribing || isRecordingMic}
                 className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition"
               >
-                ðŸŽ™ï¸ Sample 1: Host Call (BP01 â‚±1,890)
+                🎙️ Sample 1: Host Call (BP01 ₱1,890)
               </button>
               <button
                 onClick={() => handleTranscribeSample('sample2')}
                 disabled={isTranscribing || isRecordingMic}
                 className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition"
               >
-                ðŸŽ™ï¸ Sample 2: Host Discount Slip (T07 â‚±2,590)
+                🎙️ Sample 2: Host Discount Slip (T07 ₱2,590)
               </button>
             </div>
 
@@ -439,7 +439,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                     <span className="text-neutral-400 font-semibold">Detected Calls:</span>
                     {extractedCalls.map((c, i) => (
                       <span key={i} className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
-                        [{c.code}] â‚±{c.price.toLocaleString()} {c.buyer ? `â€” ${c.buyer}` : ''}
+                        [{c.code}] ₱{c.price.toLocaleString()} {c.buyer ? `— ${c.buyer}` : ''}
                       </span>
                     ))}
                   </div>
@@ -544,7 +544,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                   </span>
                   <span>{currentActiveOrder.itemName} ({currentActiveOrder.size})</span>
                   <span className="text-amber-400 font-bold font-mono">
-                    â‚±{(currentActiveOrder.statedUnitPricePhp || 0).toLocaleString()}
+                    ₱{(currentActiveOrder.statedUnitPricePhp || 0).toLocaleString()}
                   </span>
                 </div>
               )}
@@ -682,13 +682,13 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                     <span>{currentActiveOrder.itemName} ({currentActiveOrder.size} {currentActiveOrder.colour})</span>
                   </div>
                   <div className="text-[11px] text-neutral-400 mt-1">
-                    Buyer Claimed: <strong>{currentActiveOrder.buyerName}</strong> Â· Live comment: <em>"{currentActiveOrder.channel}"</em>
+                    Buyer Claimed: <strong>{currentActiveOrder.buyerName}</strong> · Live comment: <em>"{currentActiveOrder.channel}"</em>
                   </div>
                 </div>
 
                 <div className="text-right">
                   <div className="font-mono font-bold text-amber-300 text-sm">
-                    â‚±{(currentActiveOrder.statedUnitPricePhp || 0).toLocaleString()}
+                    ₱{(currentActiveOrder.statedUnitPricePhp || 0).toLocaleString()}
                   </div>
                   <button
                     onClick={() => handleVerifyOrder(currentActiveOrder.id, currentActiveOrder.statedUnitPricePhp || 1890, currentActiveOrder.formattedTimestamp)}
@@ -798,7 +798,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                       </div>
 
                       <span className="font-mono font-bold text-emerald-400">
-                        â‚±{(ord.statedUnitPricePhp || 0).toLocaleString()}
+                        ₱{(ord.statedUnitPricePhp || 0).toLocaleString()}
                       </span>
                     </div>
 
@@ -832,7 +832,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                       {ord.isVerified ? (
                         <span className="text-emerald-400 font-semibold flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" />
-                          <span>Verified from Replay âœ“</span>
+                          <span>Verified from Replay ✓</span>
                         </span>
                       ) : (
                         <button
@@ -863,7 +863,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                 <Bookmark className="w-4 h-4 text-rose-400" />
                 <span>Pin Order at Current Replay Moment ({formatSeconds(currentTime)})</span>
               </h3>
-              <button onClick={() => setShowAddMarker(false)} className="text-neutral-400 hover:text-white">âœ•</button>
+              <button onClick={() => setShowAddMarker(false)} className="text-neutral-400 hover:text-white">✕</button>
             </div>
 
             <div className="space-y-3 text-xs">

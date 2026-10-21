@@ -392,13 +392,13 @@ export const OwnerOverrideModal: React.FC<OwnerOverrideModalProps> = ({
                         <div className="p-2 rounded bg-rose-950/20 border border-rose-900/30">
                           <span className="text-[10px] text-rose-400 font-bold block mb-1">Before:</span>
                           <div className="text-neutral-300 font-mono">
-                            {item.before.itemCode} &bull; {item.before.size} &bull; {item.before.colour} &bull; Qty: {item.before.quantity} &bull; â‚±{item.before.statedUnitPricePhp}
+                            {item.before.itemCode} &bull; {item.before.size} &bull; {item.before.colour} &bull; Qty: {item.before.quantity} &bull; ₱{item.before.statedUnitPricePhp}
                           </div>
                         </div>
                         <div className="p-2 rounded bg-emerald-950/20 border border-emerald-900/30">
                           <span className="text-[10px] text-emerald-400 font-bold block mb-1">After:</span>
                           <div className="text-neutral-200 font-mono font-semibold">
-                            {item.after.itemCode} &bull; {item.after.size} &bull; {item.after.colour} &bull; Qty: {item.after.quantity} &bull; â‚±{item.after.statedUnitPricePhp}
+                            {item.after.itemCode} &bull; {item.after.size} &bull; {item.after.colour} &bull; Qty: {item.after.quantity} &bull; ₱{item.after.statedUnitPricePhp}
                           </div>
                         </div>
                       </div>

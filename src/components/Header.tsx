@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'order_review', label: 'Order Review & Approval', icon: CheckCircle2, badge: activeLive.reconciliationStatus === 'awaiting_owner_review' ? 'Awaiting Review' : 'Manual Review' },
     { id: 'pre_orders', label: 'Pre-Orders Lane', icon: ShoppingBag, badge: `${preOrdersCount} Pre-orders` },
     { id: 'buying_analytics', label: 'Buying Behavior Analytics', icon: ShieldCheck, badge: 'Insights' },
-    { id: 'inventory_board', label: 'Store Inventory Board', icon: Store, badge: readyToLeave ? 'Ready âœ“' : 'In Progress' },
+    { id: 'inventory_board', label: 'Store Inventory Board', icon: Store, badge: readyToLeave ? 'Ready ✓' : 'In Progress' },
     { id: 'messenger_adjustments', label: 'Messenger Adjustments', icon: ShieldCheck, badge: 'Live & Post-Live' },
     { id: 'replay_studio', label: 'Replay Review Studio', icon: CheckCircle2 },
     { id: 'pola_ai', label: 'Pola AI Co-Pilot', icon: Sparkles, badge: 'Gemini' },
@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
               : 'bg-emerald-950/40 border-emerald-600/40 text-emerald-300'
           }`}>
             <span className={`w-2 h-2 rounded-full ${isOnAir ? 'bg-rose-500' : 'bg-emerald-400'}`} />
-            <span>{isOnAir ? 'LIVE BROADCAST ON AIR' : 'LIVE CONCLUDED Â· RECONCILED'}</span>
+            <span>{isOnAir ? 'LIVE BROADCAST ON AIR' : 'LIVE CONCLUDED · RECONCILED'}</span>
           </div>
 
           {/* Store Location */}
@@ -113,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 border border-neutral-700/80 text-xs text-neutral-300">
             <Coins className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-neutral-400">Rate:</span>
-            <span className="font-semibold text-amber-300">1 THB = â‚±{phpRate.toFixed(2)} PHP</span>
+            <span className="font-semibold text-amber-300">1 THB = ₱{phpRate.toFixed(2)} PHP</span>
           </div>
 
           {/* Zero Refund Gated Badge */}

@@ -391,7 +391,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                         )}
                       </div>
                       <span className="text-[11px] text-neutral-400">
-                        {ord.channel === 'messenger' ? 'ðŸ’¬ Page Messenger' : ord.channel === 'vip' ? 'ðŸ‘‘ VIP Inbox' : 'ðŸ“¹ Live Chat'}
+                        {ord.channel === 'messenger' ? '💬 Page Messenger' : ord.channel === 'vip' ? '👑 VIP Inbox' : '📹 Live Chat'}
                       </span>
                     </td>
 
@@ -405,7 +405,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                     </td>
 
                     <td className="p-3 font-mono font-bold text-amber-300">
-                      â‚±{(ord.statedUnitPricePhp || 0).toLocaleString()}
+                      ₱{(ord.statedUnitPricePhp || 0).toLocaleString()}
                     </td>
 
                     <td className="p-3 text-neutral-400 font-mono text-[11px]">
@@ -488,7 +488,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                 <Edit2 className="w-4 h-4 text-rose-400" />
                 <span>Manual Order Review & Spec Update</span>
               </h3>
-              <button onClick={() => setEditingOrder(null)} className="text-neutral-400 hover:text-white">âœ•</button>
+              <button onClick={() => setEditingOrder(null)} className="text-neutral-400 hover:text-white">✕</button>
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">

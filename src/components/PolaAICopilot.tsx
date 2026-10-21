@@ -542,10 +542,10 @@ Select a specialized role or model above, or start chatting below!`,
 
               <div className="space-y-1.5">
                 {[
-                  { id: 'reconciler', label: 'ðŸ‘©â€ðŸ’¼ Pola (Live Reconciler)', desc: 'Zero-refund gate & order changes' },
-                  { id: 'auditor', label: 'ðŸ“Š Financial Auditor', desc: 'Margin, Baht-to-Peso, lost sales' },
-                  { id: 'market_sourcing', label: 'ðŸ›ï¸ Wholesale Sourcing', desc: 'Pratunam stalls & plus-size sizing' },
-                  { id: 'fast_triage', label: 'âš¡ Rapid Code Triage', desc: 'Instant 1-liner lookups' },
+                  { id: 'reconciler', label: '👩‍💼 Pola (Live Reconciler)', desc: 'Zero-refund gate & order changes' },
+                  { id: 'auditor', label: '📊 Financial Auditor', desc: 'Margin, Baht-to-Peso, lost sales' },
+                  { id: 'market_sourcing', label: '🛍️ Wholesale Sourcing', desc: 'Pratunam stalls & plus-size sizing' },
+                  { id: 'fast_triage', label: '⚡ Rapid Code Triage', desc: 'Instant 1-liner lookups' },
                 ].map((role) => (
                   <button
                     key={role.id}
@@ -588,7 +588,7 @@ Select a specialized role or model above, or start chatting below!`,
                 'Audit current live shortages & lost sales',
                 'Can we invoice any buyers right now?',
                 'How do I handle a Messenger size swap from 2XL to 3XL?',
-                'Calculate Pratunam 450à¸¿ cost to PHP at current rate',
+                'Calculate Pratunam 450฿ cost to PHP at current rate',
               ].map((suggestion, idx) => (
                 <button
                   key={idx}
@@ -596,7 +596,7 @@ Select a specialized role or model above, or start chatting below!`,
                   disabled={isLoading}
                   className="w-full text-left text-[11px] text-neutral-300 hover:text-white bg-neutral-950 hover:bg-neutral-800 p-2 rounded-lg border border-neutral-850 transition cursor-pointer truncate"
                 >
-                  ðŸ’¬ {suggestion}
+                  💬 {suggestion}
                 </button>
               ))}
             </div>
@@ -609,7 +609,7 @@ Select a specialized role or model above, or start chatting below!`,
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="font-bold text-xs text-white">
-                  Active Conversation Thread Â· {messages.length} Messages
+                  Active Conversation Thread · {messages.length} Messages
                 </span>
                 <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 font-mono text-[10px]">
                   {selectedModel}
@@ -650,9 +650,9 @@ Select a specialized role or model above, or start chatting below!`,
                       <div className={`flex items-center gap-2 text-[10px] text-neutral-500 px-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
                         <span className="font-semibold text-neutral-400">{isUser ? 'You' : 'Pola Assistant'}</span>
                         {msg.metadata?.modelUsed && (
-                          <span className="font-mono text-neutral-500">Â· {msg.metadata.modelUsed}</span>
+                          <span className="font-mono text-neutral-500">· {msg.metadata.modelUsed}</span>
                         )}
-                        <span>Â· {msg.timestamp}</span>
+                        <span>· {msg.timestamp}</span>
                       </div>
 
                       {/* Chat Bubble */}
@@ -756,7 +756,7 @@ Select a specialized role or model above, or start chatting below!`,
               <div className="flex items-center gap-2">
                 <Radio className="w-5 h-5 text-amber-400 animate-pulse" />
                 <h3 className="font-bold text-base text-white">
-                  Real-Time Voice Conversation Â· Model: gemini-3.8-live
+                  Real-Time Voice Conversation · Model: gemini-3.8-live
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/30">
                   Live API
@@ -872,7 +872,7 @@ Select a specialized role or model above, or start chatting below!`,
                   disabled={!isVoiceConnected}
                   className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-amber-500/50 text-left transition disabled:opacity-40 cursor-pointer"
                 >
-                  <span className="font-bold text-xs text-amber-300 block">ðŸŽ™ï¸ {btn.label}</span>
+                  <span className="font-bold text-xs text-amber-300 block">🎙️ {btn.label}</span>
                   <span className="text-[11px] text-neutral-400 line-clamp-1 mt-0.5">"{btn.prompt}"</span>
                 </button>
               ))}

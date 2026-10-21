@@ -244,14 +244,14 @@ export const InventoryStoreBoard: React.FC<InventoryStoreBoardProps> = ({
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 <Store className="w-5 h-5 text-amber-400" />
-                <span>Store Operations Checklist Â· Workflow 2026-10-13.3</span>
+                <span>Store Operations Checklist · Workflow 2026-10-13.3</span>
               </h2>
               <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${
                 readyToLeave 
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse' 
                   : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
               }`}>
-                READY TO LEAVE THE STORE: {readyToLeave ? 'YES âœ“' : 'NOT YET'}
+                READY TO LEAVE THE STORE: {readyToLeave ? 'YES ✓' : 'NOT YET'}
               </span>
             </div>
             <p className="text-xs text-neutral-400 mt-1">
@@ -532,7 +532,7 @@ export const InventoryStoreBoard: React.FC<InventoryStoreBoardProps> = ({
             </div>
 
             <div className="text-xs text-neutral-400">
-              Currency: <strong className="text-amber-300 font-mono">THB</strong> Â· Retail: <strong className="text-emerald-400 font-mono">PHP</strong>
+              Currency: <strong className="text-amber-300 font-mono">THB</strong> · Retail: <strong className="text-emerald-400 font-mono">PHP</strong>
             </div>
           </div>
         </div>
@@ -626,7 +626,7 @@ export const InventoryStoreBoard: React.FC<InventoryStoreBoardProps> = ({
                       <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-xs font-mono">
                         {item.code}
                       </span>
-                      <span className="font-semibold text-white text-xs">{item.size} Â· {item.colour}</span>
+                      <span className="font-semibold text-white text-xs">{item.size} · {item.colour}</span>
                     </div>
 
                     <span className="text-[10px] text-neutral-500 font-mono">
@@ -729,7 +729,7 @@ export const InventoryStoreBoard: React.FC<InventoryStoreBoardProps> = ({
                         min="0"
                         value={item.cost ?? ''}
                         onChange={(e) => onUpdateItem(item.id, { cost: e.target.value === '' ? null : Number(e.target.value) })}
-                        placeholder="à¸¿0"
+                        placeholder="฿0"
                         className="w-full bg-transparent font-bold text-neutral-200 font-mono mt-0.5 focus:outline-none"
                       />
                     </div>
@@ -741,7 +741,7 @@ export const InventoryStoreBoard: React.FC<InventoryStoreBoardProps> = ({
                         min="0"
                         value={item.price ?? ''}
                         onChange={(e) => onUpdateItem(item.id, { price: e.target.value === '' ? null : Number(e.target.value) })}
-                        placeholder="â‚±0"
+                        placeholder="₱0"
                         className="w-full bg-transparent font-bold text-neutral-200 font-mono mt-0.5 focus:outline-none"
                       />
                     </div>
@@ -800,7 +800,7 @@ export const InventoryStoreBoard: React.FC<InventoryStoreBoardProps> = ({
                 <Plus className="w-4 h-4 text-rose-400" />
                 <span>Add Observed Store Rack Item</span>
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-neutral-400 hover:text-white cursor-pointer">âœ•</button>
+              <button onClick={() => setShowAddModal(false)} className="text-neutral-400 hover:text-white cursor-pointer">✕</button>
             </div>
 
             <form onSubmit={handleCreateItem} className="space-y-3 text-xs">

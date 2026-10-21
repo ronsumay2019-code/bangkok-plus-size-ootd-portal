@@ -841,7 +841,7 @@ export default function App() {
             live={activeLive}
             orders={orders}
             onVerifyPrice={(orderId, price, ts) => {
-              showToast(`Verified ${orderId} at â‚±${price} on replay timestamp ${ts}`);
+              showToast(`Verified ${orderId} at ₱${price} on replay timestamp ${ts}`);
             }}
           />
         )}

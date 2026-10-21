@@ -515,9 +515,9 @@ export function buildBuyerBags(
       const shortedList = shortedItems.map(l => `${l.itemCode} (${l.size} ${l.colour})`).join(', ');
       
       if (bag.totalPiecesGot > 0) {
-        bag.suggestedMessageDraft = `Hi Sis ${bag.buyerName}! Good news, secured po namin yung ibang items mo (${bag.totalPiecesGot} pcs)! Unfortunately out of stock po sa supplier yung ${shortedList}. Reconciled final invoice po for your secured items is â‚±${bag.subtotalPhp.toLocaleString('en-PH')}. Gusto mo po ba ma-waitlist sa susunod na live for the missing piece? Salamat po! ðŸ’œ`;
+        bag.suggestedMessageDraft = `Hi Sis ${bag.buyerName}! Good news, secured po namin yung ibang items mo (${bag.totalPiecesGot} pcs)! Unfortunately out of stock po sa supplier yung ${shortedList}. Reconciled final invoice po for your secured items is ₱${bag.subtotalPhp.toLocaleString('en-PH')}. Gusto mo po ba ma-waitlist sa susunod na live for the missing piece? Salamat po! 💜`;
       } else {
-        bag.suggestedMessageDraft = `Hi Sis ${bag.buyerName}! Pasensya na po, naubos po agad sa store supplier yung ${shortedList}. Zero charges po tayo today and hindi ka po ma-iinvoisuhan para iwas refund. Gusto mo po ba i-priority waitlist ka namin sa next live batch? Maraming salamat po! ðŸ’œ`;
+        bag.suggestedMessageDraft = `Hi Sis ${bag.buyerName}! Pasensya na po, naubos po agad sa store supplier yung ${shortedList}. Zero charges po tayo today and hindi ka po ma-iinvoisuhan para iwas refund. Gusto mo po ba i-priority waitlist ka namin sa next live batch? Maraming salamat po! 💜`;
       }
     }
   }
@@ -595,7 +595,7 @@ export function evaluateLeaveStoreChecklist(
       done: supplierPaidThb !== null && supplierPaidThb > 0,
       critical: true,
       detail: supplierPaidThb !== null
-        ? `Supplier payment verified at à¸¿${supplierPaidThb.toLocaleString()} THB.`
+        ? `Supplier payment verified at ฿${supplierPaidThb.toLocaleString()} THB.`
         : 'Enter supplier amount paid to complete payment reconciliation.',
     },
     {

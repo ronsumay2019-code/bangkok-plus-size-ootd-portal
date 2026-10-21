@@ -169,7 +169,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
           <div className="flex items-center gap-3 mb-4">
             <Sparkles className="w-6 h-6 text-amber-400 animate-spin" />
             <h3 className="text-lg font-bold text-white">
-              Live Ended Â· Automatic Order Reconciliation Pipeline Running...
+              Live Ended · Automatic Order Reconciliation Pipeline Running...
             </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
@@ -204,7 +204,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 <span className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-wider ${
                   isOnAir ? 'bg-rose-600 text-white animate-pulse' : 'bg-neutral-800 text-neutral-300'
                 }`}>
-                  {isOnAir ? 'â— ON AIR' : 'BROADCAST ENDED'}
+                  {isOnAir ? '● ON AIR' : 'BROADCAST ENDED'}
                 </span>
                 <span className="font-mono text-sm text-neutral-200">
                   {isOnAir ? formatTimer(secondsOnAir) : 'Duration: 1h 48m'}
@@ -247,7 +247,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
             <div className="p-4 bg-neutral-900 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-white">{live.title}</h3>
-                <p className="text-xs text-neutral-400">{live.storeName} Â· Live Selling Host: Myra</p>
+                <p className="text-xs text-neutral-400">{live.storeName} · Live Selling Host: Myra</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -367,14 +367,14 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                     onClick={() => setShowBatchImport(!showBatchImport)}
                     className="text-[10px] text-amber-400 hover:text-amber-300 font-semibold"
                   >
-                    {showBatchImport ? 'Hide Batch Comment Intake ▲' : 'Paste Morning Live Comments ▼'}
+                    {showBatchImport ? 'Hide Batch Comment Intake ?' : 'Paste Morning Live Comments ?'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowWebhookLog(!showWebhookLog)}
                     className="text-[10px] text-blue-400 hover:text-blue-300 font-medium"
                   >
-                    {showWebhookLog ? 'Hide Webhook Log ▲' : 'View Webhook Log ▼'}
+                    {showWebhookLog ? 'Hide Webhook Log ?' : 'View Webhook Log ?'}
                   </button>
                 </div>
               </div>
@@ -541,7 +541,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   <option value="">Select Buyer's Claim to Swap...</option>
                   {liveOrders.map((o) => (
                     <option key={o.id} value={o.id}>
-                      {o.buyerName} â€” {o.itemCode} ({o.size} {o.colour})
+                      {o.buyerName} — {o.itemCode} ({o.size} {o.colour})
                     </option>
                   ))}
                 </select>
@@ -615,12 +615,12 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   onChange={(e) => setNewItemCode(e.target.value)}
                   className="bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 font-mono"
                 >
-                  <option value="BP01">BP01 House Patchwork (â‚±1,890)</option>
-                  <option value="BP02">BP02 Flower AppliquÃ© (â‚±2,190)</option>
-                  <option value="BP03">BP03 Vintage Floral (â‚±1,990)</option>
-                  <option value="BP04">BP04 Kimono Set (â‚±2,490)</option>
-                  <option value="BP05">BP05 Batik Maxi (â‚±2,690)</option>
-                  <option value="BP07">BP07 Silk Tunic (â‚±2,590)</option>
+                  <option value="BP01">BP01 House Patchwork (₱1,890)</option>
+                  <option value="BP02">BP02 Flower Appliqué (₱2,190)</option>
+                  <option value="BP03">BP03 Vintage Floral (₱1,990)</option>
+                  <option value="BP04">BP04 Kimono Set (₱2,490)</option>
+                  <option value="BP05">BP05 Batik Maxi (₱2,690)</option>
+                  <option value="BP07">BP07 Silk Tunic (₱2,590)</option>
                 </select>
               </div>
 
@@ -701,11 +701,11 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                       </span>
                       <span>{ord.size}</span>
                       <span>{ord.colour}</span>
-                      <span className="text-neutral-400">Ã—{ord.quantity}</span>
+                      <span className="text-neutral-400">×{ord.quantity}</span>
                     </div>
 
                     <span className="font-semibold text-amber-300">
-                      â‚±{(ord.statedUnitPricePhp || 0).toLocaleString()}
+                      ₱{(ord.statedUnitPricePhp || 0).toLocaleString()}
                     </span>
                   </div>
 
@@ -795,7 +795,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                       ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
                       : 'bg-red-500/20 text-red-300 border border-red-500/40'
                   }`}>
-                    {isShort ? `SHORT ${cov.gap}` : isCovered ? 'COVERED âœ“' : isExtra ? `EXTRA ${cov.gap}` : 'NO ROW'}
+                    {isShort ? `SHORT ${cov.gap}` : isCovered ? 'COVERED ✓' : isExtra ? `EXTRA ${cov.gap}` : 'NO ROW'}
                   </span>
                 </div>
 
@@ -823,7 +823,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                           {isMiss ? (
                             <span className="text-[10px] text-amber-400 font-bold">Misses Out</span>
                           ) : (
-                            <span className="text-[10px] text-emerald-400">Secured âœ“</span>
+                            <span className="text-[10px] text-emerald-400">Secured ✓</span>
                           )}
                         </div>
                       );
