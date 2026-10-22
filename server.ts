@@ -857,6 +857,8 @@ app.post('/api/orders/update', (req, res) => {
     return res.status(404).json({ error: 'Order not found' });
   }
 
+  if (updates.buyerName) order.buyerName = updates.buyerName.trim();
+  if (updates.buyerContact !== undefined) order.buyerContact = updates.buyerContact.trim();
   if (updates.itemCode) order.itemCode = updates.itemCode.toUpperCase();
   if (updates.itemName) order.itemName = updates.itemName;
   if (updates.size) order.size = updates.size.toUpperCase();
@@ -881,7 +883,61 @@ app.post('/api/orders/update', (req, res) => {
 
   saveRuntimeState();
 
-  res.json({ success: true, order, summary: latestSummary });
+  res.json({ success: true, order, orders, summary: latestSummary });
+});
+
+// 3b-1. Direct Reconciliation Invoice & Bag Editor (Update Miner Invoice Lines & Details in Real Time)
+app.post('/api/bags/update', (req, res) => {
+  const { originalBuyerName, buyerName, buyerContact, notes, lines } = req.body;
+  if (!originalBuyerName) {
+    return res.status(400).json({ error: 'originalBuyerName is required' });
+  }
+
+  const origKey = String(originalBuyerName).trim().toLowerCase();
+  const newName = (buyerName || originalBuyerName).trim();
+  const newContact = buyerContact !== undefined ? buyerContact.trim() : undefined;
+
+  // 1. Update buyer details for all orders belonging to this buyer
+  for (const ord of orders) {
+    if (ord.buyerName.trim().toLowerCase() === origKey) {
+      ord.buyerName = newName;
+      if (newContact !== undefined) ord.buyerContact = newContact;
+      if (notes) ord.reviewNotes = notes;
+    }
+  }
+
+  // 2. Update individual order lines
+  if (Array.isArray(lines)) {
+    for (const l of lines) {
+      if (!l.orderId) continue;
+      const targetOrder = orders.find((o) => o.id === l.orderId);
+      if (targetOrder) {
+        if (l.itemCode) targetOrder.itemCode = l.itemCode.trim().toUpperCase();
+        if (l.size) targetOrder.size = l.size.trim().toUpperCase();
+        if (l.colour) targetOrder.colour = l.colour.trim().toUpperCase();
+        if (l.quantity !== undefined && Number(l.quantity) > 0) targetOrder.quantity = Number(l.quantity);
+        if (l.unitPricePhp !== undefined && Number(l.unitPricePhp) >= 0) targetOrder.statedUnitPricePhp = Number(l.unitPricePhp);
+        targetOrder.status = 'confirmed';
+        targetOrder.reviewedBy = 'Owner / Admin';
+        targetOrder.reviewedAt = new Date().toISOString();
+      }
+    }
+  }
+
+  const targetLive = lives[0];
+  latestSummary = runAutomaticLiveReconciliation(
+    targetLive,
+    orders.filter((o) => o.liveId === targetLive.id),
+    amendments,
+    inventory.filter((i) => i.liveId === targetLive.id),
+    phpPerThbRate,
+    null,
+    'rolling_pass'
+  );
+
+  saveRuntimeState();
+
+  res.json({ success: true, orders, summary: latestSummary });
 });
 
 // 3b-2. Batch set price by item code (Agent price entry during live)
@@ -952,7 +1008,43 @@ app.post('/api/orders/approve', (req, res) => {
     'rolling_pass'
   );
 
-  res.json({ success: true, order, summary: latestSummary });
+  saveRuntimeState();
+
+  res.json({ success: true, order, orders, summary: latestSummary });
+});
+
+// 3c-2. Batch approve orders atomically (avoids race condition duplicates)
+app.post('/api/orders/approve-batch', (req, res) => {
+  const { orderIds } = req.body;
+  if (!Array.isArray(orderIds) || orderIds.length === 0) {
+    return res.status(400).json({ error: 'orderIds array is required' });
+  }
+
+  const updatedOrders: BuyerOrder[] = [];
+  for (const id of orderIds) {
+    const ord = orders.find((o) => o.id === id);
+    if (ord && ord.statedUnitPricePhp && ord.statedUnitPricePhp > 0 && ord.itemCode !== 'PENDING SPEC') {
+      ord.status = 'confirmed';
+      ord.reviewedBy = 'Owner / Admin';
+      ord.reviewedAt = new Date().toISOString();
+      updatedOrders.push(ord);
+    }
+  }
+
+  const targetLive = lives.find((l) => l.id === (updatedOrders[0]?.liveId || activeLive.id)) || lives[0];
+  latestSummary = runAutomaticLiveReconciliation(
+    targetLive,
+    orders.filter((o) => o.liveId === targetLive.id),
+    amendments,
+    inventory.filter((i) => i.liveId === targetLive.id),
+    phpPerThbRate,
+    null,
+    'rolling_pass'
+  );
+
+  saveRuntimeState();
+
+  res.json({ success: true, updatedCount: updatedOrders.length, updatedOrders, orders, summary: latestSummary });
 });
 
 // 3d. Reject order (cancel claim)
@@ -1175,7 +1267,7 @@ app.post('/api/invoices/generate', (req, res) => {
     : eligibleBags;
 
   targetBags.forEach((bag, idx) => {
-    const invNum = `INV-LIVE-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(idx + 1).padStart(3, '0')}`;
+    const invNum = bag.invoiceId || `INV-LIVE-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(idx + 1).padStart(3, '0')}`;
     bag.invoiceStatus = 'invoiced';
     bag.invoiceId = invNum;
 
@@ -1200,10 +1292,13 @@ app.post('/api/invoices/generate', (req, res) => {
     });
   });
 
+  saveRuntimeState();
+
   res.json({
     success: true,
     generatedInvoices,
     summary: latestSummary,
+    orders,
   });
 });
 

@@ -39,6 +39,7 @@ interface OrderReviewApprovalWorkspaceProps {
   amendments?: OrderAmendment[];
   messengerThreads?: MessengerThread[];
   onApproveOrder: (orderId: string) => void;
+  onApproveBatchOrders?: (orderIds: string[]) => void;
   onRejectOrder: (orderId: string, reason: string) => void;
   onUpdateOrder: (orderId: string, updates: Partial<BuyerOrder>) => void;
   onGenerateInvoices: (buyerNames?: string[]) => void;
@@ -55,6 +56,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   amendments = [],
   messengerThreads = [],
   onApproveOrder,
+  onApproveBatchOrders,
   onRejectOrder,
   onUpdateOrder,
   onGenerateInvoices,
@@ -94,13 +96,13 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   };
 
   const pendingOrders = orders.filter((o) => o.status === 'pending');
-  const confirmedOrders = orders.filter((o) => o.status === 'confirmed');
+  const confirmedOrders = orders.filter((o) => o.status === 'confirmed' || o.status === 'invoiced');
   const shortOrders = orders.filter((o) => o.status === 'short');
   const duplicateOrders = orders.filter((o) => o.isDuplicateFlagged);
 
   const filteredOrders = orders.filter((o) => {
     if (filterStatus === 'pending') return o.status === 'pending';
-    if (filterStatus === 'confirmed') return o.status === 'confirmed';
+    if (filterStatus === 'confirmed') return o.status === 'confirmed' || o.status === 'invoiced';
     if (filterStatus === 'short') return o.status === 'short';
     if (filterStatus === 'duplicates') return o.isDuplicateFlagged;
     return true;
@@ -152,7 +154,6 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
       return;
     }
     onApproveOrder(ord.id);
-    onTriggerReconciliation();
   };
 
   const handleToggleSelect = (id: string) => {
@@ -179,9 +180,12 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
       return;
     }
 
-    validIds.forEach((id) => onApproveOrder(id));
+    if (onApproveBatchOrders) {
+      onApproveBatchOrders(validIds);
+    } else {
+      validIds.forEach((id) => onApproveOrder(id));
+    }
     setSelectedOrderIds(new Set());
-    onTriggerReconciliation();
 
     if (skippedCount > 0) {
       alert(`Approved ${validIds.length} orders. ${skippedCount} orders were skipped because they have ₱0 price or PENDING SPEC.`);

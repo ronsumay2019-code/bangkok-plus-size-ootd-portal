@@ -453,14 +453,15 @@ export function buildBuyerBags(
     variantRemainingMap.set(v.key, v.purchasedCount ?? 9999);
   }
 
-  // Sort orders earliest comment first
-  const activeOrders = orders
-    .filter(o => o.status !== 'cancelled' && o.status !== 'replaced')
+  // Invoicing gate: ONLY include verified & approved orders (confirmed or invoiced)
+  // Pending unapproved claims remain in Order Review & Verification until staff/owner approval!
+  const approvedOrders = orders
+    .filter(o => (o.status === 'confirmed' || o.status === 'invoiced') && o.status !== 'cancelled' && o.status !== 'replaced')
     .sort((a, b) => new Date(a.orderedAt).getTime() - new Date(b.orderedAt).getTime());
 
   const buyerBagsMap = new Map<string, BuyerBag>();
 
-  for (const order of activeOrders) {
+  for (const order of approvedOrders) {
     const key = variantKey(order.itemCode, order.size, order.colour);
     const available = variantRemainingMap.get(key) ?? 0;
     const got = Math.min(order.quantity, Math.max(0, available));

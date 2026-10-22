@@ -448,6 +448,7 @@ export default function App() {
       });
       if (res.ok) {
         const data: any = await res.json();
+        if (data.orders) setOrders(data.orders);
         if (data.summary) setSummary(data.summary);
         showToast(`Generated official invoices for ${data.generatedInvoices.length} reconciled buyers!`);
       }
@@ -466,7 +467,8 @@ export default function App() {
       });
       if (res.ok) {
         const data: any = await res.json();
-        setOrders((prev) => prev.map((o) => (o.id === orderId ? data.order : o)));
+        if (data.orders) setOrders(data.orders);
+        else setOrders((prev) => prev.map((o) => (o.id === orderId ? data.order : o)));
         if (data.summary) setSummary(data.summary);
         showToast(`Order approved and added to confirmed store buying demand.`);
       } else {
@@ -492,6 +494,96 @@ export default function App() {
       );
       setSummary(newSummary);
       showToast(`Order approved and added to confirmed store buying demand.`);
+    }
+  };
+
+  const handleBatchApproveOrders = async (orderIds: string[]) => {
+    try {
+      const res = await fetch('/api/orders/approve-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderIds }),
+      });
+      if (res.ok) {
+        const data: any = await res.json();
+        if (data.orders) setOrders(data.orders);
+        if (data.summary) setSummary(data.summary);
+        showToast(`Approved ${data.updatedCount || orderIds.length} orders and updated invoice bags.`);
+      }
+    } catch (e) {
+      setOrders((prev) => prev.map((o) => (orderIds.includes(o.id) ? { ...o, status: 'confirmed' } : o)));
+      const updated = orders.map((o) => (orderIds.includes(o.id) ? { ...o, status: 'confirmed' as const } : o));
+      const newSummary = runAutomaticLiveReconciliation(
+        activeLive,
+        updated.filter((o) => o.liveId === activeLive.id),
+        amendments,
+        inventory.filter((i) => i.liveId === activeLive.id),
+        phpRate,
+        null,
+        'rolling_pass'
+      );
+      setSummary(newSummary);
+      showToast(`Approved ${orderIds.length} orders and updated invoice bags.`);
+    }
+  };
+
+  const handleUpdateBag = async (payload: {
+    originalBuyerName: string;
+    buyerName?: string;
+    buyerContact?: string;
+    notes?: string;
+    lines: Array<{
+      orderId: string;
+      itemCode?: string;
+      size?: string;
+      colour?: string;
+      quantity?: number;
+      unitPricePhp?: number;
+    }>;
+  }) => {
+    try {
+      const res = await fetch('/api/bags/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data: any = await res.json();
+        if (data.orders) setOrders(data.orders);
+        if (data.summary) setSummary(data.summary);
+        showToast(`Invoice details and line items updated for ${payload.buyerName || payload.originalBuyerName}!`);
+      }
+    } catch (e) {
+      const origKey = payload.originalBuyerName.trim().toLowerCase();
+      const updated = orders.map((ord) => {
+        if (ord.buyerName.trim().toLowerCase() === origKey) {
+          const lMatch = payload.lines.find((l) => l.orderId === ord.id);
+          return {
+            ...ord,
+            buyerName: payload.buyerName || ord.buyerName,
+            buyerContact: payload.buyerContact !== undefined ? payload.buyerContact : ord.buyerContact,
+            itemCode: lMatch?.itemCode ? lMatch.itemCode.toUpperCase() : ord.itemCode,
+            size: lMatch?.size ? lMatch.size.toUpperCase() : ord.size,
+            colour: lMatch?.colour ? lMatch.colour.toUpperCase() : ord.colour,
+            quantity: lMatch?.quantity !== undefined ? lMatch.quantity : ord.quantity,
+            statedUnitPricePhp: lMatch?.unitPricePhp !== undefined ? lMatch.unitPricePhp : ord.statedUnitPricePhp,
+            status: 'confirmed' as const,
+          };
+        }
+        return ord;
+      });
+      setOrders(updated);
+      const newSummary = runAutomaticLiveReconciliation(
+        activeLive,
+        updated.filter((o) => o.liveId === activeLive.id),
+        amendments,
+        inventory.filter((i) => i.liveId === activeLive.id),
+        phpRate,
+        null,
+        'rolling_pass'
+      );
+      setSummary(newSummary);
+      showToast(`Invoice updated for ${payload.buyerName || payload.originalBuyerName}!`);
     }
   };
 
@@ -840,6 +932,8 @@ export default function App() {
             summary={summary}
             onGenerateInvoices={handleGenerateInvoices}
             onTriggerReconciliation={handleTriggerReconciliation}
+            onUpdateOrder={handleUpdateOrder}
+            onUpdateBag={handleUpdateBag}
           />
         )}
 
@@ -852,6 +946,7 @@ export default function App() {
             amendments={amendments}
             messengerThreads={messengerThreads}
             onApproveOrder={handleApproveOrder}
+            onApproveBatchOrders={handleBatchApproveOrders}
             onRejectOrder={handleRejectOrder}
             onUpdateOrder={handleUpdateOrder}
             onGenerateInvoices={handleGenerateInvoices}
