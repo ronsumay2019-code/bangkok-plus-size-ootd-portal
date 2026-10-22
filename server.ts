@@ -182,6 +182,51 @@ let graphSyncStats = {
   mode: (process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN) ? 'live_graph_api' : 'awaiting_credentials',
 };
 
+// Multi-Login & Mobile Device Sessions Registry
+export interface UserSession {
+  sessionId: string;
+  userName: string;
+  userRole: 'owner' | 'admin' | 'staff';
+  token: string;
+  deviceType: 'desktop' | 'mobile' | 'tablet';
+  deviceName?: string;
+  connectedAt: string;
+  lastActiveAt: string;
+}
+
+let activeSessions: UserSession[] = [
+  {
+    sessionId: 'sess_owner_main',
+    userName: 'Pola (Shop Owner)',
+    userRole: 'owner',
+    token: 'bpso_owner_pola_2026',
+    deviceType: 'desktop',
+    deviceName: 'Desktop (Shop Owner Primary)',
+    connectedAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(),
+  },
+  {
+    sessionId: 'sess_admin_1',
+    userName: 'Admin 1 (Staff Lead)',
+    userRole: 'admin',
+    token: 'bpso_admin_one_2026',
+    deviceType: 'mobile',
+    deviceName: 'Admin Phone 1',
+    connectedAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(),
+  },
+  {
+    sessionId: 'sess_admin_2',
+    userName: 'Admin 2 (Inventory Lead)',
+    userRole: 'admin',
+    token: 'bpso_admin_two_2026',
+    deviceType: 'mobile',
+    deviceName: 'Admin Phone 2',
+    connectedAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(),
+  },
+];
+
 function saveRuntimeState() {
   try {
     fs.writeFileSync(
@@ -195,6 +240,7 @@ function saveRuntimeState() {
           preOrders,
           messengerThreads,
           phpPerThbRate,
+          activeSessions,
         },
         null,
         2
@@ -230,6 +276,9 @@ function loadRuntimeState() {
         messengerThreads = parsed.messengerThreads;
       }
       if (typeof parsed.phpPerThbRate === 'number') phpPerThbRate = parsed.phpPerThbRate;
+      if (Array.isArray(parsed.activeSessions) && parsed.activeSessions.length) {
+        activeSessions = parsed.activeSessions;
+      }
     }
   } catch (e) {
     console.warn('[State] Failed to load persisted state, using seed data.');
@@ -682,10 +731,79 @@ app.get('/api/state', (_req, res) => {
       graphSyncStats,
       latestSummary,
       phpPerThbRate,
+      activeSessions,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message, stack: err.stack });
   }
+});
+
+// 1b-2. Multi-login and mobile auth endpoints
+app.get('/api/auth/sessions', (_req, res) => {
+  res.json({
+    success: true,
+    sessions: activeSessions,
+    predefinedUsers: [
+      { id: 'owner', name: 'Pola (Shop Owner)', role: 'owner', token: 'bpso_owner_pola_2026' },
+      { id: 'admin1', name: 'Admin 1 (Staff Lead)', role: 'admin', token: 'bpso_admin_one_2026' },
+      { id: 'admin2', name: 'Admin 2 (Inventory Lead)', role: 'admin', token: 'bpso_admin_two_2026' },
+    ],
+  });
+});
+
+app.post('/api/auth/register', (req, res) => {
+  const { sessionId, token, userName, role, deviceType, deviceName } = req.body;
+  const nowIso = new Date().toISOString();
+
+  let targetRole: 'owner' | 'admin' | 'staff' = 'admin';
+  let targetName = userName || 'Admin User';
+
+  if (token === 'bpso_owner_pola_2026' || role === 'owner') {
+    targetRole = 'owner';
+    targetName = userName || 'Pola (Shop Owner)';
+  } else if (token === 'bpso_admin_one_2026' || userName?.includes('Admin 1')) {
+    targetRole = 'admin';
+    targetName = 'Admin 1 (Staff Lead)';
+  } else if (token === 'bpso_admin_two_2026' || userName?.includes('Admin 2')) {
+    targetRole = 'admin';
+    targetName = 'Admin 2 (Inventory Lead)';
+  }
+
+  const sid = sessionId || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const existing = activeSessions.find((s) => s.sessionId === sid || s.token === token);
+
+  if (existing) {
+    existing.lastActiveAt = nowIso;
+    existing.userName = targetName;
+    existing.userRole = targetRole;
+    if (deviceType) existing.deviceType = deviceType;
+    if (deviceName) existing.deviceName = deviceName;
+    saveRuntimeState();
+    return res.json({ success: true, session: existing, sessions: activeSessions });
+  }
+
+  const newSession: UserSession = {
+    sessionId: sid,
+    userName: targetName,
+    userRole: targetRole,
+    token: token || 'bpso_admin_guest',
+    deviceType: deviceType || 'mobile',
+    deviceName: deviceName || 'Mobile Phone',
+    connectedAt: nowIso,
+    lastActiveAt: nowIso,
+  };
+  activeSessions.push(newSession);
+  saveRuntimeState();
+  res.json({ success: true, session: newSession, sessions: activeSessions });
+});
+
+app.post('/api/auth/heartbeat', (req, res) => {
+  const { sessionId } = req.body;
+  const session = activeSessions.find((s) => s.sessionId === sessionId);
+  if (session) {
+    session.lastActiveAt = new Date().toISOString();
+  }
+  res.json({ success: true, sessions: activeSessions });
 });
 
 // 1b. Reset runtime state back to clean seed data

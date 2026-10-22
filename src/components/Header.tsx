@@ -10,7 +10,9 @@ import {
   HelpCircle,
   ShoppingBag,
   Activity,
-  UserCheck
+  UserCheck,
+  QrCode,
+  Smartphone,
 } from 'lucide-react';
 import { LiveSession, ReconciliationSummary } from '../types/reconciliation';
 
@@ -21,9 +23,11 @@ interface HeaderProps {
   summary: ReconciliationSummary | null;
   phpRate: number;
   onOpenAnalysis: () => void;
+  onOpenMobileAccessModal?: () => void;
   preOrdersCount?: number;
   userRole: 'owner' | 'admin' | 'staff';
   setUserRole: (role: 'owner' | 'admin' | 'staff') => void;
+  currentUserName?: string;
   graphSyncStats?: {
     lastSyncAt: string;
     syncCount: number;
@@ -39,9 +43,11 @@ export const Header: React.FC<HeaderProps> = ({
   summary,
   phpRate,
   onOpenAnalysis,
+  onOpenMobileAccessModal,
   preOrdersCount = 0,
   userRole,
   setUserRole,
+  currentUserName,
   graphSyncStats,
 }) => {
   const isOnAir = activeLive.status === 'live';
@@ -130,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
 
-          {/* User Executive Role Switcher */}
+          {/* User Executive Role Switcher & Current User */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-800/90 border border-neutral-700 text-xs">
             <UserCheck className="w-3.5 h-3.5 text-rose-400" />
             <span className="text-neutral-400 text-[11px]">Role:</span>
@@ -143,7 +149,25 @@ export const Header: React.FC<HeaderProps> = ({
               <option value="admin" className="bg-neutral-900 text-white">Admin (Full Override)</option>
               <option value="staff" className="bg-neutral-900 text-neutral-300">Staff (Standard)</option>
             </select>
+            {currentUserName && (
+              <span className="hidden xl:inline text-[10px] text-neutral-400 font-mono border-l border-neutral-700 pl-1.5 truncate max-w-[130px]" title={currentUserName}>
+                {currentUserName}
+              </span>
+            )}
           </div>
+
+          {/* Mobile Phone App Access QR Button */}
+          {onOpenMobileAccessModal && (
+            <button
+              type="button"
+              onClick={onOpenMobileAccessModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 hover:from-rose-500 hover:to-pink-500 text-xs font-bold text-white shadow-md shadow-rose-950/40 transition cursor-pointer"
+              title="Generate QR code and links for 2 Admin phones without losing your session"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>📱 Admin Phone QR</span>
+            </button>
+          )}
 
           {/* Executive Gap Analysis Button */}
           <button

@@ -11,6 +11,7 @@ import { OrderReviewApprovalWorkspace } from './components/OrderReviewApprovalWo
 import { BuyingBehaviorDashboard } from './components/BuyingBehaviorDashboard';
 import { PreOrdersLane } from './components/PreOrdersLane';
 import { OwnerOverrideModal } from './components/OwnerOverrideModal';
+import { MobileAccessQRModal } from './components/MobileAccessQRModal';
 import { 
   LiveSession, 
   BuyerOrder, 
@@ -34,6 +35,7 @@ import { runAutomaticLiveReconciliation } from './services/reconciliationEngine'
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('live_command');
   const [showAnalysisModal, setShowAnalysisModal] = useState<boolean>(false);
+  const [isMobileAccessModalOpen, setIsMobileAccessModalOpen] = useState<boolean>(false);
   const [lives, setLives] = useState<LiveSession[]>(SEED_LIVE_SESSIONS);
   const [inventory, setInventory] = useState<InventoryItem[]>(SEED_INVENTORY_ITEMS);
   const [orders, setOrders] = useState<BuyerOrder[]>(SEED_BUYER_ORDERS);
@@ -44,8 +46,77 @@ export default function App() {
   const [summary, setSummary] = useState<ReconciliationSummary | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Role authorization state ('owner' | 'admin' | 'staff')
+  // Role authorization state ('owner' | 'admin' | 'staff') & Active User Profile
   const [userRole, setUserRole] = useState<'owner' | 'admin' | 'staff'>('owner');
+  const [currentUserName, setCurrentUserName] = useState<string>('Pola (Shop Owner)');
+
+  // Multi-Login & Mobile Authentication on Mount
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const urlParams = new URLSearchParams(window.location.search);
+      const authParam = urlParams.get('auth');
+      const tokenParam = urlParams.get('token');
+      const userParam = urlParams.get('user');
+      const roleParam = urlParams.get('role');
+
+      if (authParam || tokenParam) {
+        let detectedRole: 'owner' | 'admin' | 'staff' = (roleParam as any) || 'admin';
+        let detectedName = userParam || (
+          authParam === 'owner' 
+            ? 'Pola (Shop Owner)' 
+            : authParam === 'admin2' 
+            ? 'Admin 2 (Inventory Lead)' 
+            : 'Admin 1 (Staff Lead)'
+        );
+
+        if (authParam === 'owner' || tokenParam === 'bpso_owner_pola_2026') {
+          detectedRole = 'owner';
+          detectedName = 'Pola (Shop Owner)';
+        }
+
+        setUserRole(detectedRole);
+        setCurrentUserName(detectedName);
+
+        const sessionPayload = {
+          userName: detectedName,
+          userRole: detectedRole,
+          token: tokenParam || `bpso_${authParam || 'admin'}_2026`,
+          deviceType: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+          deviceName: /iPhone/i.test(navigator.userAgent)
+            ? 'iPhone'
+            : /Android/i.test(navigator.userAgent)
+            ? 'Android Phone'
+            : 'Browser Client',
+        };
+
+        localStorage.setItem('bpso_user_session', JSON.stringify(sessionPayload));
+
+        // Clean query params from address bar without reloading
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+
+        showToast(`📱 Authenticated as ${detectedName} (${detectedRole.toUpperCase()})`);
+
+        // Register session with backend
+        fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sessionPayload),
+        }).catch(() => {});
+      } else {
+        // Restore existing local session if stored
+        const stored = localStorage.getItem('bpso_user_session');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.userRole) setUserRole(parsed.userRole);
+          if (parsed.userName) setCurrentUserName(parsed.userName);
+        }
+      }
+    } catch {
+      // Local fallback
+    }
+  }, []);
 
   // Meta Webhook & Graph API state (clean start with zero test events)
   const [webhookEventsLog, setWebhookEventsLog] = useState<any[]>([]);
@@ -691,7 +762,7 @@ export default function App() {
         body: JSON.stringify({
           liveId: activeLive.id,
           role: userRole,
-          reviewedBy: userRole === 'owner' ? 'Pola (Shop Owner)' : 'Admin System',
+          reviewedBy: currentUserName || (userRole === 'owner' ? 'Pola (Shop Owner)' : 'Admin System'),
           action,
           notes,
         }),
@@ -895,9 +966,26 @@ export default function App() {
         summary={summary}
         phpRate={phpRate}
         onOpenAnalysis={() => setShowAnalysisModal(true)}
+        onOpenMobileAccessModal={() => setIsMobileAccessModalOpen(true)}
         preOrdersCount={preOrders.length}
         userRole={userRole}
-        setUserRole={setUserRole}
+        setUserRole={(newRole) => {
+          setUserRole(newRole);
+          const defaultNames: Record<string, string> = {
+            owner: 'Pola (Shop Owner)',
+            admin: currentUserName.includes('Admin') ? currentUserName : 'Admin 1 (Staff Lead)',
+            staff: 'Staff Member',
+          };
+          const newName = defaultNames[newRole] || currentUserName;
+          setCurrentUserName(newName);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(
+              'bpso_user_session',
+              JSON.stringify({ userName: newName, userRole: newRole, token: `bpso_${newRole}_2026` })
+            );
+          }
+        }}
+        currentUserName={currentUserName}
         graphSyncStats={graphSyncStats}
       />
 
@@ -1052,6 +1140,29 @@ export default function App() {
       <StrategicAnalysisModal
         isOpen={showAnalysisModal}
         onClose={() => setShowAnalysisModal(false)}
+      />
+
+      {/* Mobile Phone App Access & Multi-Login QR Code Modal */}
+      <MobileAccessQRModal
+        isOpen={isMobileAccessModalOpen}
+        onClose={() => setIsMobileAccessModalOpen(false)}
+        currentUserRole={userRole}
+        currentUserName={currentUserName}
+        onSwitchUser={(newName, newRole, token) => {
+          setCurrentUserName(newName);
+          setUserRole(newRole);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(
+              'bpso_user_session',
+              JSON.stringify({
+                userName: newName,
+                userRole: newRole,
+                token,
+              })
+            );
+          }
+          showToast(`Switched active profile to ${newName} (${newRole.toUpperCase()})`);
+        }}
       />
     </div>
   );
