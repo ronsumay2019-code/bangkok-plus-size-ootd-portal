@@ -509,19 +509,20 @@ export default function App() {
     return null;
   };
 
-  // 7. Generate Invoices
-  const handleGenerateInvoices = async (buyerNames?: string[]) => {
+  // 7. Generate Invoices & Dispatch to Customer Messenger
+  const handleGenerateInvoices = async (buyerNames?: string[], messageText?: string) => {
     try {
       const res = await fetch('/api/invoices/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ buyerNames }),
+        body: JSON.stringify({ buyerNames, messageText }),
       });
       if (res.ok) {
         const data: any = await res.json();
         if (data.orders) setOrders(data.orders);
         if (data.summary) setSummary(data.summary);
-        showToast(`Generated official invoices for ${data.generatedInvoices.length} reconciled buyers!`);
+        if (Array.isArray(data.messengerThreads)) setMessengerThreads(data.messengerThreads);
+        showToast(`Official invoice logged & ready to send for ${data.generatedInvoices.length} buyer!`);
       }
     } catch (e) {
       showToast('Official invoices generated for verified pieces only.');
@@ -1022,6 +1023,8 @@ export default function App() {
             onTriggerReconciliation={handleTriggerReconciliation}
             onUpdateOrder={handleUpdateOrder}
             onUpdateBag={handleUpdateBag}
+            messengerThreads={messengerThreads}
+            onReplyMessenger={handleReplyMessenger}
           />
         )}
 

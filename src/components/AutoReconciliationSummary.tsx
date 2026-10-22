@@ -30,12 +30,13 @@ import {
   Camera,
   Image as ImageIcon,
   ExternalLink,
+  Share2,
 } from 'lucide-react';
-import { ReconciliationSummary, BuyerBag, BuyerOrder } from '../types/reconciliation';
+import { ReconciliationSummary, BuyerBag, BuyerOrder, MessengerThread } from '../types/reconciliation';
 
 interface AutoReconciliationSummaryProps {
   summary: ReconciliationSummary | null;
-  onGenerateInvoices: (buyerNames?: string[]) => void;
+  onGenerateInvoices: (buyerNames?: string[], messageText?: string) => void;
   onTriggerReconciliation: () => void;
   onUpdateOrder?: (orderId: string, updates: Partial<BuyerOrder>) => void;
   onUpdateBag?: (payload: {
@@ -52,6 +53,8 @@ interface AutoReconciliationSummaryProps {
       unitPricePhp?: number;
     }>;
   }) => Promise<void> | void;
+  messengerThreads?: MessengerThread[];
+  onReplyMessenger?: (threadId: string, text: string) => Promise<void> | void;
 }
 
 export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps> = ({
@@ -60,6 +63,8 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
   onTriggerReconciliation,
   onUpdateOrder,
   onUpdateBag,
+  messengerThreads,
+  onReplyMessenger,
 }) => {
   const [selectedBuyer, setSelectedBuyer] = useState<string | null>(null);
   const [copiedDraft, setCopiedDraft] = useState<string | null>(null);
@@ -257,18 +262,104 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
     setInvoiceSentSuccess(false);
   };
 
+  const getMessengerUrl = (bag: BuyerBag) => {
+    const contact = (bag.buyerContact || '').trim();
+    if (contact.startsWith('http')) return contact;
+    if (contact.startsWith('m.me/')) return `https://${contact}`;
+    if (/^\d{8,}$/.test(contact)) return `https://m.me/${contact}`;
+    if (contact && !contact.includes(' ') && contact.length > 2) {
+      return `https://m.me/${contact}`;
+    }
+    return 'https://www.facebook.com/messages/t/';
+  };
+
+  const buildFullInvoiceMessage = (bag: BuyerBag, note: string, photos: string[]) => {
+    const linesSummary = (bag.lines || [])
+      .filter((l) => l.got > 0)
+      .map((l) => `  • ${l.got}x ${l.itemCode} (${l.size} ${l.colour}) — ₱${(l.got * l.unitPricePhp).toLocaleString()}`)
+      .join('\n');
+
+    const photoNotice = photos.length > 0
+      ? `\n📸 [${photos.length} Pratunam Bangkok Garment Photo(s) Attached on File]\n`
+      : '';
+
+    return `${note.trim()}
+
+===============================
+🛍️ BANGKOK PLUS SIZE OOTD — OFFICIAL INVOICE
+Invoice #: ${bag.invoiceId || 'INV-' + bag.buyerName.slice(0, 3).toUpperCase()}
+Billed To: ${bag.buyerName}
+
+VERIFIED ITEMS (Ready from Bangkok Store):
+${linesSummary}
+
+-------------------------------
+Total Pieces: ${bag.totalPiecesGot} pcs
+TOTAL AMOUNT DUE: ₱${bag.subtotalPhp.toLocaleString()} PHP
+Pratunam Handling & Packaging: FREE
+-------------------------------
+
+PAYMENT OPTIONS:
+💳 GCash: 0917-XXX-XXXX (Bangkok Plus Size OOTD)
+💳 Maya / BDO Bank Transfer Available
+(Please send payment confirmation slip within 24 hours to secure your items)
+===============================${photoNotice}`;
+  };
+
   const handleSendInvoiceWithHandwrittenNote = async () => {
     if (!previewBag) return;
     setIsSendingInvoice(true);
+    const fullMsg = buildFullInvoiceMessage(previewBag, handwrittenNote, attachedPhotos);
+
     try {
-      onGenerateInvoices([previewBag.buyerName]);
+      // 1. Generate & persist official invoice in backend with complete message
+      onGenerateInvoices([previewBag.buyerName], fullMsg);
+
+      // 2. Sync to portal messenger thread if existing
+      const matchingThread = messengerThreads?.find(
+        (t) => t.buyerName.toLowerCase() === previewBag.buyerName.toLowerCase()
+      );
+      if (matchingThread && onReplyMessenger) {
+        await onReplyMessenger(matchingThread.id, fullMsg);
+      }
+
+      // 3. Automatically copy to clipboard for 1-tap pasting into Messenger
+      try {
+        await navigator.clipboard.writeText(fullMsg);
+        setCopiedDraft('modal_invoice');
+      } catch {}
+
+      // 4. Try native OS mobile share if available (opens Messenger / Viber app on phone)
+      if (typeof navigator !== 'undefined' && 'share' in navigator) {
+        try {
+          await navigator.share({
+            title: `Invoice for ${previewBag.buyerName} - Bangkok Plus Size OOTD`,
+            text: fullMsg,
+          });
+        } catch {
+          // Native share closed or dismissed
+        }
+      }
+
       setInvoiceSentSuccess(true);
-      setTimeout(() => {
-        setInvoiceSentSuccess(false);
-        setPreviewBag(null);
-      }, 2500);
     } finally {
       setIsSendingInvoice(false);
+    }
+  };
+
+  const handleTriggerNativeShare = async () => {
+    if (!previewBag) return;
+    const fullMsg = buildFullInvoiceMessage(previewBag, handwrittenNote, attachedPhotos);
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      try {
+        await navigator.share({
+          title: `Invoice for ${previewBag.buyerName} - Bangkok Plus Size OOTD`,
+          text: fullMsg,
+        });
+      } catch {}
+    } else {
+      navigator.clipboard.writeText(fullMsg);
+      setCopiedDraft('modal_invoice');
     }
   };
 
@@ -1151,11 +1242,14 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                         onChange={(e) => setModalBuyerName(e.target.value)}
                         className="w-full bg-neutral-950 border border-neutral-700 rounded px-2.5 py-1 text-white font-bold text-xs focus:outline-none focus:border-rose-500"
                       />
-                      <span className="text-neutral-400 block text-[10px] font-semibold uppercase mt-2 mb-1">Contact / PSID:</span>
+                      <span className="text-neutral-400 block text-[10px] font-semibold uppercase mt-2 mb-1">
+                        Contact / Messenger Link (e.g. m.me/username):
+                      </span>
                       <input
                         type="text"
                         value={modalBuyerContact}
                         onChange={(e) => setModalBuyerContact(e.target.value)}
+                        placeholder="e.g. m.me/escobinas or 0917-xxx-xxxx"
                         className="w-full bg-neutral-950 border border-neutral-700 rounded px-2.5 py-1 text-neutral-300 font-mono text-xs focus:outline-none focus:border-rose-500"
                       />
                     </div>
@@ -1165,7 +1259,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                         <strong className="text-amber-300">{summary.liveTitle}</strong>
                       </div>
                       <div className="text-[10px] text-emerald-400 font-mono mt-2">
-                        Editing customer name & contact for this invoice
+                        Editing customer name & Messenger contact
                       </div>
                     </div>
                   </div>
@@ -1174,7 +1268,18 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                     <div>
                       <span className="text-neutral-500 block text-[10px] font-semibold uppercase">Billed To (Miner):</span>
                       <strong className="text-white text-sm">{previewBag.buyerName}</strong>
-                      <div className="text-[10px] text-neutral-400 font-mono">{previewBag.buyerContact || 'FB Messenger PSID Connected'}</div>
+                      <div className="text-[10px] text-neutral-400 font-mono flex items-center gap-1.5 mt-0.5">
+                        <span>{previewBag.buyerContact || 'FB Messenger Connected'}</span>
+                        <a
+                          href={getMessengerUrl(previewBag)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sky-400 hover:text-sky-300 underline font-sans text-[11px] font-semibold"
+                          title="Open Messenger conversation"
+                        >
+                          (Open Chat ↗)
+                        </a>
+                      </div>
                     </div>
                     <div className="text-right">
                       <span className="text-neutral-500 block text-[10px] font-semibold uppercase">Broadcast Origin:</span>
@@ -1339,71 +1444,146 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
               </div>
             </div>
 
-            {/* Success Alert if dispatched */}
-            {invoiceSentSuccess && (
-              <div className="p-3 bg-emerald-950/60 border border-emerald-500 rounded-xl text-emerald-200 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Invoice and handwritten note successfully queued for dispatch via Business Messenger!</span>
+            {/* Live Messenger Dispatch & Action Hub */}
+            {invoiceSentSuccess ? (
+              <div className="p-4 bg-gradient-to-r from-emerald-950/80 via-neutral-900 to-sky-950/80 border border-emerald-500/60 rounded-2xl space-y-3 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div>
+                      <strong className="text-white text-xs block">
+                        Official Invoice Ready & Copied to Phone Clipboard!
+                      </strong>
+                      <span className="text-[11px] text-emerald-300">
+                        Total ₱{previewBag.subtotalPhp.toLocaleString()} PHP ({previewBag.totalPiecesGot} pieces) logged on store records.
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/40">
+                    Copied ✓
+                  </span>
+                </div>
+
+                <div className="p-3 bg-neutral-950/90 rounded-xl border border-neutral-800 text-[11px] text-neutral-300 space-y-2.5">
+                  <p className="leading-relaxed">
+                    📲 <strong>Next step:</strong> The complete invoice breakdown and personalized note are copied. Tap below to send directly to <strong>{previewBag.buyerName}</strong>:
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {/* Direct Messenger Open Button */}
+                    <a
+                      href={getMessengerUrl(previewBag)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-950/50 flex items-center gap-2 transition"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>💬 Open Messenger for {previewBag.buyerName}</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                    </a>
+
+                    {/* Native Mobile Share Sheet Button */}
+                    {typeof navigator !== 'undefined' && 'share' in navigator && (
+                      <button
+                        type="button"
+                        onClick={handleTriggerNativeShare}
+                        className="px-3.5 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 font-semibold text-xs rounded-xl flex items-center gap-2 transition cursor-pointer"
+                      >
+                        <Share2 className="w-4 h-4 text-emerald-400" />
+                        <span>Share via Phone Apps (Messenger / Viber)</span>
+                      </button>
+                    )}
+
+                    {/* Copy Text Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const payload = buildFullInvoiceMessage(previewBag, handwrittenNote, attachedPhotos);
+                        navigator.clipboard.writeText(payload);
+                        handleCopyText(payload, 'modal_invoice_again');
+                      }}
+                      className="px-3.5 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copiedDraft === 'modal_invoice_again' ? 'Copied Again!' : 'Copy Invoice Text'}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
+            ) : null}
 
             {/* Modal Actions */}
-            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-neutral-800 text-xs">
-              {isModalEditing ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setIsModalEditing(false)}
-                    disabled={isSavingBag}
-                    className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl transition"
-                  >
-                    Cancel Editing
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveModalEdit}
-                    disabled={isSavingBag}
-                    className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-1.5"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{isSavingBag ? 'Saving Edits...' : 'Save Invoice Edits'}</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const photoText = attachedPhotos.length > 0 ? `\n[📸 ${attachedPhotos.length} Pratunam Garment Photo(s) Attached]\n` : '';
-                      const copyPayload = `PERSONAL NOTE:\n${handwrittenNote}\n\n====================\nBANGKOK PLUS SIZE OOTD INVOICE\nBilled To: ${previewBag.buyerName}\nTotal Due: ₱${previewBag.subtotalPhp.toLocaleString()}\nPieces: ${previewBag.totalPiecesGot}\n${photoText}====================`;
-                      navigator.clipboard.writeText(copyPayload);
-                      handleCopyText(copyPayload, 'modal_invoice');
-                    }}
-                    className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl flex items-center gap-1.5 transition"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>{copiedDraft === 'modal_invoice' ? 'Copied!' : 'Copy Note & Invoice'}</span>
-                  </button>
+            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-neutral-800 text-xs">
+              <div className="flex items-center gap-2">
+                <a
+                  href={getMessengerUrl(previewBag)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-sky-400 hover:text-sky-300 border border-neutral-700 font-semibold rounded-xl flex items-center gap-1.5 transition"
+                  title="Open Messenger conversation directly"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Open Messenger Chat</span>
+                  <ExternalLink className="w-3 h-3 opacity-70" />
+                </a>
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setPreviewBag(null)}
-                    className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl transition"
-                  >
-                    Close Preview
-                  </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {isModalEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalEditing(false)}
+                      disabled={isSavingBag}
+                      className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl transition cursor-pointer"
+                    >
+                      Cancel Editing
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveModalEdit}
+                      disabled={isSavingBag}
+                      className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{isSavingBag ? 'Saving Edits...' : 'Save Invoice Edits'}</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const copyPayload = buildFullInvoiceMessage(previewBag, handwrittenNote, attachedPhotos);
+                        navigator.clipboard.writeText(copyPayload);
+                        handleCopyText(copyPayload, 'modal_invoice');
+                      }}
+                      className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copiedDraft === 'modal_invoice' ? 'Copied!' : 'Copy Note & Invoice'}</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={handleSendInvoiceWithHandwrittenNote}
-                    disabled={isSendingInvoice}
-                    className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-emerald-950/40 flex items-center gap-2 transition"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>{isSendingInvoice ? 'Sending Invoice...' : 'Send Final Invoice & Note to Buyer'}</span>
-                  </button>
-                </>
-              )}
+                    <button
+                      type="button"
+                      onClick={() => setPreviewBag(null)}
+                      className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl transition cursor-pointer"
+                    >
+                      Close Preview
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSendInvoiceWithHandwrittenNote}
+                      disabled={isSendingInvoice}
+                      className="px-5 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-emerald-950/40 flex items-center gap-2 transition cursor-pointer"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>{isSendingInvoice ? 'Dispatching...' : 'Send Final Invoice & Note to Buyer'}</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -1366,7 +1366,7 @@ app.post('/api/live/toggle', (req, res) => {
 
 // 8. Generate Official Final Invoices (Strictly Gated to Reconciled Items Only!)
 app.post('/api/invoices/generate', (req, res) => {
-  const { buyerNames } = req.body;
+  const { buyerNames, messageText } = req.body;
   if (!latestSummary) {
     return res.status(400).json({ error: 'No reconciled summary available. Please reconcile first.' });
   }
@@ -1408,6 +1408,47 @@ app.post('/api/invoices/generate', (req, res) => {
       itemsCount: bag.totalPiecesGot,
       generatedAt: new Date().toISOString(),
     });
+
+    // Record invoice message into buyer Messenger thread in portal
+    let existingThread = messengerThreads.find(
+      (t) => t.buyerName.toLowerCase() === bag.buyerName.toLowerCase()
+    );
+    const invoiceMsgBody = messageText || `Official Invoice #${invNum} generated for ${bag.buyerName} — Total Due: ₱${bag.subtotalPhp.toLocaleString()} (${bag.totalPiecesGot} pcs).`;
+
+    if (!existingThread) {
+      existingThread = {
+        id: `th_inv_${Date.now()}_${idx}`,
+        psid: `psid_${Date.now()}`,
+        buyerName: bag.buyerName,
+        buyerHandle: `fb.com/${bag.buyerName.replace(/\s+/g, '.')}`,
+        windowExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        unreadCount: 0,
+        messages: [],
+      };
+      messengerThreads.unshift(existingThread);
+    }
+
+    existingThread.messages.push({
+      id: `m_inv_${Date.now()}_${idx}`,
+      sender: 'page_agent',
+      text: invoiceMsgBody,
+      timestamp: new Date().toISOString(),
+    });
+    existingThread.unreadCount = 0;
+
+    // Outbound dispatch attempt if token is configured
+    const fbToken = process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
+    if (fbToken && existingThread.psid) {
+      fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_type: 'RESPONSE',
+          recipient: { id: existingThread.psid },
+          message: { text: invoiceMsgBody },
+        }),
+      }).catch((err) => console.warn('[Invoice Dispatch] Outbound error:', err));
+    }
   });
 
   saveRuntimeState();
@@ -1417,6 +1458,7 @@ app.post('/api/invoices/generate', (req, res) => {
     generatedInvoices,
     summary: latestSummary,
     orders,
+    messengerThreads,
   });
 });
 
