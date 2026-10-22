@@ -5,7 +5,6 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Modality, LiveServerMessage } from '@google/genai';
 
@@ -46,18 +45,21 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const STATE_FILE_PATH = path.resolve(__dirname, 'runtime-state.json');
+const STATE_FILE_PATH = process.env.VERCEL
+  ? '/tmp/runtime-state.json'
+  : path.resolve(__dirname, 'runtime-state.json');
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/api/live-voice' });
 const PORT = 3000;
 
 app.use(express.json({ limit: '50mb' }) as any);
 app.use(express.urlencoded({ extended: true, limit: '50mb' }) as any);
 
-// Setup Live API WebSocket handler for gemini-3.8-live real-time voice conversations
-wss.on('connection', async (clientWs) => {
+// Setup Live API WebSocket handler for gemini-3.8-live real-time voice conversations (non-serverless only)
+if (!process.env.VERCEL) {
+  const wss = new WebSocketServer({ server, path: '/api/live-voice' });
+  wss.on('connection', async (clientWs) => {
   console.log('[Live API] Client connected to /api/live-voice');
   let liveSession: any = null;
 
@@ -144,7 +146,8 @@ Speak naturally, warmly, and concisely. Keep verbal answers brief and conversati
       clientWs.send(JSON.stringify({ type: 'error', error: connErr?.message || 'Failed to connect to gemini-3.8-live' }));
     }
   }
-});
+  });
+}
 
 // In-memory operational store initialized from authentic seed data + persisted snapshot
 let lives: LiveSession[] = JSON.parse(JSON.stringify(SEED_LIVE_SESSIONS));
@@ -1716,6 +1719,7 @@ async function startServer() {
   const isDev = process.env.NODE_ENV !== 'production';
 
   if (isDev) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true, port: PORT, host: '0.0.0.0' },
       appType: 'spa',

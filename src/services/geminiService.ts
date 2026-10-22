@@ -1,8 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 
-// Initialize Gemini SDK with runtime env key
+// Initialize Gemini SDK with runtime env key (fallback prevents throw when key is not yet set)
 export const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || '',
+  apiKey: process.env.GEMINI_API_KEY || 'gemini-key-not-configured',
 });
 
 export interface ChatbotRoleDefinition {
