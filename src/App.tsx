@@ -76,14 +76,38 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Fetch initial state from backend or fallback to initial reconciliation
+  // Fetch initial state from backend and auto-sync Facebook Live + Messenger every 30s
   useEffect(() => {
+    const runAutoSync = async (liveIdToSync: string) => {
+      try {
+        const syncRes = await fetch('/api/facebook/live-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ liveId: liveIdToSync }),
+        });
+        if (syncRes.ok) {
+          const syncData: any = await syncRes.json();
+          if (syncData.targetLive) setLives((prev) => prev.map((l) => (l.id === syncData.targetLive.id ? syncData.targetLive : l)));
+          if (Array.isArray(syncData.orders)) setOrders(syncData.orders);
+          if (Array.isArray(syncData.messengerThreads)) setMessengerThreads(syncData.messengerThreads);
+          if (syncData.latestSummary) setSummary(syncData.latestSummary);
+          if (syncData.graphSyncStats) setGraphSyncStats(syncData.graphSyncStats);
+        }
+      } catch {
+        // Silent background sync fallback
+      }
+    };
+
     const fetchState = async () => {
+      let currentLiveId = activeLive.id;
       try {
         const res = await fetch('/api/state');
         if (res.ok) {
           const data: any = await res.json();
-          if (Array.isArray(data.lives) && data.lives.length) setLives(data.lives);
+          if (Array.isArray(data.lives) && data.lives.length) {
+            setLives(data.lives);
+            currentLiveId = data.lives[0].id;
+          }
           if (Array.isArray(data.inventory)) setInventory(data.inventory);
           if (Array.isArray(data.orders)) setOrders(data.orders);
           if (Array.isArray(data.amendments)) setAmendments(data.amendments);
@@ -107,8 +131,15 @@ export default function App() {
         );
         setSummary(initSummary);
       }
+      await runAutoSync(currentLiveId);
     };
     fetchState();
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void runAutoSync(activeLive.id);
+      }
+    }, 30_000);
+    return () => clearInterval(timer);
   }, []);
 
   // 1. Toggle Live Session (Start or End -> Auto-Reconciliation on End)

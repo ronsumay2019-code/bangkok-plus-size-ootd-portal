@@ -1006,39 +1006,84 @@ app.post('/api/facebook/live-sync', async (req, res) => {
       if (!videoId || videoId === 'Not connected yet') {
         const listUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
           pageId
-        )}/live_videos?fields=id,title,status,creation_time,permalink_url&limit=5&access_token=${encodeURIComponent(
+        )}/live_videos?fields=id,title,description,status,creation_time,permalink_url,video{id}&limit=5&access_token=${encodeURIComponent(
           fbToken
         )}`;
         const listRes = await fetch(listUrl);
         if (listRes.ok) {
           const listData: any = await listRes.json();
-          const latestVid = listData.data?.[0];
-          if (latestVid?.id) {
-            videoId = latestVid.id;
-            targetLive.fbVideoId = latestVid.id;
-            graphSyncStats.onAirVideoId = latestVid.id;
-            if (latestVid.title) targetLive.title = latestVid.title;
+          const latestVid = (listData.data || []).find((v: any) => v.status === 'LIVE') || listData.data?.[0];
+          const resolvedVid = latestVid?.video?.id || latestVid?.id;
+          if (resolvedVid) {
+            videoId = String(resolvedVid);
+            targetLive.fbVideoId = videoId;
+            graphSyncStats.onAirVideoId = videoId;
+            const titleText = latestVid.title || (typeof latestVid.description === 'string' ? latestVid.description.split('\n')[0].trim() : '');
+            if (titleText) targetLive.title = titleText;
             if (latestVid.status) effectiveStatus = latestVid.status;
             if (latestVid.permalink_url) targetLive.videoUrl = `https://www.facebook.com${latestVid.permalink_url}`;
           }
-        } else {
-          const errJson: any = await listRes.json().catch(() => ({}));
-          graphError = errJson?.error?.message || `Graph API HTTP ${listRes.status}`;
+        }
+        // Fallback to /{pageId}/videos (does not require Meta Live Video API review)
+        if (!videoId || videoId === 'Not connected yet') {
+          const vidsUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
+            pageId
+          )}/videos?fields=id,live_status,title,description,created_time,permalink_url&limit=10&access_token=${encodeURIComponent(
+            fbToken
+          )}`;
+          const vidsRes = await fetch(vidsUrl);
+          if (vidsRes.ok) {
+            const vidsData: any = await vidsRes.json();
+            const liveVids = (vidsData.data || []).filter((v: any) => typeof v.live_status === 'string' && v.live_status.length > 0);
+            const chosen = liveVids.find((v: any) => v.live_status === 'LIVE') || liveVids[0] || vidsData.data?.[0];
+            if (chosen?.id) {
+              videoId = String(chosen.id);
+              targetLive.fbVideoId = videoId;
+              graphSyncStats.onAirVideoId = videoId;
+              const titleText = chosen.title || (typeof chosen.description === 'string' ? chosen.description.split('\n')[0].trim() : '');
+              if (titleText) targetLive.title = titleText;
+              if (chosen.live_status) effectiveStatus = chosen.live_status;
+              if (chosen.permalink_url) targetLive.videoUrl = `https://www.facebook.com${chosen.permalink_url}`;
+              graphError = null;
+            }
+          } else if (!listRes.ok) {
+            const errJson: any = await vidsRes.json().catch(() => ({}));
+            graphError = errJson?.error?.message || `Graph API HTTP ${vidsRes.status}`;
+          }
         }
       }
 
       if (videoId && videoId !== 'Not connected yet') {
         const graphUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
           videoId
-        )}?fields=id,title,status,live_views,comments.limit(500){id,message,from,created_time}&access_token=${encodeURIComponent(
+        )}?fields=id,title,description,live_status&access_token=${encodeURIComponent(
           fbToken
         )}`;
         const graphRes = await fetch(graphUrl);
         if (graphRes.ok) {
           const graphData: any = await graphRes.json();
-          if (graphData.status) effectiveStatus = graphData.status;
-          if (graphData.title) targetLive.title = graphData.title;
-          const commentsList = graphData.comments?.data || [];
+          if (graphData.live_status) effectiveStatus = graphData.live_status;
+          const titleText = graphData.title || (typeof graphData.description === 'string' ? graphData.description.split('\n')[0].trim() : '');
+          if (titleText) targetLive.title = titleText;
+        }
+        const streamCommentsUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
+          videoId
+        )}/comments?fields=id,message,from{id,name},created_time&filter=stream&order=reverse_chronological&limit=500&access_token=${encodeURIComponent(
+          fbToken
+        )}`;
+        let commentsRes = await fetch(streamCommentsUrl);
+        let commentsJson: any = commentsRes.ok ? await commentsRes.json().catch(() => ({})) : {};
+        if (!Array.isArray(commentsJson.data) || commentsJson.data.length === 0) {
+          const plainCommentsUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
+            videoId
+          )}/comments?fields=id,message,from{id,name},created_time&limit=500&access_token=${encodeURIComponent(
+            fbToken
+          )}`;
+          commentsRes = await fetch(plainCommentsUrl);
+          commentsJson = commentsRes.ok ? await commentsRes.json().catch(() => ({})) : {};
+        }
+        if (commentsRes.ok) {
+          const commentsList = Array.isArray(commentsJson.data) ? commentsJson.data.slice().reverse() : [];
           totalCommentsFetched = commentsList.length;
           targetLive.totalComments = Math.max(targetLive.totalComments || 0, totalCommentsFetched);
 
@@ -1050,7 +1095,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
                 orders.push({
                   id: `ord_graph_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
                   liveId: targetLive.id,
-                  buyerName: c.from?.name || 'FB Live Buyer',
+                  buyerName: c.from?.name || (c.from?.id ? `FB Buyer ${String(c.from.id).slice(-4)}` : 'FB Live Buyer'),
                   channel: 'live_chat',
                   sourceCommentId: c.id,
                   itemCode: parsed.code,
@@ -1072,8 +1117,8 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           }
           targetLive.totalMined = orders.filter((o) => o.liveId === targetLive.id).length;
         } else {
-          const errJson: any = await graphRes.json().catch(() => ({}));
-          graphError = errJson?.error?.message || `Graph API HTTP ${graphRes.status}`;
+          const errJson: any = await commentsRes.json().catch(() => ({}));
+          graphError = errJson?.error?.message || `Graph API HTTP ${commentsRes.status}`;
         }
       }
 
