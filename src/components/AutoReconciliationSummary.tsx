@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   FileCheck, 
   CheckCircle2, 
@@ -27,6 +27,9 @@ import {
   Plus,
   Trash2,
   Check,
+  Camera,
+  Image as ImageIcon,
+  ExternalLink,
 } from 'lucide-react';
 import { ReconciliationSummary, BuyerBag, BuyerOrder } from '../types/reconciliation';
 
@@ -63,11 +66,32 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
   const [invoicingSuccess, setInvoicingSuccess] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'ready' | 'needs_resolution'>('all');
 
-  // Invoice Preview & Handwritten Note state
+  // Invoice Preview, Handwritten Note & Garment Photo state
   const [previewBag, setPreviewBag] = useState<BuyerBag | null>(null);
   const [handwrittenNote, setHandwrittenNote] = useState<string>('');
+  const [attachedPhotos, setAttachedPhotos] = useState<string[]>([]);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceSentSuccess, setInvoiceSentSuccess] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        const result = uploadEvent.target?.result;
+        if (typeof result === 'string') {
+          setAttachedPhotos((prev) => [...prev, result]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setAttachedPhotos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
 
   // Bag Inline Editing State
   const [editingBagBuyer, setEditingBagBuyer] = useState<string | null>(null);
@@ -226,6 +250,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
 
   const handleOpenInvoicePreview = (bag: BuyerBag) => {
     setPreviewBag(bag);
+    setAttachedPhotos([]);
     setHandwrittenNote(
       `Hi Sis ${bag.buyerName}! 💖 Maraming salamat sa pag-mine kanina sa ating live selling! Sinigurado ko talagang maganda at bago tong items mo diretso galing Bangkok Pratunam store. May kasama itong special freebie para sa yo! Ingat always and enjoy your plus-size OOTD! ✨\n— Live Host / BPSO Team`
     );
@@ -1007,6 +1032,86 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
               )}
             </div>
 
+            {/* Camera / Garment Photos Capture & Attachment (Live Phone Camera or Upload) */}
+            <div className="space-y-2.5 p-3.5 bg-neutral-950/80 border border-neutral-800 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Pratunam Garment Photos (Live Phone Camera Capture)</span>
+                </label>
+                <span className="text-[10px] text-neutral-400 font-mono">
+                  {attachedPhotos.length} photo{attachedPhotos.length === 1 ? '' : 's'} attached
+                </span>
+              </div>
+
+              {/* Hidden file input supporting native camera capture */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                ref={photoInputRef}
+                onChange={handlePhotoUpload}
+                className="hidden"
+                multiple
+              />
+
+              {/* Camera Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="px-3.5 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white rounded-xl font-bold flex items-center gap-2 text-xs shadow-md shadow-rose-950/40 transition cursor-pointer"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>📸 Snap Garment Photo with Camera</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (photoInputRef.current) {
+                      photoInputRef.current.removeAttribute('capture');
+                      photoInputRef.current.click();
+                      photoInputRef.current.setAttribute('capture', 'environment');
+                    }
+                  }}
+                  className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-xl font-semibold flex items-center gap-1.5 text-xs transition cursor-pointer"
+                >
+                  <ImageIcon className="w-4 h-4 text-neutral-400" />
+                  <span>Choose from Phone Gallery</span>
+                </button>
+              </div>
+
+              {/* Photo Thumbnails Preview */}
+              {attachedPhotos.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                  {attachedPhotos.map((photoSrc, idx) => (
+                    <div key={idx} className="relative group rounded-xl overflow-hidden border border-neutral-700 bg-neutral-900 aspect-square shadow-inner">
+                      <img
+                        src={photoSrc}
+                        alt={`Garment item ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-1 left-1 bg-black/75 backdrop-blur-sm px-1.5 py-0.5 rounded text-[9px] font-mono text-white">
+                        Item Pic #{idx + 1}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(idx)}
+                        className="absolute top-1 right-1 bg-rose-600/90 hover:bg-rose-500 p-1 rounded-full text-white shadow transition cursor-pointer"
+                        title="Remove Photo"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-neutral-500 italic">
+                  Tip: Admins can snap real-time pictures of the bagged Bangkok garments to send alongside this invoice for 100% buyer confirmation.
+                </p>
+              )}
+            </div>
+
             {/* The Official Invoice Attachment Preview */}
             <div className="space-y-2">
               <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider flex items-center justify-between">
@@ -1269,7 +1374,8 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                   <button
                     type="button"
                     onClick={() => {
-                      const copyPayload = `PERSONAL NOTE:\n${handwrittenNote}\n\n====================\nBANGKOK PLUS SIZE OOTD INVOICE\nBilled To: ${previewBag.buyerName}\nTotal Due: ₱${previewBag.subtotalPhp.toLocaleString()}\nPieces: ${previewBag.totalPiecesGot}\n====================`;
+                      const photoText = attachedPhotos.length > 0 ? `\n[📸 ${attachedPhotos.length} Pratunam Garment Photo(s) Attached]\n` : '';
+                      const copyPayload = `PERSONAL NOTE:\n${handwrittenNote}\n\n====================\nBANGKOK PLUS SIZE OOTD INVOICE\nBilled To: ${previewBag.buyerName}\nTotal Due: ₱${previewBag.subtotalPhp.toLocaleString()}\nPieces: ${previewBag.totalPiecesGot}\n${photoText}====================`;
                       navigator.clipboard.writeText(copyPayload);
                       handleCopyText(copyPayload, 'modal_invoice');
                     }}
