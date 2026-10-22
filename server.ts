@@ -358,6 +358,56 @@ function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: st
   };
 }
 
+function parseClaimSpecFromRaw(rawText: string, fallbackCode = 'LIVE') {
+  const clean = (rawText || '').trim();
+  const upper = clean.toUpperCase();
+
+  const KNOWN_COLOURS = [
+    'CHARCOAL', 'PINK', 'VIOLET', 'BLUSH', 'BUTTER', 'LILAC', 'CREAM', 'NAVY', 
+    'MAROON', 'BLACK', 'WHITE', 'BROWN', 'GRAY', 'GREY', 'STONE', 'BLUE', 
+    'OLIVE', 'EMERALD', 'RUST', 'MUSTARD', 'BEIGE', 'YELLOW', 'RED', 'GREEN', 'PURPLE'
+  ];
+  const matchedColours: string[] = [];
+  for (const c of KNOWN_COLOURS) {
+    if (new RegExp(`\\b${c}\\b`, 'i').test(upper)) {
+      matchedColours.push(c);
+    }
+  }
+  const colour = matchedColours.length > 0 ? matchedColours.join(' / ') : 'ASSORTED';
+
+  const sizeMatch = upper.match(/\b(6XL|5XL|4XL|3XL|2XL|XL|SIZE\s*40|40|FS|FREE\s*SIZE)\b/i);
+  const size = sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : 'FREE SIZE';
+
+  let itemCode = fallbackCode;
+  if (/\b(?:AC\s+)?RUSTANS\b/i.test(upper)) {
+    itemCode = 'RUSTANS';
+  } else if (/\bLU\s*PANTS\b/i.test(upper)) {
+    itemCode = 'LU PANTS';
+  } else if (/\bLINEN\s*PANTS\b/i.test(upper)) {
+    itemCode = 'LINEN PANTS';
+  } else if (/\bPANTS\b/i.test(upper)) {
+    itemCode = 'PANTS';
+  } else if (fallbackCode && fallbackCode !== 'LIVE') {
+    itemCode = fallbackCode.toUpperCase();
+  } else {
+    const codeMatch = upper.match(/(?<![A-Z0-9])([A-Z]{1,4}\d{1,4}|\d{1,2})(?![A-Z0-9])/);
+    if (codeMatch && !['MINE', 'MIN', 'PO', 'KO', 'SA', 'PA', 'NG', 'NA', 'HM'].includes(codeMatch[1])) {
+      itemCode = codeMatch[1];
+    } else {
+      const stripped = upper
+        .replace(/\b(MINE|MYN|MIEN|KUHA|STEAL|PO|KO|SIS|PLS|PLEASE|MAAM|MAM|HM|HOW\s*MUCH|SANA|PA)\b/gi, '')
+        .trim();
+      const firstWords = stripped.split(/\s+/).slice(0, 2).join(' ');
+      if (firstWords.length >= 2 && !firstWords.includes('1890')) {
+        itemCode = firstWords;
+      }
+    }
+  }
+
+  const itemName = clean.length > 0 ? clean : `${itemCode} - ${colour}`;
+  return { itemCode: itemCode.toUpperCase(), size: size.toUpperCase(), colour: colour.toUpperCase(), itemName };
+}
+
 /* ==================== API ENDPOINTS ==================== */
 
 // 1. Get full state
@@ -443,12 +493,8 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
           const cid = `bridge_cl_${clRow.id}`;
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
-            const rawText = clRow.raw || clRow.raw_text || '';
-            const colours = ['MAROON', 'BLACK', 'NAVY', 'BLUE', 'CREAM', 'STONE', 'WHITE', 'EMERALD', 'OLIVE'];
-            const upperRaw = rawText.toUpperCase();
-            const foundCol = colours.find((c) => upperRaw.includes(c)) || 'MAROON';
-            const sizeMatch = upperRaw.match(/\b(6XL|5XL|4XL|3XL|2XL|XL|SIZE\s*40|40)\b/i);
-            const parsedSize = clRow.size || (sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : '3XL');
+            const raw = clRow.raw || clRow.raw_text || '';
+            const spec = parseClaimSpecFromRaw(raw, clRow.code || 'LIVE');
 
             orders.push({
               id: `ord_cl_${clRow.id}`,
@@ -456,10 +502,10 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
               buyerName: clRow.customer_name || clRow.customer_id || 'FB Live Buyer',
               channel: 'live_chat',
               sourceCommentId: clRow.comment_id || cid,
-              itemCode: (clRow.code || 'BP01').toUpperCase(),
-              itemName: rawText || clRow.code || 'Live Claim',
-              size: parsedSize.toUpperCase(),
-              colour: foundCol.toUpperCase(),
+              itemCode: clRow.code ? clRow.code.toUpperCase() : spec.itemCode,
+              itemName: raw || spec.itemName,
+              size: clRow.size ? clRow.size.toUpperCase() : spec.size,
+              colour: spec.colour,
               quantity: Number(clRow.qty) || 1,
               statedUnitPricePhp: 1890,
               orderedAt: clRow.created_at || clRow.at || new Date().toISOString(),
@@ -1283,20 +1329,23 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           const st = recentVid.status || (bData.onAir ? 'LIVE' : 'VOD');
           effectiveStatus = st === 'live' ? 'LIVE' : st === 'ended' ? 'VOD' : st;
         }
+
         for (const reqRow of bData.bridge?.orderRequests || []) {
           const cid = `bridge_req_${reqRow.id}`;
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
+            const raw = reqRow.raw_message || reqRow.item_description || reqRow.item_code || '';
+            const spec = parseClaimSpecFromRaw(raw, reqRow.item_code || 'LIVE');
             orders.push({
               id: `ord_br_${reqRow.id}`,
               liveId: targetLive.id,
               buyerName: reqRow.buyer_name || 'FB Live Buyer',
               channel: 'live_chat',
               sourceCommentId: cid,
-              itemCode: (reqRow.item_code || 'LIVE').toUpperCase(),
-              itemName: reqRow.item_description || reqRow.raw_message || reqRow.item_code || 'Live Item',
-              size: (reqRow.size || '3XL').toUpperCase(),
-              colour: (reqRow.colour || 'MAROON').toUpperCase(),
+              itemCode: spec.itemCode,
+              itemName: reqRow.raw_message || spec.itemName,
+              size: reqRow.size ? reqRow.size.toUpperCase() : spec.size,
+              colour: reqRow.colour && reqRow.colour !== 'MAROON' ? reqRow.colour.toUpperCase() : spec.colour,
               quantity: Number(reqRow.quantity) || 1,
               statedUnitPricePhp: Number(reqRow.unit_price_php) || 1890,
               orderedAt: reqRow.created_at || nowIso,
@@ -1313,26 +1362,30 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           const cid = `bridge_cl_${clRow.id}`;
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
-            const rawText = clRow.raw || clRow.raw_text || '';
-            const colours = ['MAROON', 'BLACK', 'NAVY', 'BLUE', 'CREAM', 'STONE', 'WHITE', 'EMERALD', 'OLIVE'];
-            const upperRaw = rawText.toUpperCase();
-            const foundCol = colours.find((c) => upperRaw.includes(c)) || 'MAROON';
-            const sizeMatch = upperRaw.match(/\b(6XL|5XL|4XL|3XL|2XL|XL|SIZE\s*40|40)\b/i);
-            const parsedSize = clRow.size || (sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : '3XL');
-
+            const raw = clRow.raw || clRow.raw_text || '';
+            const spec = parseClaimSpecFromRaw(raw, clRow.code || 'LIVE');
             orders.push({
               id: `ord_cl_${clRow.id}`,
               liveId: targetLive.id,
               buyerName: clRow.customer_name || clRow.customer_id || 'FB Live Buyer',
               channel: 'live_chat',
               sourceCommentId: clRow.comment_id || cid,
-              itemCode: (clRow.code || 'BP01').toUpperCase(),
-              itemName: rawText || clRow.code || 'Live Claim',
-              size: parsedSize.toUpperCase(),
-              colour: foundCol.toUpperCase(),
+              itemCode: clRow.code ? clRow.code.toUpperCase() : spec.itemCode,
+              itemName: raw || spec.itemName,
+              size: clRow.size ? clRow.size.toUpperCase() : spec.size,
+              colour: spec.colour,
               quantity: Number(clRow.qty) || 1,
               statedUnitPricePhp: 1890,
               orderedAt: clRow.created_at || clRow.at || nowIso,
+              status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
+              invoiced: false,
+              lane: 'live',
+              version: 1,
+              overrideHistory: [],
+            });
+            backfilledComments++;
+          }
+        }
               status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
               invoiced: false,
               lane: 'live',
