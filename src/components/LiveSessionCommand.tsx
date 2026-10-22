@@ -378,7 +378,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
               {isOnAir && (
                 <div className="absolute top-3 left-3 bg-neutral-950/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-neutral-800 text-xs flex items-center gap-2 text-white">
                   <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                  <span>Showing item: <strong className="text-amber-400">BP01 House Patchwork Linen</strong></span>
+                  <span>Showing item: <strong className="text-amber-400">RUSTANS Bangkok Plus Size</strong></span>
                 </div>
               )}
             </div>
@@ -581,7 +581,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 <div className="pt-2 border-t border-neutral-800 space-y-2">
                   <label className="text-[11px] text-neutral-300 block font-medium">
                     Paste Raw Facebook Live Comments from This Morning&apos;s Broadcast (1 comment per line, e.g.{' '}
-                    <code className="text-amber-300">Buyer Name: MINE BP01 3XL MAROON</code>):
+                    <code className="text-amber-300">Jhoy Escobiñas: Mine LU pants black</code>):
                   </label>
                   <textarea
                     rows={4}
@@ -589,7 +589,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                     aria-label="Raw Morning Live Comments"
                     value={rawBatchComments}
                     onChange={(e) => setRawBatchComments(e.target.value)}
-                    placeholder={"Buyer Name: MINE BP01 3XL MAROON\nBuyer Name: MINE BP02 2XL STONE"}
+                    placeholder={"Jhoy Escobiñas: Mine LU pants black\nEmz Cruz: Mine Rustans Pink & Charcoal\nArcega Gina: AC RUSTANS\nShiela Marasigan: Rustans violet"}
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2.5 text-xs text-white font-mono"
                   />
                   <div className="flex justify-end">
@@ -746,14 +746,17 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
               {Array.from(new Set(inventory.map((i) => i.itemCode))).map((code) => (
                 <option key={code} value={code} />
               ))}
-              <option value="BP01" />
-              <option value="BP02" />
-              <option value="BP03" />
-              <option value="BP04" />
-              <option value="BP05" />
-              <option value="BP07" />
-              <option value="D3" />
-              <option value="T10" />
+              <option value="RUSTANS" />
+              <option value="LU PANTS" />
+              <option value="LINEN PANTS" />
+              <option value="LONG DRESS" />
+              <option value="FLOWY DRESS" />
+              <option value="SEXY BLACK" />
+              <option value="HALF SET" />
+              <option value="ELEGANT SET" />
+              <option value="GIG 5" />
+              <option value="TALI TIE DYE" />
+              <option value="SKORT" />
             </datalist>
 
             <datalist id="live-simulator-sizes">
@@ -796,7 +799,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   <input
                     type="text"
                     list="live-simulator-item-codes"
-                    placeholder="e.g. BP01, D3, T10..."
+                    placeholder="e.g. RUSTANS, LU PANTS, LINEN..."
                     value={newItemCode}
                     onChange={(e) => {
                       const val = e.target.value;

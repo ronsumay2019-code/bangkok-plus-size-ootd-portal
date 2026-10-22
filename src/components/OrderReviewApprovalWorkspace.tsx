@@ -73,10 +73,25 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   const [isApproving, setIsApproving] = useState(false);
 
   // Edit form state
+  const [editItemCode, setEditItemCode] = useState('');
   const [editSize, setEditSize] = useState('');
   const [editColour, setEditColour] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editNotes, setEditNotes] = useState('');
+
+  const KNOWN_BANGKOK_PRICES: Record<string, number> = {
+    'RUSTANS': 550,
+    'LU PANTS': 490,
+    'LINEN PANTS': 490,
+    'LONG DRESS': 650,
+    'FLOWY DRESS': 590,
+    'SEXY BLACK': 550,
+    'HALF SET': 590,
+    'ELEGANT SET': 650,
+    'GIG 5': 550,
+    'TALI TIE DYE': 450,
+    'SKORT': 450,
+  };
 
   const pendingOrders = orders.filter((o) => o.status === 'pending');
   const confirmedOrders = orders.filter((o) => o.status === 'confirmed');
@@ -98,9 +113,10 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
 
   const handleOpenEdit = (ord: BuyerOrder) => {
     setEditingOrder(ord);
-    setEditSize(ord.size);
-    setEditColour(ord.colour);
-    setEditPrice(String(ord.statedUnitPricePhp || ''));
+    setEditItemCode(ord.itemCode === 'PENDING SPEC' ? '' : ord.itemCode);
+    setEditSize(ord.size || 'FREE SIZE (PLUS)');
+    setEditColour(ord.colour || 'ASSORTED');
+    setEditPrice(ord.statedUnitPricePhp ? String(ord.statedUnitPricePhp) : '');
     setEditNotes(ord.reviewNotes || '');
   };
 
@@ -108,16 +124,35 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
     e.preventDefault();
     if (!editingOrder) return;
 
+    const finalItemCode = (editItemCode.trim() || 'PENDING SPEC').toUpperCase();
+    const finalPrice = editPrice !== '' ? Number(editPrice) : 0;
+
     onUpdateOrder(editingOrder.id, {
+      itemCode: finalItemCode,
       size: editSize.toUpperCase(),
       colour: editColour.toUpperCase(),
-      statedUnitPricePhp: editPrice !== '' ? Number(editPrice) : 0,
+      statedUnitPricePhp: finalPrice,
       reviewNotes: editNotes,
       reviewedBy: 'Owner / Admin',
       reviewedAt: new Date().toISOString(),
     });
 
     setEditingOrder(null);
+  };
+
+  const handleAttemptApprove = (ord: BuyerOrder) => {
+    if (!ord.statedUnitPricePhp || ord.statedUnitPricePhp <= 0) {
+      alert(`Cannot approve claim for ${ord.buyerName}: Unit price is ₱0. Please set the item price first.`);
+      handleOpenEdit(ord);
+      return;
+    }
+    if (ord.itemCode === 'PENDING SPEC') {
+      alert(`Cannot approve claim for ${ord.buyerName}: Item code is PENDING SPEC. Please assign the garment code first.`);
+      handleOpenEdit(ord);
+      return;
+    }
+    onApproveOrder(ord.id);
+    onTriggerReconciliation();
   };
 
   const handleToggleSelect = (id: string) => {
@@ -128,9 +163,29 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   };
 
   const handleBulkApprove = () => {
-    selectedOrderIds.forEach((id) => onApproveOrder(id));
+    const validIds: string[] = [];
+    let skippedCount = 0;
+    selectedOrderIds.forEach((id) => {
+      const ord = orders.find((o) => o.id === id);
+      if (ord && ord.statedUnitPricePhp && ord.statedUnitPricePhp > 0 && ord.itemCode !== 'PENDING SPEC') {
+        validIds.push(id);
+      } else {
+        skippedCount++;
+      }
+    });
+
+    if (validIds.length === 0 && skippedCount > 0) {
+      alert(`Cannot approve: All selected orders have ₱0 price or PENDING SPEC item code. Please update their prices and codes first.`);
+      return;
+    }
+
+    validIds.forEach((id) => onApproveOrder(id));
     setSelectedOrderIds(new Set());
     onTriggerReconciliation();
+
+    if (skippedCount > 0) {
+      alert(`Approved ${validIds.length} orders. ${skippedCount} orders were skipped because they have ₱0 price or PENDING SPEC.`);
+    }
   };
 
   return (
@@ -455,10 +510,40 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                           </a>
                         )}
                       </div>
+                      {ord.reviewNotes && (
+                        <div className="text-[10px] text-neutral-400 italic mt-1 truncate max-w-xs" title={ord.reviewNotes}>
+                          {ord.reviewNotes}
+                        </div>
+                      )}
                     </td>
 
-                    <td className="p-3 font-mono font-bold text-rose-300">
-                      {ord.itemCode}
+                    <td className="p-3">
+                      {ord.itemCode === 'PENDING SPEC' ? (
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30">
+                            ⚠️ PENDING SPEC
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(ord)}
+                            className="px-2 py-0.5 rounded bg-sky-950/60 hover:bg-sky-800 text-sky-300 text-[10px] font-semibold border border-sky-600/40 transition"
+                          >
+                            Assign Code
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-rose-300">{ord.itemCode}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(ord)}
+                            title="Edit Item Code"
+                            className="text-neutral-600 hover:text-neutral-300 transition"
+                          >
+                            <Edit2 className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
                     </td>
 
                     <td className="p-3 font-mono">
@@ -466,8 +551,29 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                       <span className="text-neutral-400 ml-1.5">{ord.colour}</span>
                     </td>
 
-                    <td className="p-3 font-mono font-bold text-amber-300">
-                      ₱{(ord.statedUnitPricePhp || 0).toLocaleString()}
+                    <td className="p-3 font-mono">
+                      {!ord.statedUnitPricePhp || ord.statedUnitPricePhp <= 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(ord)}
+                          className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-[11px] border border-rose-500/40 flex items-center gap-1 shadow transition"
+                        >
+                          <AlertTriangle className="w-3 h-3 text-rose-400" />
+                          <span>⚠️ ₱0 · Set Price</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-amber-300">₱{ord.statedUnitPricePhp.toLocaleString()}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(ord)}
+                            title="Edit Price"
+                            className="text-neutral-600 hover:text-neutral-300 transition"
+                          >
+                            <Edit2 className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
                     </td>
 
                     <td className="p-3 text-neutral-400 font-mono text-[11px]">
@@ -566,12 +672,19 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                       <div className="flex items-center justify-end gap-1.5">
                         {isPending && (
                           <button
-                            onClick={() => {
-                              onApproveOrder(ord.id);
-                              onTriggerReconciliation();
-                            }}
-                            title="Approve Order"
-                            className="p-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white transition"
+                            onClick={() => handleAttemptApprove(ord)}
+                            title={
+                              !ord.statedUnitPricePhp || ord.statedUnitPricePhp <= 0
+                                ? '⚠️ Price is ₱0 — click to assign price before approving'
+                                : ord.itemCode === 'PENDING SPEC'
+                                ? '⚠️ Item code is PENDING SPEC — click to assign code before approving'
+                                : 'Approve Order'
+                            }
+                            className={`p-1.5 rounded-lg transition ${
+                              !ord.statedUnitPricePhp || ord.statedUnitPricePhp <= 0 || ord.itemCode === 'PENDING SPEC'
+                                ? 'bg-amber-950/60 text-amber-400 hover:bg-amber-600 hover:text-white border border-amber-500/40'
+                                : 'bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white'
+                            }`}
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
@@ -624,9 +737,46 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">
-              <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800">
+              <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 space-y-1">
                 <div className="text-neutral-400">Buyer: <strong className="text-white">{editingOrder.buyerName}</strong></div>
-                <div className="text-neutral-400">Item: <strong className="text-rose-300 font-mono">{editingOrder.itemCode}</strong></div>
+                {editingOrder.reviewNotes && (
+                  <div className="text-[11px] text-amber-300/90 font-mono">
+                    Note / Comment: "{editingOrder.reviewNotes}"
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-neutral-400 block mb-1 font-semibold">Bangkok Garment Item Code</label>
+                <input
+                  type="text"
+                  list="modal-bangkok-item-codes"
+                  value={editItemCode}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditItemCode(val);
+                    const upper = val.trim().toUpperCase();
+                    if (KNOWN_BANGKOK_PRICES[upper] && (!editPrice || editPrice === '0')) {
+                      setEditPrice(String(KNOWN_BANGKOK_PRICES[upper]));
+                    }
+                  }}
+                  placeholder="e.g. RUSTANS, LU PANTS, LINEN PANTS..."
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white font-mono uppercase"
+                  required
+                />
+                <datalist id="modal-bangkok-item-codes">
+                  <option value="RUSTANS" />
+                  <option value="LU PANTS" />
+                  <option value="LINEN PANTS" />
+                  <option value="LONG DRESS" />
+                  <option value="FLOWY DRESS" />
+                  <option value="SEXY BLACK" />
+                  <option value="HALF SET" />
+                  <option value="ELEGANT SET" />
+                  <option value="GIG 5" />
+                  <option value="TALI TIE DYE" />
+                  <option value="SKORT" />
+                </datalist>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -637,6 +787,8 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                     onChange={(e) => setEditSize(e.target.value)}
                     className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white"
                   >
+                    <option value="FREE SIZE (PLUS)">FREE SIZE (PLUS)</option>
+                    <option value="FS (PLUS)">FS (PLUS)</option>
                     <option value="XL">XL</option>
                     <option value="2XL">2XL</option>
                     <option value="3XL">3XL</option>
@@ -652,18 +804,25 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                     type="text"
                     value={editColour}
                     onChange={(e) => setEditColour(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white"
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white uppercase"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-neutral-400 block mb-1">Unit Price (PHP)</label>
+                <label className="text-neutral-400 block mb-1 font-semibold">
+                  Unit Price (PHP) {(!editPrice || editPrice === '0') && <span className="text-rose-400">* Required</span>}
+                </label>
                 <input
                   type="number"
+                  min="1"
                   value={editPrice}
                   onChange={(e) => setEditPrice(e.target.value)}
-                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white font-mono"
+                  placeholder="e.g. 550"
+                  className={`w-full bg-neutral-950 border rounded-lg p-2 text-white font-mono ${
+                    !editPrice || editPrice === '0' ? 'border-rose-500' : 'border-neutral-700'
+                  }`}
+                  required
                 />
               </div>
 
@@ -673,7 +832,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                   rows={2}
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="e.g. Host verbally corrected price on replay (06:52)"
+                  placeholder="e.g. Host verbally called item price on replay"
                   className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white"
                 />
               </div>

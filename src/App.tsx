@@ -468,8 +468,17 @@ export default function App() {
         const data: any = await res.json();
         setOrders((prev) => prev.map((o) => (o.id === orderId ? data.order : o)));
         if (data.summary) setSummary(data.summary);
+        showToast(`Order approved and added to confirmed store buying demand.`);
+      } else {
+        const errJson = await res.json().catch(() => null);
+        showToast(`Cannot approve: ${errJson?.error || 'Invalid order details.'}`);
       }
     } catch (e) {
+      const target = orders.find((o) => o.id === orderId);
+      if (target && (!target.statedUnitPricePhp || target.statedUnitPricePhp <= 0 || target.itemCode === 'PENDING SPEC')) {
+        showToast(`Cannot approve claim: Unit price is ₱0 or item code is pending specification.`);
+        return;
+      }
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'confirmed' } : o)));
       const updated = orders.map((o) => (o.id === orderId ? { ...o, status: 'confirmed' as const } : o));
       const newSummary = runAutomaticLiveReconciliation(
@@ -482,8 +491,8 @@ export default function App() {
         'rolling_pass'
       );
       setSummary(newSummary);
+      showToast(`Order approved and added to confirmed store buying demand.`);
     }
-    showToast(`Order approved and added to confirmed store buying demand.`);
   };
 
   const handleRejectOrder = async (orderId: string, reason: string) => {

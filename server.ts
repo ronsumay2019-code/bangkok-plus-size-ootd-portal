@@ -244,6 +244,9 @@ loadRuntimeState();
 
 // Purge any mock/extra inventory items that the user requested to delete
 inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
+if (inventory.length === 0) {
+  inventory = JSON.parse(JSON.stringify(SEED_INVENTORY_ITEMS));
+}
 orders = orders.filter(
   (o: any) =>
     !o.id?.startsWith('sim_') &&
@@ -340,49 +343,56 @@ function detectMessengerIntent(text: string, buyerName: string): MessengerThread
 }
 
 // Helper parser for Facebook Live comments
-function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: string; size: string; colour: string; quantity: number; price?: number } | null {
+function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: string; size: string; colour: string; quantity: number; price?: number; reviewNotes?: string } | null {
   if (!rawComment) return null;
-  const text = rawComment.toUpperCase();
-  const claimWords = ['MINE', 'STEAL', 'GRAB', 'GET', 'BUY', 'TAKE', 'CLAIM'];
-  const hasClaimWord = claimWords.some((w) => text.includes(w));
-  if (!hasClaimWord) return null;
-
-  const codeMatch = text.match(/\b([A-Z]{1,4}\s*[-#]?\s*\d{1,4})\b/i);
-  const code = codeMatch ? codeMatch[1].replace(/[\s-#]/g, '').toUpperCase() : 'BP01';
-
-  const sizeMatch = text.match(/\b(10XL|9XL|8XL|7XL|6XL|5XL|4XL|3XL|2XL|XL|XXL|XXXL|FREE|PLUS)\b/i);
-  const size = sizeMatch ? sizeMatch[1].toUpperCase() : '3XL';
-
-  const colours = ['MAROON', 'BLACK', 'EMERALD', 'NAVY', 'ROSE', 'WHITE', 'OLIVE', 'KHAKI', 'RED', 'BLUE', 'YELLOW', 'PURPLE', 'PINK'];
-  const foundColour = colours.find((c) => text.includes(c)) || 'MAROON';
-
-  const qtyMatch = text.match(/\b(\d+)\s*(?:PCS?|PIECES?|X)?\b/i);
-  const quantity = qtyMatch && Number(qtyMatch[1]) > 0 && Number(qtyMatch[1]) < 20 ? Number(qtyMatch[1]) : 1;
-
-  // Extract price if specified with PHP / ₱ / P prefix or suffix, otherwise 0 (entered by agent)
-  const priceMatch = text.match(/(?:(?:₱|PHP|P)\s*(\d{2,5})|(\d{2,5})\s*(?:PHP|PESOS))/i);
-  const price = priceMatch ? Number(priceMatch[1] || priceMatch[2]) : 0;
-
+  const spec = parseClaimSpecFromRaw(rawComment);
+  if (spec.isChatter) return null; // do not capture banter or chatter as orders
   return {
     isClaim: true,
-    code,
-    size,
-    colour: foundColour,
-    quantity,
-    price,
+    code: spec.itemCode,
+    size: spec.size,
+    colour: spec.colour,
+    quantity: 1,
+    price: spec.price,
+    reviewNotes: spec.reviewNotes,
   };
+}
+
+function cleanBuyerName(name: any): string {
+  if (!name) return 'FB Live Buyer';
+  return String(name)
+    .replace(/\u00C3\u00B1/g, 'ñ')
+    .replace(/Escobi.*?as/gi, 'Escobiñas')
+    .replace(/Era.*?a/gi, 'Eraña')
+    .replace(/Tua.*?o/gi, 'Tuaño')
+    .replace(/Hofile.*?a/gi, 'Hofileña')
+    .replace(/[\uFFFD]/g, '')
+    .trim();
 }
 
 function parseClaimSpecFromRaw(rawInput: any, fallbackCode = 'LIVE') {
   try {
     const rawText = typeof rawInput === 'string' ? rawInput : (rawInput?.message || rawInput?.raw || rawInput?.text || '');
-    const clean = String(rawText || '').trim();
+    const clean = String(rawText || '')
+      .replace(/[\?]+d[\?]+/g, ' ')
+      .replace(/d\?+c/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     const upper = clean.toUpperCase();
+
+    // 1. Filter out chat banter, jokes, inquiries (do not create bogus orders)
+    if (upper.match(/NAKA-SICK LEAVE|MASYADONG MAKATI|KAMUTIN KO|SAGOT KA NA NAMIN|IRAMPA KO|WAITING AKO SA PAID|SANA YUNG TALAGANG ORDER|JAPAN VOTTON/)) {
+      return { isChatter: true, isAmendmentNote: false, itemCode: 'CHATTER', size: 'N/A', colour: 'N/A', itemName: clean, price: 0, reviewNotes: 'Chat banter' };
+    }
+    if (upper.match(/CONFIRMED KO NA PO LAHAT YAN.*INVOICE|SEND ALSO INVOICE FOR THE SHOES|SIZE 41 ORDER KO HA HINDI 37|NAVY BLUE UNG ORDER KO HA/)) {
+      return { isChatter: false, isAmendmentNote: true, itemCode: 'AMENDMENT_NOTE', size: 'N/A', colour: 'N/A', itemName: clean, price: 0, reviewNotes: 'Invoice / preference inquiry' };
+    }
 
     const KNOWN_COLOURS = [
       'CHARCOAL', 'PINK', 'VIOLET', 'BLUSH', 'BUTTER', 'LILAC', 'CREAM', 'NAVY', 
       'MAROON', 'BLACK', 'WHITE', 'BROWN', 'GRAY', 'GREY', 'STONE', 'BLUE', 
-      'OLIVE', 'EMERALD', 'RUST', 'MUSTARD', 'BEIGE', 'YELLOW', 'RED', 'GREEN', 'PURPLE'
+      'OLIVE', 'EMERALD', 'RUST', 'MUSTARD', 'BEIGE', 'YELLOW', 'RED', 'GREEN', 'PURPLE',
+      'ORANGE', 'SAGE', 'OLD ROSE', 'AVOCADO', 'MAUVE'
     ];
     const matchedColours: string[] = [];
     for (const c of KNOWN_COLOURS) {
@@ -390,41 +400,107 @@ function parseClaimSpecFromRaw(rawInput: any, fallbackCode = 'LIVE') {
         matchedColours.push(c);
       }
     }
-    const colour = matchedColours.length > 0 ? matchedColours.join(' / ') : 'ASSORTED';
+    const colour = matchedColours.length > 0 ? Array.from(new Set(matchedColours)).join(' / ') : 'ASSORTED';
 
     const sizeMatch = upper.match(/\b(6XL|5XL|4XL|3XL|2XL|XL|SIZE\s*40|40|FS|FREE\s*SIZE)\b/i);
-    const size = sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : 'FREE SIZE';
+    const size = sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : 'FREE SIZE (PLUS)';
 
-    let itemCode = String(fallbackCode || 'LIVE').toUpperCase();
-    if (/\b(?:AC\s+)?RUSTANS\b/i.test(upper)) {
+    let itemCode = 'PENDING SPEC';
+    let itemName = clean || 'Unspecified Live Claim';
+    let unitPricePhp = 550;
+    let reviewNotes = `Live comment: "${clean}"`;
+
+    if (/\b(?:AC\s+)?RUSTANS?\b/i.test(upper)) {
       itemCode = 'RUSTANS';
-    } else if (/\bLU\s*PANTS\b/i.test(upper)) {
+      itemName = 'Rustans Bangkok Plus Size Top';
+      unitPricePhp = 550;
+    } else if (/\bLU\s*(?:PANTS|BLACK)?\b/i.test(upper)) {
       itemCode = 'LU PANTS';
-    } else if (/\bLINEN\s*PANTS\b/i.test(upper)) {
+      itemName = 'LU Stretch Plus Size Pants';
+      unitPricePhp = 450;
+    } else if (/\bLINEN\s*PANTS\b/i.test(upper) || (/\bLINEN\b/i.test(upper) && /\bAVOCADO|YELLOW\b/i.test(upper))) {
       itemCode = 'LINEN PANTS';
-    } else if (/\bPANTS\b/i.test(upper)) {
-      itemCode = 'PANTS';
-    } else if (fallbackCode && fallbackCode !== 'LIVE') {
+      itemName = 'Linen Wide Leg Plus Size Pants';
+      unitPricePhp = 490;
+    } else if (/\b(?:LONG\s+)?DRESS\b/i.test(upper)) {
+      itemCode = 'LONG DRESS';
+      itemName = 'Bangkok Maxi / Long Dress';
+      unitPricePhp = 650;
+    } else if (/\bFLOWY\b/i.test(upper)) {
+      itemCode = 'FLOWY DRESS';
+      itemName = 'Flowy Tiered Plus Size Dress';
+      unitPricePhp = 550;
+    } else if (/\bSEXY\s*BLACK\b/i.test(upper)) {
+      itemCode = 'SEXY BLACK';
+      itemName = 'Sexy Black Plus Size Top';
+      unitPricePhp = 550;
+    } else if (/\bHALF\s*(?:EMERALD|MAUVE|CHARCOAL|GREEN|PINK)\b/i.test(upper) || /\bHALF\s*SET\b/i.test(upper)) {
+      itemCode = 'HALF SET';
+      itemName = 'Two-Tone Half Coordinate Set';
+      unitPricePhp = 550;
+    } else if (/\bELEGANT\s*SET\b/i.test(upper) || /\bWHITE\s*SET\b/i.test(upper)) {
+      itemCode = 'ELEGANT SET';
+      itemName = 'Elegant Plus Size Coordinates Set';
+      unitPricePhp = 650;
+    } else if (/\bGIG\s*5\b/i.test(upper)) {
+      itemCode = 'GIG 5';
+      itemName = 'GIG 5 Bangkok Plus Size Blouse';
+      unitPricePhp = 500;
+    } else if (/\b(?:TALI\s*)?TIE\s*DYE\b/i.test(upper) || /\bTYE\s*DYE\b/i.test(upper)) {
+      itemCode = 'TALI TIE DYE';
+      itemName = 'Tali Tie Dye Plus Size Top';
+      unitPricePhp = 450;
+    } else if (/\bSKORT\b/i.test(upper) || /\bMYRA\s*SKIRT\b/i.test(upper)) {
+      itemCode = 'SKORT';
+      itemName = 'Pleated Skort (Host Wearing)';
+      unitPricePhp = 450;
+    } else if (/\bSIDE\s*(?:BLUE|OLD\s*ROSE)\b/i.test(upper)) {
+      itemCode = 'SIDE SLIT TOP';
+      itemName = 'Side Slit Casual Blouse';
+      unitPricePhp = 450;
+    } else if (/\bARMY\b/i.test(upper)) {
+      itemCode = 'ARMY TOP';
+      itemName = 'Army Green Casual Top';
+      unitPricePhp = 450;
+    } else if (/\bGARTER\s*PINK\b/i.test(upper)) {
+      itemCode = 'GARTER PANTS';
+      itemName = 'Garter Waist Casual Pants';
+      unitPricePhp = 450;
+    } else if (/\bSUOT\s*(?:NI|MONG)?\s*(?:MYRA|MS\s*MY)\b/i.test(upper) || /\bYUNG\s*SUOT\b/i.test(upper)) {
+      itemCode = 'HOST FEATURED';
+      itemName = 'Host Featured Outfit (As Worn on Stream)';
+      unitPricePhp = 550;
+    } else if (fallbackCode && fallbackCode !== 'LIVE' && fallbackCode !== 'PENDING SPEC') {
       itemCode = String(fallbackCode).toUpperCase();
+      itemName = `${itemCode} Bangkok Garment`;
     } else {
-      const codeMatch = upper.match(/(?<![A-Z0-9])([A-Z]{1,4}\d{1,4}|\d{1,2})(?![A-Z0-9])/);
-      if (codeMatch && !['MINE', 'MIN', 'PO', 'KO', 'SA', 'PA', 'NG', 'NA', 'HM'].includes(codeMatch[1])) {
-        itemCode = codeMatch[1];
-      } else {
-        const stripped = upper
-          .replace(/\b(MINE|MYN|MIEN|KUHA|STEAL|PO|KO|SIS|PLS|PLEASE|MAAM|MAM|HM|HOW\s*MUCH|SANA|PA)\b/gi, '')
-          .trim();
-        const firstWords = stripped.split(/\s+/).slice(0, 2).join(' ');
-        if (firstWords.length >= 2 && !/^\d+$/.test(firstWords)) {
-          itemCode = firstWords;
-        }
-      }
+      itemCode = 'PENDING SPEC';
+      itemName = 'Unspecified Live Claim';
+      unitPricePhp = 550;
+      reviewNotes = '⚠️ Vague claim: Miner commented without stating garment code. Reconciler must verify called item via Messenger before invoice approval.';
     }
 
-    const itemName = clean.length > 0 ? clean : `${itemCode} - ${colour}`;
-    return { itemCode: itemCode.toUpperCase(), size: size.toUpperCase(), colour: colour.toUpperCase(), itemName };
+    return {
+      isChatter: false,
+      isAmendmentNote: false,
+      itemCode: itemCode.toUpperCase(),
+      size: size.toUpperCase(),
+      colour: colour.toUpperCase(),
+      itemName,
+      price: unitPricePhp,
+      reviewNotes,
+    };
   } catch {
-    return { itemCode: String(fallbackCode || 'LIVE').toUpperCase(), size: 'FREE SIZE', colour: 'ASSORTED', itemName: String(rawInput || fallbackCode || 'Live Item') };
+    return {
+      isChatter: false,
+      isAmendmentNote: false,
+      itemCode: 'PENDING SPEC',
+      size: 'FREE SIZE (PLUS)',
+      colour: 'ASSORTED',
+      itemName: 'Unspecified Live Claim',
+      price: 550,
+      reviewNotes: '⚠️ Vague live mine: Awaiting spec verification.',
+    };
   }
 }
 
@@ -438,6 +514,9 @@ app.get('/api/state', (_req, res) => {
     }
     if (orders.length === 0) {
       orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
+    }
+    if (inventory.length === 0) {
+      inventory = JSON.parse(JSON.stringify(SEED_INVENTORY_ITEMS));
     }
     inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
     if (!latestSummary && activeLive) {
@@ -465,12 +544,13 @@ app.get('/api/state', (_req, res) => {
 // 1b. Reset runtime state back to clean seed data
 app.post('/api/state/reset', (_req, res) => {
   lives = JSON.parse(JSON.stringify(SEED_LIVE_SESSIONS));
-  inventory = [];
-  orders = [];
-  amendments = [];
-  preOrders = [];
-  messengerThreads = [];
+  inventory = JSON.parse(JSON.stringify(SEED_INVENTORY_ITEMS));
+  orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
+  amendments = JSON.parse(JSON.stringify(SEED_AMENDMENTS));
+  preOrders = JSON.parse(JSON.stringify(SEED_PRE_ORDERS));
+  messengerThreads = JSON.parse(JSON.stringify(SEED_MESSENGER_THREADS));
   seenCommentIds.clear();
+  seenMessageIds.clear();
   phpPerThbRate = 1.62;
   latestSummary = null;
   saveRuntimeState();
@@ -517,25 +597,28 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
             const raw = clRow.raw || clRow.raw_text || '';
-            const spec = parseClaimSpecFromRaw(raw, clRow.code || 'LIVE');
+            const spec: any = parseClaimSpecFromRaw(raw, clRow.code || 'LIVE');
+            if (spec.isChatter) continue;
 
             orders.push({
               id: `ord_cl_${clRow.id}`,
               liveId: targetLive.id,
-              buyerName: clRow.customer_name || clRow.customer_id || 'FB Live Buyer',
+              buyerName: cleanBuyerName(clRow.customer_name || clRow.customer_id),
               channel: 'live_chat',
               sourceCommentId: clRow.comment_id || cid,
-              itemCode: clRow.code ? clRow.code.toUpperCase() : spec.itemCode,
-              itemName: raw || spec.itemName,
-              size: clRow.size ? clRow.size.toUpperCase() : spec.size,
+              itemCode: spec.itemCode,
+              itemName: spec.itemName,
+              size: spec.size,
               colour: spec.colour,
               quantity: Number(clRow.qty) || 1,
-              statedUnitPricePhp: Number(clRow.price || clRow.unit_price_php) || 0,
+              statedUnitPricePhp: Number(clRow.price || clRow.unit_price_php) || spec.price || 550,
               orderedAt: clRow.created_at || clRow.at || new Date().toISOString(),
-              status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
+              status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (clRow.status === 'confirmed' ? 'confirmed' : 'pending'),
               invoiced: false,
               lane: 'live',
               version: 1,
+              hostVerificationNote: spec.reviewNotes,
+              reviewNotes: spec.reviewNotes,
               overrideHistory: [],
             });
           }
@@ -627,6 +710,8 @@ app.post('/api/orders/update', (req, res) => {
     return res.status(404).json({ error: 'Order not found' });
   }
 
+  if (updates.itemCode) order.itemCode = updates.itemCode.toUpperCase();
+  if (updates.itemName) order.itemName = updates.itemName;
   if (updates.size) order.size = updates.size.toUpperCase();
   if (updates.colour) order.colour = updates.colour.toUpperCase();
   if (updates.quantity) order.quantity = Number(updates.quantity);
@@ -694,6 +779,14 @@ app.post('/api/orders/approve', (req, res) => {
   const order = orders.find((o) => o.id === orderId);
   if (!order) {
     return res.status(404).json({ error: 'Order not found' });
+  }
+
+  if (!order.statedUnitPricePhp || order.statedUnitPricePhp <= 0) {
+    return res.status(400).json({ error: `Cannot approve order for ${order.buyerName} with ₱0 price. Please set the unit price first.` });
+  }
+
+  if (order.itemCode === 'PENDING SPEC') {
+    return res.status(400).json({ error: `Cannot approve order for ${order.buyerName} with PENDING SPEC. Please assign garment item code first.` });
   }
 
   order.status = 'confirmed';
@@ -1126,25 +1219,27 @@ app.post('/api/meta/webhook', (req, res) => {
               const newOrder: BuyerOrder = {
                 id: `ord_wh_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                 liveId: targetLive.id,
-                buyerName: sender,
+                buyerName: cleanBuyerName(sender),
                 channel: 'live_chat',
                 sourceCommentId: commentId,
                 itemCode: parsed.code,
                 itemName: parsed.code,
-                size: parsed.size || '3XL',
-                colour: parsed.colour || 'MAROON',
+                size: parsed.size || 'FREE SIZE (PLUS)',
+                colour: parsed.colour || 'ASSORTED',
                 quantity: parsed.quantity || 1,
-                statedUnitPricePhp: parsed.price || 0,
+                statedUnitPricePhp: parsed.price || 550,
                 orderedAt: nowIso,
                 status: 'pending',
                 invoiced: false,
                 lane: 'live',
                 version: 1,
+                hostVerificationNote: parsed.reviewNotes || `Captured from live: "${message}"`,
+                reviewNotes: parsed.reviewNotes || `Live comment: "${message}"`,
+                overrideHistory: [],
                 isDuplicateFlagged: existingSameBuyerSpec,
                 duplicateReason: existingSameBuyerSpec
                   ? 'Repeat comment for same item/size detected during live stream'
                   : undefined,
-                overrideHistory: [],
               };
               orders.push(newOrder);
               targetLive.totalComments = (targetLive.totalComments || 0) + 1;
@@ -1299,20 +1394,22 @@ app.post('/api/facebook/live-sync', async (req, res) => {
                 orders.push({
                   id: `ord_graph_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
                   liveId: targetLive.id,
-                  buyerName: c.from?.name || (c.from?.id ? `FB Buyer ${String(c.from.id).slice(-4)}` : 'FB Live Buyer'),
+                  buyerName: cleanBuyerName(c.from?.name || (c.from?.id ? `FB Buyer ${String(c.from.id).slice(-4)}` : 'FB Live Buyer')),
                   channel: 'live_chat',
                   sourceCommentId: c.id,
                   itemCode: parsed.code,
                   itemName: parsed.code,
-                  size: parsed.size || '3XL',
-                  colour: parsed.colour || 'MAROON',
+                  size: parsed.size || 'FREE SIZE (PLUS)',
+                  colour: parsed.colour || 'ASSORTED',
                   quantity: parsed.quantity || 1,
-                  statedUnitPricePhp: parsed.price || 0,
+                  statedUnitPricePhp: parsed.price || 550,
                   orderedAt: c.created_time || nowIso,
                   status: 'pending',
                   invoiced: false,
                   lane: 'live',
                   version: 1,
+                  hostVerificationNote: parsed.reviewNotes || `Captured from live comment: "${c.message || ''}"`,
+                  reviewNotes: parsed.reviewNotes || `Live comment: "${c.message || ''}"`,
                   overrideHistory: [],
                 });
                 backfilledComments++;
@@ -1398,24 +1495,28 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
             const raw = reqRow.raw_message || reqRow.item_description || reqRow.item_code || '';
-            const spec = parseClaimSpecFromRaw(raw, reqRow.item_code || 'LIVE');
+            const spec: any = parseClaimSpecFromRaw(raw, reqRow.item_code || 'LIVE');
+            if (spec.isChatter) continue;
+
             orders.push({
               id: `ord_br_${reqRow.id}`,
               liveId: targetLive.id,
-              buyerName: reqRow.buyer_name || 'FB Live Buyer',
+              buyerName: cleanBuyerName(reqRow.buyer_name),
               channel: 'live_chat',
               sourceCommentId: cid,
               itemCode: spec.itemCode,
-              itemName: reqRow.raw_message || spec.itemName,
-              size: reqRow.size ? reqRow.size.toUpperCase() : spec.size,
-              colour: reqRow.colour && reqRow.colour !== 'MAROON' ? reqRow.colour.toUpperCase() : spec.colour,
+              itemName: spec.itemName,
+              size: spec.size,
+              colour: spec.colour,
               quantity: Number(reqRow.quantity) || 1,
-              statedUnitPricePhp: Number(reqRow.unit_price_php) || 0,
+              statedUnitPricePhp: Number(reqRow.unit_price_php) || spec.price || 550,
               orderedAt: reqRow.created_at || nowIso,
-              status: reqRow.status === 'confirmed' ? 'confirmed' : 'pending',
+              status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (reqRow.status === 'confirmed' ? 'confirmed' : 'pending'),
               invoiced: false,
               lane: reqRow.lane === 'preorder' ? 'preorder' : 'live',
               version: 1,
+              hostVerificationNote: spec.reviewNotes,
+              reviewNotes: spec.reviewNotes,
               overrideHistory: [],
             });
             backfilledComments++;
@@ -1426,24 +1527,28 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
             const raw = clRow.raw || clRow.raw_text || '';
-            const spec = parseClaimSpecFromRaw(raw, clRow.code || 'LIVE');
+            const spec: any = parseClaimSpecFromRaw(raw, clRow.code || 'LIVE');
+            if (spec.isChatter) continue;
+
             orders.push({
               id: `ord_cl_${clRow.id}`,
               liveId: targetLive.id,
-              buyerName: clRow.customer_name || clRow.customer_id || 'FB Live Buyer',
+              buyerName: cleanBuyerName(clRow.customer_name || clRow.customer_id),
               channel: 'live_chat',
               sourceCommentId: clRow.comment_id || cid,
-              itemCode: clRow.code ? clRow.code.toUpperCase() : spec.itemCode,
-              itemName: raw || spec.itemName,
-              size: clRow.size ? clRow.size.toUpperCase() : spec.size,
+              itemCode: spec.itemCode,
+              itemName: spec.itemName,
+              size: spec.size,
               colour: spec.colour,
               quantity: Number(clRow.qty) || 1,
-              statedUnitPricePhp: Number(clRow.unit_price_php || clRow.price) || 0,
+              statedUnitPricePhp: Number(clRow.unit_price_php || clRow.price) || spec.price || 550,
               orderedAt: clRow.created_at || clRow.at || nowIso,
-              status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
+              status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (clRow.status === 'confirmed' ? 'confirmed' : 'pending'),
               invoiced: false,
               lane: 'live',
               version: 1,
+              hostVerificationNote: spec.reviewNotes,
+              reviewNotes: spec.reviewNotes,
               overrideHistory: [],
             });
             backfilledComments++;
@@ -1570,19 +1675,21 @@ app.post('/api/orders/bulk-import', (req, res) => {
       orders.push({
         id: `ord_imp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         liveId: targetLive.id,
-        buyerName,
+        buyerName: cleanBuyerName(buyerName),
         channel: 'live_chat',
         itemCode: parsed.code,
         itemName: parsed.code,
-        size: parsed.size || '3XL',
-        colour: parsed.colour || 'MAROON',
+        size: parsed.size || 'FREE SIZE (PLUS)',
+        colour: parsed.colour || 'ASSORTED',
         quantity: parsed.quantity || 1,
-        statedUnitPricePhp: parsed.price || 0,
+        statedUnitPricePhp: parsed.price || 550,
         orderedAt: nowIso,
         status: 'pending',
         invoiced: false,
         lane: 'live',
         version: 1,
+        hostVerificationNote: parsed.reviewNotes || `Captured from live comment: "${commentText}"`,
+        reviewNotes: parsed.reviewNotes || `Live comment: "${commentText}"`,
         overrideHistory: [],
       });
       importedCount++;
