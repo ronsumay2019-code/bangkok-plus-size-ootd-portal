@@ -397,7 +397,7 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
   if (orders.length === 0) {
     try {
       const bridgeUrl = process.env.BRIDGE_SYNC_URL || 'https://bangkokplussizeootd.vercel.app/api/facebook/live-sync?bridge=1';
-      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
+      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(3000) });
       if (bridgeRes.ok) {
         const bData: any = await bridgeRes.json();
         for (const clRow of bData.bridge?.claims || []) {
@@ -1228,7 +1228,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
     // Automatic bridge fallback to main Bangkok Plus Size OOTD backend (which holds the connected Facebook Page token in Supabase)
     try {
       const bridgeUrl = process.env.BRIDGE_SYNC_URL || 'https://bangkokplussizeootd.vercel.app/api/facebook/live-sync?bridge=1';
-      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
+      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(3500) });
       if (bridgeRes.ok) {
         const bData: any = await bridgeRes.json();
         graphSyncStats.mode = 'live_graph_api';
