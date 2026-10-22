@@ -12,6 +12,7 @@ import { BuyingBehaviorDashboard } from './components/BuyingBehaviorDashboard';
 import { PreOrdersLane } from './components/PreOrdersLane';
 import { OwnerOverrideModal } from './components/OwnerOverrideModal';
 import { MobileAccessQRModal } from './components/MobileAccessQRModal';
+import { MetaTokenModal } from './components/MetaTokenModal';
 import { 
   LiveSession, 
   BuyerOrder, 
@@ -36,6 +37,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('live_command');
   const [showAnalysisModal, setShowAnalysisModal] = useState<boolean>(false);
   const [isMobileAccessModalOpen, setIsMobileAccessModalOpen] = useState<boolean>(false);
+  const [isMetaTokenModalOpen, setIsMetaTokenModalOpen] = useState<boolean>(false);
   const [lives, setLives] = useState<LiveSession[]>(SEED_LIVE_SESSIONS);
   const [inventory, setInventory] = useState<InventoryItem[]>(SEED_INVENTORY_ITEMS);
   const [orders, setOrders] = useState<BuyerOrder[]>(SEED_BUYER_ORDERS);
@@ -968,6 +970,7 @@ export default function App() {
         phpRate={phpRate}
         onOpenAnalysis={() => setShowAnalysisModal(true)}
         onOpenMobileAccessModal={() => setIsMobileAccessModalOpen(true)}
+        onOpenMetaTokenModal={() => setIsMetaTokenModalOpen(true)}
         preOrdersCount={preOrders.length}
         userRole={userRole}
         setUserRole={(newRole) => {
@@ -1165,6 +1168,16 @@ export default function App() {
             );
           }
           showToast(`Switched active profile to ${newName} (${newRole.toUpperCase()})`);
+        }}
+      />
+
+      {/* Meta Facebook Page Access Token Modal */}
+      <MetaTokenModal
+        isOpen={isMetaTokenModalOpen}
+        onClose={() => setIsMetaTokenModalOpen(false)}
+        onTokenSaved={() => {
+          showToast('Meta Graph API Token connected! Outbound DMs active.');
+          setGraphSyncStats((prev: any) => ({ ...prev, mode: 'live_graph_api' }));
         }}
       />
     </div>

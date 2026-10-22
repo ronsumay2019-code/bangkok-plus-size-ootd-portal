@@ -24,6 +24,7 @@ interface HeaderProps {
   phpRate: number;
   onOpenAnalysis: () => void;
   onOpenMobileAccessModal?: () => void;
+  onOpenMetaTokenModal?: () => void;
   preOrdersCount?: number;
   userRole: 'owner' | 'admin' | 'staff';
   setUserRole: (role: 'owner' | 'admin' | 'staff') => void;
@@ -44,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   phpRate,
   onOpenAnalysis,
   onOpenMobileAccessModal,
+  onOpenMetaTokenModal,
   preOrdersCount = 0,
   userRole,
   setUserRole,
@@ -127,14 +129,19 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Zero-Refund Invoicing Gate</span>
           </div>
 
-          {/* Meta Webhook & Graph API Status */}
-          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 border border-neutral-700/80 text-xs text-neutral-300">
+          {/* Meta Webhook & Graph API Status / Token Config */}
+          <button
+            type="button"
+            onClick={onOpenMetaTokenModal}
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 hover:bg-neutral-700/80 border border-neutral-700/80 text-xs text-neutral-300 transition cursor-pointer"
+            title="Click to connect or view your Facebook Page Access Token for automated Messenger DM dispatch"
+          >
             <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="text-neutral-400">Meta Sync:</span>
+            <span className="text-neutral-400">Meta API:</span>
             <span className="font-semibold text-emerald-300">
-              {graphSyncStats?.broadcastStatus === 'LIVE' ? 'Live Stream Active' : 'Webhook Listening'}
+              {graphSyncStats?.mode === 'live_graph_api' ? 'Graph API Active' : 'Connect Token 🔑'}
             </span>
-          </div>
+          </button>
 
           {/* User Executive Role Switcher & Current User */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-800/90 border border-neutral-700 text-xs">
