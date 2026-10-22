@@ -3,7 +3,8 @@
     "target": "ES2022",
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
-    "module": "ESNext",
+    "module": "CommonJS",
+    "esModuleInterop": true,
     "types": ["vite/client"],
     "lib": [
       "ES2022",
@@ -11,7 +12,7 @@
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
