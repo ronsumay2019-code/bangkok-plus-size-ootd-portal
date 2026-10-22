@@ -363,6 +363,9 @@ function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: st
 // 1. Get full state
 app.get('/api/state', (_req, res) => {
   try {
+    if (orders.length === 0) {
+      loadRuntimeState();
+    }
     inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
     if (!latestSummary && activeLive) {
       try {
