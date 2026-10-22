@@ -14,29 +14,38 @@ import {
   Layers,
   ArrowRight,
   ExternalLink,
-  Tag
+  Tag,
+  X,
+  Send,
 } from 'lucide-react';
-import { PreOrder, BuyerOrder } from '../types/reconciliation';
+import { PreOrder, BuyerOrder, MessengerThread } from '../types/reconciliation';
 
 interface PreOrdersLaneProps {
   preOrders: PreOrder[];
+  messengerThreads?: MessengerThread[];
   onAddPreOrder: (data: Partial<PreOrder>) => Promise<void>;
   onUpdateStatus: (preOrderId: string, status: PreOrder['status'], notes?: string) => Promise<void>;
   onOpenOverride: (order: PreOrder, isPreOrder: boolean) => void;
+  onReplyMessenger?: (threadId: string, text: string) => Promise<void>;
   userRole: 'owner' | 'admin' | 'staff';
 }
 
 export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
   preOrders,
+  messengerThreads = [],
   onAddPreOrder,
   onUpdateStatus,
   onOpenOverride,
+  onReplyMessenger,
   userRole,
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterChannel, setFilterChannel] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedMessengerThread, setSelectedMessengerThread] = useState<MessengerThread | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
   // New pre-order form state
   const [buyerName, setBuyerName] = useState('');
@@ -94,6 +103,18 @@ export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
       setNotes('');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMessengerThread || !replyText.trim() || !onReplyMessenger) return;
+    setIsSendingReply(true);
+    try {
+      await onReplyMessenger(selectedMessengerThread.id, replyText.trim());
+      setReplyText('');
+    } finally {
+      setIsSendingReply(false);
     }
   };
 
@@ -316,6 +337,69 @@ export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
                       </>
                     )}
                   </div>
+
+                  {/* Snapshot of Messenger Inbox in Pre-Orders Lane (Requirement 2C) */}
+                  {(() => {
+                    const matchingThread = messengerThreads.find(
+                      (t) => t.buyerName.toLowerCase() === item.buyerName.toLowerCase() ||
+                             (item.buyerContact && (t.psid === item.buyerContact || item.buyerContact.includes(t.psid)))
+                    );
+
+                    if (item.channel !== 'messenger' && !matchingThread) return null;
+
+                    const lastMsg = matchingThread?.messages?.[matchingThread.messages.length - 1];
+
+                    return (
+                      <div className="mt-3 p-3 bg-neutral-950/90 rounded-xl border border-sky-500/40 text-xs space-y-2 max-w-xl">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-bold text-sky-300 text-[11px]">
+                            <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
+                            <span>Business Messenger Inbox Snapshot · Order Source</span>
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+                            24h Window Active
+                          </span>
+                        </div>
+
+                        <div className="bg-neutral-900/80 rounded-lg p-2.5 border border-neutral-800 text-[11px] text-neutral-300">
+                          <div className="text-[10px] text-neutral-500 mb-0.5 font-mono">
+                            Latest Customer Inquiry / Order Message:
+                          </div>
+                          <div className="italic text-sky-200">
+                            "{lastMsg?.text || item.notes || `Hi sis! Pa-preorder po ako ng ${item.itemCode} (${item.size} ${item.colour}) please.`}"
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-neutral-400 font-mono">
+                          <span>PSID: {matchingThread?.psid || item.buyerContact || 'Page Connected PSID'}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMessengerThread(matchingThread || {
+                              id: `th_pre_${item.id}`,
+                              psid: item.buyerContact || `psid_${item.id}`,
+                              buyerName: item.buyerName,
+                              buyerHandle: `fb.com/${item.buyerName}`,
+                              windowExpiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
+                              unreadCount: 0,
+                              messages: [
+                                {
+                                  id: `m_pre_${item.id}`,
+                                  mid: `m_pre_${item.id}`,
+                                  sender: 'buyer',
+                                  text: item.notes || `Pre-order inquiry for ${item.itemCode} (${item.size} ${item.colour})`,
+                                  timestamp: item.createdAt,
+                                }
+                              ]
+                            })}
+                            className="text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 underline"
+                          >
+                            <span>Open Messenger Conversation Thread</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -507,6 +591,80 @@ export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Synced Messenger Thread Snapshot Modal (Requirement 2C) */}
+      {selectedMessengerThread && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-sky-400" />
+                <div>
+                  <h3 className="font-bold text-sm text-white">{selectedMessengerThread.buyerName}</h3>
+                  <div className="text-[10px] text-neutral-400 font-mono">PSID: {selectedMessengerThread.psid}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMessengerThread(null)}
+                className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 max-h-72 overflow-y-auto space-y-2 text-xs">
+              {selectedMessengerThread.messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`p-2.5 rounded-xl max-w-[85%] text-xs ${
+                    m.sender === 'buyer'
+                      ? 'bg-neutral-800 text-neutral-200 mr-auto'
+                      : 'bg-gradient-to-r from-sky-600 to-blue-600 text-white ml-auto'
+                  }`}
+                >
+                  <div>{m.text}</div>
+                  <div className="text-[9px] opacity-60 text-right mt-1 font-mono">
+                    {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleSendReply} className="flex gap-2 pt-2 border-t border-neutral-800">
+              <input
+                type="text"
+                placeholder="Reply to customer via Business Messenger..."
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                className="flex-1 bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-neutral-500 focus:border-purple-500"
+              />
+              <button
+                type="submit"
+                disabled={isSendingReply || !replyText.trim()}
+                className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold rounded-lg text-xs flex items-center gap-1 transition"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isSendingReply ? 'Sending...' : 'Reply'}</span>
+              </button>
+            </form>
+
+            <div className="flex items-center justify-between pt-2 border-t border-neutral-800 text-xs">
+              <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-mono">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                24h Messaging Window Active
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedMessengerThread(null)}
+                className="px-4 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition"
+              >
+                Close Snapshot
+              </button>
+            </div>
           </div>
         </div>
       )}

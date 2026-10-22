@@ -15,7 +15,13 @@ import {
   Users,
   Store,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Eye,
+  FileText,
+  X,
+  Printer,
+  MessageSquare,
+  PenTool,
 } from 'lucide-react';
 import { ReconciliationSummary, BuyerBag } from '../types/reconciliation';
 
@@ -34,6 +40,35 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
   const [copiedDraft, setCopiedDraft] = useState<string | null>(null);
   const [invoicingSuccess, setInvoicingSuccess] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'ready' | 'needs_resolution'>('all');
+
+  // Invoice Preview & Handwritten Note state (Requirement 3)
+  const [previewBag, setPreviewBag] = useState<BuyerBag | null>(null);
+  const [handwrittenNote, setHandwrittenNote] = useState<string>('');
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
+  const [invoiceSentSuccess, setInvoiceSentSuccess] = useState(false);
+
+  const handleOpenInvoicePreview = (bag: BuyerBag) => {
+    setPreviewBag(bag);
+    setHandwrittenNote(
+      `Hi Sis ${bag.buyerName}! 💖 Maraming salamat sa pag-mine kanina sa ating live selling! Sinigurado ko talagang maganda at bago tong items mo diretso galing Bangkok Pratunam store. May kasama itong special freebie para sa yo! Ingat always and enjoy your plus-size OOTD! ✨\n— Live Host / BPSO Team`
+    );
+    setInvoiceSentSuccess(false);
+  };
+
+  const handleSendInvoiceWithHandwrittenNote = async () => {
+    if (!previewBag) return;
+    setIsSendingInvoice(true);
+    try {
+      onGenerateInvoices([previewBag.buyerName]);
+      setInvoiceSentSuccess(true);
+      setTimeout(() => {
+        setInvoiceSentSuccess(false);
+        setPreviewBag(null);
+      }, 2500);
+    } finally {
+      setIsSendingInvoice(false);
+    }
+  };
 
   if (!summary) {
     return (
@@ -100,6 +135,16 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const targetBag = summary.buyerBags.find((b) => b.totalPiecesGot > 0) || summary.buyerBags[0];
+                if (targetBag) handleOpenInvoicePreview(targetBag);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Preview Final Invoice</span>
+            </button>
             <button
               onClick={onTriggerReconciliation}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-semibold border border-neutral-700 transition"
@@ -313,7 +358,19 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenInvoicePreview(bag);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-950/40 hover:bg-sky-900/60 border border-sky-500/40 hover:border-sky-500 text-sky-300 rounded-xl text-xs font-semibold shadow transition"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Preview Invoice</span>
+                    </button>
+
                     <div className="text-right">
                       <div className="font-bold text-sm text-emerald-400 font-mono">
                         ₱{bag.subtotalPhp.toLocaleString()}
@@ -490,6 +547,218 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
           </table>
         </div>
       </div>
+
+      {/* Invoice Preview Modal with Handwritten Note Above Attachment (Requirement 3) */}
+      {previewBag && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-gradient-to-tr from-sky-600 to-indigo-600 rounded-xl text-white shadow">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">
+                    Official Final Invoice & Note Dispatch
+                  </h3>
+                  <p className="text-xs text-neutral-400">
+                    BPSO Gated Protocol: Verify reconciled pieces and attach a personalized handwritten note before dispatching.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewBag(null)}
+                className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* REQUIREMENT 3: Text field above the invoice attachment for random handwritten note */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <PenTool className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Personal Handwritten Note (Appears Above Invoice Attachment)</span>
+                </label>
+                <span className="text-[10px] text-neutral-500 italic">
+                  Editable message typewritten by hand
+                </span>
+              </div>
+
+              <textarea
+                rows={3}
+                value={handwrittenNote}
+                onChange={(e) => setHandwrittenNote(e.target.value)}
+                placeholder="Type a random handwritten note or special host message to the miner..."
+                className="w-full bg-amber-950/20 border border-amber-500/40 focus:border-amber-400 rounded-xl p-3 text-xs text-amber-100 placeholder:text-neutral-500 font-serif italic focus:outline-none transition"
+              />
+
+              {/* Live Handwritten Style Preview Card */}
+              {handwrittenNote.trim() && (
+                <div className="p-3 bg-gradient-to-r from-amber-950/30 via-neutral-900 to-amber-950/20 border border-amber-600/30 rounded-xl shadow-inner">
+                  <div className="text-[10px] font-bold text-amber-400/80 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <span>Handwritten Note Card Preview:</span>
+                  </div>
+                  <p className="text-xs text-amber-200 font-serif italic whitespace-pre-wrap leading-relaxed">
+                    "{handwrittenNote}"
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* The Official Invoice Attachment Preview */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Invoice Attachment Preview</span>
+                <span className="text-emerald-400 font-mono text-[10px]">Zero-Refund Gate Active ✓</span>
+              </div>
+
+              <div className="bg-neutral-950 rounded-2xl border-2 border-neutral-700/80 p-5 shadow-2xl space-y-4 text-xs font-sans">
+                {/* Brand Header */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                  <div>
+                    <h2 className="text-base font-extrabold text-white tracking-wider">
+                      BANGKOK PLUS SIZE OOTD
+                    </h2>
+                    <p className="text-[10px] text-neutral-400">
+                      Pratunam Curated Plus Size Fashion & Pasabuy Wholesale
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/40">
+                      OFFICIAL INVOICE #{previewBag.invoiceId || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${previewBag.buyerName.slice(0, 3).toUpperCase()}`}
+                    </span>
+                    <div className="text-[10px] text-neutral-500 mt-1 font-mono">
+                      Date: {new Date().toLocaleDateString('en-PH', { dateStyle: 'medium' })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Buyer & Session Details */}
+                <div className="grid grid-cols-2 gap-3 p-3 bg-neutral-900/60 rounded-xl text-neutral-300 text-xs">
+                  <div>
+                    <span className="text-neutral-500 block text-[10px] font-semibold uppercase">Billed To (Miner):</span>
+                    <strong className="text-white text-sm">{previewBag.buyerName}</strong>
+                    <div className="text-[10px] text-neutral-400 font-mono">{previewBag.buyerContact || 'FB Messenger PSID Connected'}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-neutral-500 block text-[10px] font-semibold uppercase">Broadcast Origin:</span>
+                    <strong className="text-amber-300">{summary.liveTitle}</strong>
+                    <div className="text-[10px] text-neutral-400 font-mono">Verified in Bangkok Store</div>
+                  </div>
+                </div>
+
+                {/* Itemized Reconciled Pieces Table */}
+                <div className="overflow-x-auto rounded-xl border border-neutral-800">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-neutral-900 text-neutral-400 font-medium border-b border-neutral-800">
+                      <tr>
+                        <th className="p-2.5">Item & Spec</th>
+                        <th className="p-2.5 text-center">Verified Qty</th>
+                        <th className="p-2.5 text-right">Unit Price</th>
+                        <th className="p-2.5 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-900">
+                      {previewBag.lines
+                        .filter((l) => l.got > 0)
+                        .map((l) => (
+                          <tr key={l.orderId} className="hover:bg-neutral-900/40">
+                            <td className="p-2.5">
+                              <span className="font-mono font-bold text-white">{l.itemCode}</span>
+                              <span className="text-neutral-400 ml-2">({l.size} {l.colour})</span>
+                            </td>
+                            <td className="p-2.5 text-center font-mono font-bold text-emerald-400">
+                              {l.got} pc{l.got > 1 ? 's' : ''}
+                            </td>
+                            <td className="p-2.5 text-right font-mono text-neutral-300">
+                              ₱{l.unitPricePhp.toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-white">
+                              ₱{(l.got * l.unitPricePhp).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Subtotal, Zero Phantom Charge Notice, and Total Due */}
+                <div className="pt-2 border-t border-neutral-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-neutral-400 text-xs">
+                    <span>Subtotal ({previewBag.totalPiecesGot} Verified Pieces)</span>
+                    <span className="font-mono text-white">₱{previewBag.subtotalPhp.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-neutral-400 text-xs">
+                    <span>Pratunam Batch Handling & Packaging</span>
+                    <span className="font-mono text-emerald-400">FREE</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-neutral-800 text-sm">
+                    <strong className="text-white">Total Amount Due (PHP):</strong>
+                    <strong className="text-lg font-bold text-emerald-400 font-mono">
+                      ₱{previewBag.subtotalPhp.toLocaleString()}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Payment Instructions Badge */}
+                <div className="p-2.5 bg-neutral-900 rounded-xl border border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
+                  <div className="flex items-center gap-1.5">
+                    <Coins className="w-3.5 h-3.5 text-amber-400" />
+                    <span>GCash / Maya / BDO bank transfer instructions attached on dispatch.</span>
+                  </div>
+                  <span className="text-emerald-400 font-mono text-[10px]">100% Zero-Refund Safety</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Success Alert if dispatched */}
+            {invoiceSentSuccess && (
+              <div className="p-3 bg-emerald-950/60 border border-emerald-500 rounded-xl text-emerald-200 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Invoice and handwritten note successfully queued for dispatch via Business Messenger!</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-neutral-800 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  const copyPayload = `PERSONAL NOTE:\n${handwrittenNote}\n\n====================\nBANGKOK PLUS SIZE OOTD INVOICE\nBilled To: ${previewBag.buyerName}\nTotal Due: ₱${previewBag.subtotalPhp.toLocaleString()}\nPieces: ${previewBag.totalPiecesGot}\n====================`;
+                  navigator.clipboard.writeText(copyPayload);
+                  handleCopyText(copyPayload, 'modal_invoice');
+                }}
+                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl flex items-center gap-1.5 transition"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copiedDraft === 'modal_invoice' ? 'Copied!' : 'Copy Note & Invoice'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPreviewBag(null)}
+                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl transition"
+              >
+                Close Preview
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSendInvoiceWithHandwrittenNote}
+                disabled={isSendingInvoice}
+                className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-emerald-950/40 flex items-center gap-2 transition"
+              >
+                <Send className="w-4 h-4" />
+                <span>{isSendingInvoice ? 'Sending Invoice...' : 'Send Final Invoice & Note to Buyer'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

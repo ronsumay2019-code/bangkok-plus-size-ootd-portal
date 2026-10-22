@@ -13,12 +13,19 @@ import {
   RefreshCw,
   Send,
   Terminal,
+  Clock,
+  User,
+  Check,
+  CheckCircle2,
+  MessageCircle,
 } from 'lucide-react';
 import { 
   LiveSession, 
   BuyerOrder, 
   InventoryItem, 
   ReconciliationSummary,
+  MessengerThread,
+  OrderAmendment,
 } from '../types/reconciliation';
 
 interface LiveSessionCommandProps {
@@ -26,6 +33,8 @@ interface LiveSessionCommandProps {
   orders: BuyerOrder[];
   inventory: InventoryItem[];
   summary: ReconciliationSummary | null;
+  messengerThreads?: MessengerThread[];
+  amendments?: OrderAmendment[];
   webhookEventsLog?: Array<{
     id: string;
     timestamp: string;
@@ -60,12 +69,16 @@ interface LiveSessionCommandProps {
     options?: { fbVideoId?: string; fbPageId?: string; accessToken?: string }
   ) => Promise<void>;
   onBulkImportOrders?: (rawLines: string) => Promise<void>;
+  onReplyMessenger?: (threadId: string, text: string) => Promise<void>;
 }
 
 export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   live,
   orders,
+  inventory,
   summary,
+  messengerThreads = [],
+  amendments = [],
   webhookEventsLog = [],
   graphSyncStats,
   onToggleLive,
@@ -75,14 +88,17 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   onSwitchToSummary,
   onGraphSync,
   onBulkImportOrders,
+  onReplyMessenger,
 }) => {
   const isOnAir = live.status === 'live';
   const [secondsOnAir, setSecondsOnAir] = useState(0);
   const [newBuyerName, setNewBuyerName] = useState('');
-  const [newItemCode, setNewItemCode] = useState('BP01');
-  const [newSize, setNewSize] = useState('3XL');
-  const [newColour, setNewColour] = useState('MAROON');
-  const [newPrice] = useState('1890');
+  const [newItemCode, setNewItemCode] = useState('');
+  const [newSize, setNewSize] = useState('');
+  const [newColour, setNewColour] = useState('');
+  const [newPrice, setNewPrice] = useState('');
+  const [newQuantity, setNewQuantity] = useState('1');
+  const [newChannel, setNewChannel] = useState<'live_chat' | 'messenger'>('live_chat');
   const [selectedOrderForSwap, setSelectedOrderForSwap] = useState<string>('');
   const [swapNewSize, setSwapNewSize] = useState('4XL');
   const [swapNewColour, setSwapNewColour] = useState('MAROON');
@@ -90,6 +106,11 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   const [reconcileStep, setReconcileStep] = useState(0);
   const [isSyncingGraph, setIsSyncingGraph] = useState(false);
   const [showWebhookLog, setShowWebhookLog] = useState(false);
+
+  // In-session Messenger reply state
+  const [activeMessengerThreadId, setActiveMessengerThreadId] = useState<string>(messengerThreads[0]?.id || '');
+  const [quickMessengerReply, setQuickMessengerReply] = useState('');
+  const [isSendingQuickReply, setIsSendingQuickReply] = useState(false);
 
   // Morning Live Graph API v22.0 connection inputs
   const [fbVideoIdInput, setFbVideoIdInput] = useState(live.fbVideoId || '');
@@ -132,17 +153,50 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
 
   const handleSimulateMineComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBuyerName || !newItemCode) return;
+    if (!newBuyerName.trim() || !newItemCode.trim()) return;
+
+    // Auto lookup price if not explicitly typed
+    let price = Number(newPrice);
+    if (!price || isNaN(price)) {
+      const matchInv = inventory.find(
+        (i) => i.itemCode.toLowerCase() === newItemCode.trim().toLowerCase()
+      );
+      price = matchInv ? matchInv.unitPricePhp : 1890;
+    }
+
+    const qty = Math.max(1, parseInt(newQuantity, 10) || 1);
+    const sz = newSize.trim() || 'Free Size';
+    const clr = newColour.trim() || 'Assorted';
+
     onAddOrder({
-      buyerName: newBuyerName,
-      itemCode: newItemCode,
-      size: newSize,
-      colour: newColour,
-      quantity: 1,
-      channel: 'live_chat',
-      statedPrice: Number(newPrice) || 1890,
+      buyerName: newBuyerName.trim(),
+      itemCode: newItemCode.trim().toUpperCase(),
+      size: sz.toUpperCase(),
+      colour: clr.toUpperCase(),
+      quantity: qty,
+      channel: newChannel,
+      statedPrice: price,
     });
+
+    // Reset all fields to empty to allow agents to enter unforeseen/called codes cleanly
     setNewBuyerName('');
+    setNewItemCode('');
+    setNewSize('');
+    setNewColour('');
+    setNewPrice('');
+    setNewQuantity('1');
+  };
+
+  const handleSendMessengerQuickReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeMessengerThreadId || !quickMessengerReply.trim() || !onReplyMessenger) return;
+    setIsSendingQuickReply(true);
+    try {
+      await onReplyMessenger(activeMessengerThreadId, quickMessengerReply.trim());
+      setQuickMessengerReply('');
+    } finally {
+      setIsSendingQuickReply(false);
+    }
   };
 
   const handleApplySwap = (e: React.FormEvent) => {
@@ -587,8 +641,8 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
 
         {/* Right Column: Live Comment Feed & Real-time Demand Ledger (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          {/* Quick Mine Simulator */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4">
+          {/* Quick Mine Simulator (Requirement 1: Editable, Empty Defaults, Adapts to Any Live Item Code) */}
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-amber-400" />
@@ -596,61 +650,153 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   Live Mine Capture Simulator
                 </h4>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-neutral-800 text-neutral-400">
-                Rule Parser Active
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Editable & Sync Ready
               </span>
             </div>
 
+            {/* Datalists for quick click suggestions while allowing arbitrary ad-hoc codes */}
+            <datalist id="live-simulator-item-codes">
+              {Array.from(new Set(inventory.map((i) => i.itemCode))).map((code) => (
+                <option key={code} value={code} />
+              ))}
+              <option value="BP01" />
+              <option value="BP02" />
+              <option value="BP03" />
+              <option value="BP04" />
+              <option value="BP05" />
+              <option value="BP07" />
+              <option value="D3" />
+              <option value="T10" />
+            </datalist>
+
+            <datalist id="live-simulator-sizes">
+              <option value="Free Size" />
+              <option value="L" />
+              <option value="XL" />
+              <option value="2XL" />
+              <option value="3XL" />
+              <option value="4XL" />
+              <option value="5XL" />
+              <option value="6XL" />
+              <option value="Plus Size" />
+            </datalist>
+
+            <datalist id="live-simulator-colours">
+              <option value="Maroon" />
+              <option value="Black" />
+              <option value="Navy" />
+              <option value="Emerald" />
+              <option value="Stone" />
+              <option value="White" />
+              <option value="Floral" />
+              <option value="Assorted" />
+            </datalist>
+
             <form onSubmit={handleSimulateMineComment} className="space-y-2 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  placeholder="Buyer Name (e.g. Aileen Cruz)"
-                  value={newBuyerName}
-                  onChange={(e) => setNewBuyerName(e.target.value)}
-                  className="bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200"
-                />
-                <select
-                  value={newItemCode}
-                  onChange={(e) => setNewItemCode(e.target.value)}
-                  className="bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 font-mono"
-                >
-                  <option value="BP01">BP01 House Patchwork (₱1,890)</option>
-                  <option value="BP02">BP02 Flower Appliqué (₱2,190)</option>
-                  <option value="BP03">BP03 Vintage Floral (₱1,990)</option>
-                  <option value="BP04">BP04 Kimono Set (₱2,490)</option>
-                  <option value="BP05">BP05 Batik Maxi (₱2,690)</option>
-                  <option value="BP07">BP07 Silk Tunic (₱2,590)</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-neutral-400 block mb-0.5">Buyer Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Aileen Cruz"
+                    value={newBuyerName}
+                    onChange={(e) => setNewBuyerName(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-neutral-400 block mb-0.5">Item Code * (Type any called code)</label>
+                  <input
+                    type="text"
+                    list="live-simulator-item-codes"
+                    placeholder="e.g. BP01, D3, T10..."
+                    value={newItemCode}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewItemCode(val);
+                      // Auto-suggest price if known inventory code
+                      const match = inventory.find((i) => i.itemCode.toLowerCase() === val.trim().toLowerCase());
+                      if (match && !newPrice) {
+                        setNewPrice(String(match.unitPricePhp));
+                      }
+                    }}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <select
-                  value={newSize}
-                  onChange={(e) => setNewSize(e.target.value)}
-                  className="bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200"
-                >
-                  <option value="2XL">Size: 2XL</option>
-                  <option value="3XL">Size: 3XL</option>
-                  <option value="4XL">Size: 4XL</option>
-                  <option value="5XL">Size: 5XL</option>
-                </select>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>
+                  <label className="text-[10px] text-neutral-400 block mb-0.5">Size</label>
+                  <input
+                    type="text"
+                    list="live-simulator-sizes"
+                    placeholder="e.g. 3XL"
+                    value={newSize}
+                    onChange={(e) => setNewSize(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
+                  />
+                </div>
 
-                <input
-                  type="text"
-                  value={newColour}
-                  onChange={(e) => setNewColour(e.target.value)}
-                  className="bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200"
-                />
+                <div>
+                  <label className="text-[10px] text-neutral-400 block mb-0.5">Colour</label>
+                  <input
+                    type="text"
+                    list="live-simulator-colours"
+                    placeholder="e.g. Maroon"
+                    value={newColour}
+                    onChange={(e) => setNewColour(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
+                  />
+                </div>
 
-                <button
-                  type="submit"
-                  disabled={!newBuyerName}
-                  className="bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 text-white font-medium rounded-lg flex items-center justify-center gap-1 transition"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Claim</span>
-                </button>
+                <div>
+                  <label className="text-[10px] text-neutral-400 block mb-0.5">Price (₱)</label>
+                  <input
+                    type="number"
+                    placeholder="1890"
+                    value={newPrice}
+                    onChange={(e) => setNewPrice(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-neutral-400 block mb-0.5">Qty</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={newQuantity}
+                    onChange={(e) => setNewQuantity(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
+                <div className="sm:col-span-6">
+                  <select
+                    value={newChannel}
+                    onChange={(e) => setNewChannel(e.target.value as 'live_chat' | 'messenger')}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 text-xs"
+                  >
+                    <option value="live_chat">📹 Channel: Facebook Live Chat</option>
+                    <option value="messenger">💬 Channel: Business Messenger DM</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-6">
+                  <button
+                    type="submit"
+                    disabled={!newBuyerName || !newItemCode}
+                    className="w-full bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 disabled:opacity-50 text-white font-semibold rounded-lg py-1.5 flex items-center justify-center gap-1.5 shadow transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Mine Claim</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -732,7 +878,195 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
         </div>
       </div>
 
-      {/* Live Demand vs Physical Rack Stock (Ordered vs on the rack) */}
+      {/* Live Business Messenger & In-Live Amendments Inbox (Requirement 2A) */}
+      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-neutral-800">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-gradient-to-tr from-sky-600 to-blue-600 rounded-xl text-white shadow">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-white">
+                  Live Business Messenger & In-Live Amendments Inbox
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-mono text-[10px] font-bold border border-sky-500/30">
+                  {messengerThreads.length} Synced Threads
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/30">
+                  {amendments.length} Live Amendments
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Synced Meta Page Business Messenger threads and live buyer amendment requests during broadcast.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Threads Column (4 cols) */}
+          <div className="lg:col-span-4 bg-neutral-950/70 border border-neutral-800 rounded-xl p-3 flex flex-col h-[340px]">
+            <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span>Customer DM Threads</span>
+              <span className="text-sky-400 font-mono">Meta Page Inbox</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {messengerThreads.length === 0 ? (
+                <div className="text-center py-8 text-neutral-500 text-xs italic">
+                  No Messenger threads synced yet. Incoming buyer messages will appear here live.
+                </div>
+              ) : (
+                messengerThreads.map((th) => {
+                  const isSelected = (activeMessengerThreadId || messengerThreads[0]?.id) === th.id;
+                  const lastMsg = th.messages?.[th.messages.length - 1];
+                  const hasIntent = !!th.detectedIntent;
+
+                  return (
+                    <button
+                      key={th.id}
+                      onClick={() => setActiveMessengerThreadId(th.id)}
+                      className={`w-full text-left p-2.5 rounded-xl border transition ${
+                        isSelected
+                          ? 'bg-sky-950/40 border-sky-500 text-white'
+                          : 'bg-neutral-900/60 border-neutral-800 text-neutral-300 hover:border-neutral-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-xs truncate max-w-[150px] text-white">
+                          {th.buyerName}
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+                          24h Active
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-neutral-400 truncate">
+                        {lastMsg ? lastMsg.text : 'Thread opened'}
+                      </div>
+
+                      {hasIntent && (
+                        <div className="mt-1 flex items-center gap-1">
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            {th.detectedIntent?.type.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Active Conversation & Quick Reply (5 cols) */}
+          <div className="lg:col-span-5 bg-neutral-950/70 border border-neutral-800 rounded-xl p-3 flex flex-col h-[340px]">
+            {(() => {
+              const activeTh = messengerThreads.find(
+                (t) => t.id === (activeMessengerThreadId || messengerThreads[0]?.id)
+              );
+
+              if (!activeTh) {
+                return (
+                  <div className="flex-1 flex items-center justify-center text-xs text-neutral-500 italic">
+                    Select a Messenger thread to view messages and reply.
+                  </div>
+                );
+              }
+
+              return (
+                <>
+                  <div className="pb-2 border-b border-neutral-800 mb-2 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-xs text-white">{activeTh.buyerName}</div>
+                      <div className="text-[10px] text-neutral-400 font-mono">PSID: {activeTh.psid || activeTh.id}</div>
+                    </div>
+                    {activeTh.detectedIntent && (
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
+                        {activeTh.detectedIntent.summary || activeTh.detectedIntent.type}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-xs mb-2">
+                    {activeTh.messages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={`p-2 rounded-xl max-w-[85%] text-xs ${
+                          m.sender === 'buyer'
+                            ? 'bg-neutral-800 text-neutral-200 mr-auto'
+                            : 'bg-gradient-to-r from-sky-600 to-blue-600 text-white ml-auto'
+                        }`}
+                      >
+                        <div>{m.text}</div>
+                        <div className="text-[9px] opacity-60 text-right mt-0.5 font-mono">
+                          {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <form onSubmit={handleSendMessengerQuickReply} className="flex gap-2 pt-2 border-t border-neutral-800">
+                    <input
+                      type="text"
+                      placeholder={`Reply to ${activeTh.buyerName} via Messenger...`}
+                      value={quickMessengerReply}
+                      onChange={(e) => setQuickMessengerReply(e.target.value)}
+                      className="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-500 focus:border-sky-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSendingQuickReply || !quickMessengerReply.trim()}
+                      className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSendingQuickReply ? 'Sending...' : 'Reply'}</span>
+                    </button>
+                  </form>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* In-Live Amendments Log (3 cols) */}
+          <div className="lg:col-span-3 bg-neutral-950/70 border border-neutral-800 rounded-xl p-3 flex flex-col h-[340px]">
+            <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span>Amendments Log</span>
+              <span className="font-mono text-[10px] text-neutral-400">{amendments.length}</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+              {amendments.length === 0 ? (
+                <div className="text-neutral-500 text-center py-8 text-[11px] italic">
+                  No adjustments requested yet during this live session.
+                </div>
+              ) : (
+                amendments.map((am) => (
+                  <div key={am.id} className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-white text-[11px]">{am.buyerName}</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold uppercase">
+                        {am.type.replace('_', ' ')}
+                      </span>
+                    </div>
+
+                    <div className="font-mono text-[10px] text-neutral-300 flex items-center gap-1">
+                      <span className="text-neutral-500">{am.originalSpec.size} {am.originalSpec.colour}</span>
+                      <ArrowRightLeft className="w-3 h-3 text-amber-400" />
+                      <span className="text-emerald-400 font-bold">{am.newSpec.size} {am.newSpec.colour}</span>
+                    </div>
+
+                    <div className="text-[10px] text-neutral-400 italic truncate">
+                      "{am.rawText}"
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-neutral-800">
           <div>

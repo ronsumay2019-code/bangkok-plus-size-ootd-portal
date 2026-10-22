@@ -18,15 +18,26 @@ import {
   Sparkles,
   ShieldAlert,
   Lock,
-  ArrowRight
+  ArrowRight,
+  MessageSquare,
+  Video,
+  ArrowRightLeft,
 } from 'lucide-react';
-import { BuyerOrder, ReconciliationSummary, LiveSession } from '../types/reconciliation';
+import { 
+  BuyerOrder, 
+  ReconciliationSummary, 
+  LiveSession,
+  OrderAmendment,
+  MessengerThread,
+} from '../types/reconciliation';
 
 interface OrderReviewApprovalWorkspaceProps {
   orders: BuyerOrder[];
   summary: ReconciliationSummary | null;
   activeLive: LiveSession;
   userRole: 'owner' | 'admin' | 'staff';
+  amendments?: OrderAmendment[];
+  messengerThreads?: MessengerThread[];
   onApproveOrder: (orderId: string) => void;
   onRejectOrder: (orderId: string, reason: string) => void;
   onUpdateOrder: (orderId: string, updates: Partial<BuyerOrder>) => void;
@@ -41,6 +52,8 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   summary,
   activeLive,
   userRole,
+  amendments = [],
+  messengerThreads = [],
   onApproveOrder,
   onRejectOrder,
   onUpdateOrder,
@@ -56,6 +69,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   const [rejectReason, setRejectReason] = useState('Out of stock at supplier');
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [approvalNotes, setApprovalNotes] = useState('');
+  const [selectedMessengerSnapshot, setSelectedMessengerSnapshot] = useState<MessengerThread | null>(null);
   const [isApproving, setIsApproving] = useState(false);
 
   // Edit form state
@@ -365,6 +379,16 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                 const isConfirmed = ord.status === 'confirmed';
                 const isDuplicate = ord.isDuplicateFlagged;
 
+                const matchingAmendment = amendments.find(
+                  (a) => a.originalOrderId === ord.id || 
+                         a.buyerName.toLowerCase() === ord.buyerName.toLowerCase()
+                );
+                const matchingMessengerThread = messengerThreads.find(
+                  (t) => t.buyerName.toLowerCase() === ord.buyerName.toLowerCase() ||
+                         (t.psid && ord.sourceCommentId?.includes(t.psid))
+                );
+                const isAmended = !!matchingAmendment || ord.status === 'replaced' || (ord.hostVerificationNote && ord.hostVerificationNote.includes('Adjusted'));
+
                 return (
                   <tr key={ord.id} className={`hover:bg-neutral-800/30 transition ${isSelected ? 'bg-rose-950/20' : ''}`}>
                     <td className="p-3">
@@ -390,9 +414,47 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] text-neutral-400">
-                        {ord.channel === 'messenger' ? '💬 Page Messenger' : ord.channel === 'vip' ? '👑 VIP Inbox' : '📹 Live Chat'}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className="text-[11px] text-neutral-400">
+                          {ord.channel === 'messenger' ? '💬 Page Messenger' : ord.channel === 'vip' ? '👑 VIP Inbox' : '📹 Live Chat'}
+                        </span>
+                        {ord.channel === 'messenger' || matchingMessengerThread ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMessengerSnapshot(matchingMessengerThread || {
+                              id: `th_${ord.id}`,
+                              psid: `psid_${ord.id}`,
+                              buyerName: ord.buyerName,
+                              buyerHandle: `fb.com/${ord.buyerName}`,
+                              windowExpiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
+                              unreadCount: 0,
+                              messages: [
+                                {
+                                  id: `m_${ord.id}`,
+                                  mid: `m_${ord.id}`,
+                                  sender: 'buyer',
+                                  text: `Claim placed: ${ord.itemCode} (${ord.size} ${ord.colour}) - ₱${ord.statedUnitPricePhp}`,
+                                  timestamp: ord.orderedAt,
+                                }
+                              ]
+                            })}
+                            className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            <span>Messenger DM ↗</span>
+                          </button>
+                        ) : (
+                          <a
+                            href={activeLive.videoUrl || `https://www.facebook.com/watch/?v=${activeLive.fbVideoId || '1126219396590785'}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1"
+                          >
+                            <Video className="w-3 h-3" />
+                            <span>Live Stream ↗</span>
+                          </a>
+                        )}
+                      </div>
                     </td>
 
                     <td className="p-3 font-mono font-bold text-rose-300">
@@ -412,8 +474,78 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                       {new Date(ord.orderedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
 
-                    <td className="p-3 max-w-xs truncate text-[11px] text-neutral-300">
-                      {ord.hostVerificationNote || ord.reviewNotes || 'Captured from live stream.'}
+                    <td className="p-3 max-w-sm text-[11px]">
+                      <div className="text-neutral-300">
+                        {ord.hostVerificationNote || ord.reviewNotes || 'Captured from live stream.'}
+                      </div>
+
+                      {/* Snapshot of Amended Order with Live Chat / Messenger Link (Requirement 2B) */}
+                      {isAmended && (
+                        <div className="mt-2 p-2 rounded-lg bg-amber-950/40 border border-amber-500/40 text-[11px] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-amber-300 flex items-center gap-1 text-[10px]">
+                              <ArrowRightLeft className="w-3 h-3 text-amber-400" />
+                              <span>Amended Order Snapshot ({matchingAmendment?.type.replace('_', ' ') || 'Adjusted'})</span>
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-neutral-900 text-amber-200 font-mono">
+                              {matchingAmendment?.channel === 'messenger' ? '💬 Messenger' : '📹 Live Chat'}
+                            </span>
+                          </div>
+
+                          {matchingAmendment && (
+                            <div className="font-mono text-[10px] text-neutral-300 flex items-center gap-1">
+                              <span className="text-neutral-400 line-through">{matchingAmendment.originalSpec.size} {matchingAmendment.originalSpec.colour}</span>
+                              <ArrowRight className="w-2.5 h-2.5 text-amber-400" />
+                              <span className="text-emerald-400 font-bold">{matchingAmendment.newSpec.size} {matchingAmendment.newSpec.colour}</span>
+                            </div>
+                          )}
+
+                          {matchingAmendment?.rawText && (
+                            <div className="text-[10px] text-neutral-400 italic truncate">
+                              "{matchingAmendment.rawText}"
+                            </div>
+                          )}
+
+                          <div className="pt-1 flex items-center gap-2 border-t border-amber-900/40">
+                            {matchingAmendment?.channel === 'messenger' || ord.channel === 'messenger' ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedMessengerSnapshot(matchingMessengerThread || {
+                                  id: `th_${ord.id}`,
+                                  psid: `psid_${ord.id}`,
+                                  buyerName: ord.buyerName,
+                                  buyerHandle: `fb.com/${ord.buyerName}`,
+                                  windowExpiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
+                                  unreadCount: 0,
+                                  messages: [
+                                    {
+                                      id: `m_${ord.id}`,
+                                      mid: `m_${ord.id}`,
+                                      sender: 'buyer',
+                                      text: matchingAmendment?.rawText || `Adjustment request for ${ord.itemCode}`,
+                                      timestamp: ord.orderedAt,
+                                    }
+                                  ]
+                                })}
+                                className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1"
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                                <span>View Synced Messenger Thread Snapshot ↗</span>
+                              </button>
+                            ) : (
+                              <a
+                                href={activeLive.videoUrl || `https://www.facebook.com/watch/?v=${activeLive.fbVideoId || '1126219396590785'}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1"
+                              >
+                                <Video className="w-3 h-3" />
+                                <span>View FB Live Chat Replay ↗</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </td>
 
                     <td className="p-3">
@@ -608,6 +740,62 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                 className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl"
               >
                 Confirm Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Synced Messenger Thread Snapshot Modal (Requirement 2B) */}
+      {selectedMessengerSnapshot && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-sky-400" />
+                <div>
+                  <h3 className="font-bold text-sm text-white">{selectedMessengerSnapshot.buyerName}</h3>
+                  <div className="text-[10px] text-neutral-400 font-mono">PSID: {selectedMessengerSnapshot.psid}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMessengerSnapshot(null)}
+                className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 max-h-72 overflow-y-auto space-y-2 text-xs">
+              {selectedMessengerSnapshot.messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`p-2.5 rounded-xl max-w-[85%] text-xs ${
+                    m.sender === 'buyer'
+                      ? 'bg-neutral-800 text-neutral-200 mr-auto'
+                      : 'bg-gradient-to-r from-sky-600 to-blue-600 text-white ml-auto'
+                  }`}
+                >
+                  <div>{m.text}</div>
+                  <div className="text-[9px] opacity-60 text-right mt-1 font-mono">
+                    {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-neutral-800 text-xs">
+              <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-mono">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Meta 24h Messaging Window Active
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedMessengerSnapshot(null)}
+                className="px-4 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-lg transition"
+              >
+                Close Snapshot
               </button>
             </div>
           </div>

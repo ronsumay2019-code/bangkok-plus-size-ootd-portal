@@ -89,6 +89,7 @@ export default function App() {
           const syncData: any = await syncRes.json();
           if (syncData.targetLive) setLives((prev) => prev.map((l) => (l.id === syncData.targetLive.id ? syncData.targetLive : l)));
           if (Array.isArray(syncData.orders)) setOrders(syncData.orders);
+          if (Array.isArray(syncData.inventory)) setInventory(syncData.inventory);
           if (Array.isArray(syncData.messengerThreads)) setMessengerThreads(syncData.messengerThreads);
           if (syncData.latestSummary) setSummary(syncData.latestSummary);
           if (syncData.graphSyncStats) setGraphSyncStats(syncData.graphSyncStats);
@@ -314,13 +315,18 @@ export default function App() {
       if (res.ok) {
         const data: any = await res.json();
         setSummary(data.summary);
+        if (Array.isArray(data.orders)) setOrders(data.orders);
+        if (Array.isArray(data.inventory)) setInventory(data.inventory);
+        if (data.targetLive) {
+          setLives((prev) => prev.map((l) => (l.id === data.targetLive.id ? data.targetLive : l)));
+        }
       }
     } catch (e) {
       const newSummary = runAutomaticLiveReconciliation(
         activeLive,
-        orders.filter((o) => o.liveId === activeLive.id),
+        orders.filter((o) => !o.liveId || o.liveId === activeLive.id),
         amendments,
-        inventory.filter((i) => i.liveId === activeLive.id),
+        inventory.filter((i) => !i.liveId || i.liveId === activeLive.id),
         phpRate,
         null,
         'manual_trigger'
@@ -765,6 +771,8 @@ export default function App() {
             orders={orders}
             inventory={inventory}
             summary={summary}
+            messengerThreads={messengerThreads}
+            amendments={amendments}
             webhookEventsLog={webhookEventsLog}
             graphSyncStats={graphSyncStats}
             onToggleLive={handleToggleLive}
@@ -775,6 +783,7 @@ export default function App() {
             onSimulateWebhook={handleSimulateWebhook}
             onGraphSync={handleGraphSync}
             onBulkImportOrders={handleBulkImportOrders}
+            onReplyMessenger={handleReplyMessenger}
           />
         )}
 
@@ -792,6 +801,8 @@ export default function App() {
             summary={summary}
             activeLive={activeLive}
             userRole={userRole}
+            amendments={amendments}
+            messengerThreads={messengerThreads}
             onApproveOrder={handleApproveOrder}
             onRejectOrder={handleRejectOrder}
             onUpdateOrder={handleUpdateOrder}
@@ -805,9 +816,11 @@ export default function App() {
         {activeTab === 'pre_orders' && (
           <PreOrdersLane
             preOrders={preOrders}
+            messengerThreads={messengerThreads}
             onAddPreOrder={handleAddPreOrder}
             onUpdateStatus={handleUpdatePreOrderStatus}
             onOpenOverride={(order, isPreOrder) => setOverrideModal({ isOpen: true, order, isPreOrder })}
+            onReplyMessenger={handleReplyMessenger}
             userRole={userRole}
           />
         )}

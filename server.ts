@@ -377,7 +377,7 @@ app.get('/api/tests/run', (_req, res) => {
 });
 
 // 2. Trigger automatic or manual reconciliation
-app.post('/api/reconciliation/trigger-auto', (req, res) => {
+app.post('/api/reconciliation/trigger-auto', async (req, res) => {
   const { liveId, phpRate, supplierPaidThb, triggerType } = req.body;
   const targetLive = lives.find((l) => l.id === (liveId || activeLive.id)) || lives[0];
   
@@ -385,8 +385,59 @@ app.post('/api/reconciliation/trigger-auto', (req, res) => {
     phpPerThbRate = Number(phpRate);
   }
 
-  const liveOrders = orders.filter((o) => o.liveId === targetLive.id);
-  const liveInventory = inventory.filter((i) => i.liveId === targetLive.id);
+  // Ensure inventory is populated with physical store rack items
+  if (inventory.length === 0) {
+    inventory = SEED_INVENTORY_ITEMS.map((item) => ({
+      ...item,
+      liveId: targetLive.id,
+    }));
+  }
+
+  // If orders are empty, attempt bridge sync from Facebook Live
+  if (orders.length === 0) {
+    try {
+      const bridgeUrl = process.env.BRIDGE_SYNC_URL || 'https://bangkokplussizeootd.vercel.app/api/facebook/live-sync?bridge=1';
+      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
+      if (bridgeRes.ok) {
+        const bData: any = await bridgeRes.json();
+        for (const clRow of bData.bridge?.claims || []) {
+          const cid = `bridge_cl_${clRow.id}`;
+          if (!seenCommentIds.has(cid)) {
+            seenCommentIds.add(cid);
+            const rawText = clRow.raw || clRow.raw_text || '';
+            const colours = ['MAROON', 'BLACK', 'NAVY', 'BLUE', 'CREAM', 'STONE', 'WHITE', 'EMERALD', 'OLIVE'];
+            const upperRaw = rawText.toUpperCase();
+            const foundCol = colours.find((c) => upperRaw.includes(c)) || 'MAROON';
+            const sizeMatch = upperRaw.match(/\b(6XL|5XL|4XL|3XL|2XL|XL|SIZE\s*40|40)\b/i);
+            const parsedSize = clRow.size || (sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : '3XL');
+
+            orders.push({
+              id: `ord_cl_${clRow.id}`,
+              liveId: targetLive.id,
+              buyerName: clRow.customer_name || clRow.customer_id || 'FB Live Buyer',
+              channel: 'live_chat',
+              sourceCommentId: clRow.comment_id || cid,
+              itemCode: (clRow.code || 'BP01').toUpperCase(),
+              itemName: rawText || clRow.code || 'Live Claim',
+              size: parsedSize.toUpperCase(),
+              colour: foundCol.toUpperCase(),
+              quantity: Number(clRow.qty) || 1,
+              statedUnitPricePhp: 1890,
+              orderedAt: clRow.created_at || clRow.at || new Date().toISOString(),
+              status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
+              invoiced: false,
+              lane: 'live',
+              version: 1,
+              overrideHistory: [],
+            });
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  const liveOrders = orders.filter((o) => !o.liveId || o.liveId === targetLive.id);
+  const liveInventory = inventory.filter((i) => !i.liveId || i.liveId === targetLive.id);
 
   latestSummary = runAutomaticLiveReconciliation(
     targetLive,
@@ -407,10 +458,14 @@ app.post('/api/reconciliation/trigger-auto', (req, res) => {
         ? 'reconciled' 
         : 'needs_review';
 
+  saveRuntimeState();
+
   res.json({
     success: true,
     summary: latestSummary,
     targetLive,
+    orders: liveOrders,
+    inventory: liveInventory,
   });
 });
 
@@ -1219,19 +1274,26 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           const cid = `bridge_cl_${clRow.id}`;
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
+            const rawText = clRow.raw || clRow.raw_text || '';
+            const colours = ['MAROON', 'BLACK', 'NAVY', 'BLUE', 'CREAM', 'STONE', 'WHITE', 'EMERALD', 'OLIVE'];
+            const upperRaw = rawText.toUpperCase();
+            const foundCol = colours.find((c) => upperRaw.includes(c)) || 'MAROON';
+            const sizeMatch = upperRaw.match(/\b(6XL|5XL|4XL|3XL|2XL|XL|SIZE\s*40|40)\b/i);
+            const parsedSize = clRow.size || (sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : '3XL');
+
             orders.push({
               id: `ord_cl_${clRow.id}`,
               liveId: targetLive.id,
-              buyerName: clRow.customer_id || 'FB Live Buyer',
+              buyerName: clRow.customer_name || clRow.customer_id || 'FB Live Buyer',
               channel: 'live_chat',
               sourceCommentId: clRow.comment_id || cid,
-              itemCode: (clRow.code || 'LIVE').toUpperCase(),
-              itemName: clRow.raw_text || clRow.code || 'Live Claim',
-              size: (clRow.size || '3XL').toUpperCase(),
-              colour: 'MAROON',
+              itemCode: (clRow.code || 'BP01').toUpperCase(),
+              itemName: rawText || clRow.code || 'Live Claim',
+              size: parsedSize.toUpperCase(),
+              colour: foundCol.toUpperCase(),
               quantity: Number(clRow.qty) || 1,
               statedUnitPricePhp: 1890,
-              orderedAt: clRow.created_at || nowIso,
+              orderedAt: clRow.created_at || clRow.at || nowIso,
               status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
               invoiced: false,
               lane: 'live',
@@ -1240,6 +1302,14 @@ app.post('/api/facebook/live-sync', async (req, res) => {
             });
             backfilledComments++;
           }
+        }
+
+        // Ensure inventory rack items are populated for targetLive
+        if (inventory.length === 0) {
+          inventory = SEED_INVENTORY_ITEMS.map((item) => ({
+            ...item,
+            liveId: targetLive.id,
+          }));
         }
         totalCommentsFetched = Math.max(bData.imported?.read || 0, orders.filter((o) => o.liveId === targetLive.id).length);
         targetLive.totalComments = Math.max(targetLive.totalComments || 0, totalCommentsFetched);
@@ -1317,6 +1387,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
     graphSyncStats,
     targetLive,
     orders,
+    inventory,
     messengerThreads,
     latestSummary,
     backfilledComments,
