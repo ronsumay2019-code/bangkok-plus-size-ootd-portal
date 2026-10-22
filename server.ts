@@ -1361,14 +1361,16 @@ app.post('/api/meta/webhook', (req, res) => {
             eventDetails = `Comment claim: "${message}" by ${sender}`;
 
             const targetLive = lives.find((l) => l.status === 'live') || lives[0];
-            const parsed = parseLiveSellingClaim(message);
-            if (parsed && parsed.isClaim) {
+            const specs = parseClaimSpecsFromRaw(message);
+            for (const spec of specs) {
+              if (spec.isChatter || spec.isAmendmentNote) continue;
               const existingSameBuyerSpec = orders.some(
                 (o) =>
                   o.liveId === targetLive.id &&
                   o.buyerName.toLowerCase() === sender.toLowerCase() &&
-                  o.itemCode === parsed.code &&
-                  o.size === (parsed.size || '3XL')
+                  o.itemCode === spec.itemCode &&
+                  o.size === (spec.size || 'FREE SIZE (PLUS)') &&
+                  o.colour === spec.colour
               );
 
               const newOrder: BuyerOrder = {
@@ -1377,19 +1379,19 @@ app.post('/api/meta/webhook', (req, res) => {
                 buyerName: cleanBuyerName(sender),
                 channel: 'live_chat',
                 sourceCommentId: commentId,
-                itemCode: parsed.code,
-                itemName: parsed.code,
-                size: parsed.size || 'FREE SIZE (PLUS)',
-                colour: parsed.colour || 'ASSORTED',
-                quantity: parsed.quantity || 1,
-                statedUnitPricePhp: parsed.price || 550,
+                itemCode: spec.itemCode,
+                itemName: spec.itemName,
+                size: spec.size || 'FREE SIZE (PLUS)',
+                colour: spec.colour || 'ASSORTED',
+                quantity: spec.quantity || 1,
+                statedUnitPricePhp: spec.price || 550,
                 orderedAt: nowIso,
-                status: 'pending',
+                status: spec.itemCode === 'PENDING SPEC' ? 'pending' : 'confirmed',
                 invoiced: false,
                 lane: 'live',
                 version: 1,
-                hostVerificationNote: parsed.reviewNotes || `Captured from live: "${message}"`,
-                reviewNotes: parsed.reviewNotes || `Live comment: "${message}"`,
+                hostVerificationNote: spec.reviewNotes || `Captured from live: "${message}"`,
+                reviewNotes: spec.reviewNotes || `Live comment: "${message}"`,
                 overrideHistory: [],
                 isDuplicateFlagged: existingSameBuyerSpec,
                 duplicateReason: existingSameBuyerSpec
@@ -1397,11 +1399,10 @@ app.post('/api/meta/webhook', (req, res) => {
                   : undefined,
               };
               orders.push(newOrder);
-              targetLive.totalComments = (targetLive.totalComments || 0) + 1;
               targetLive.totalMined = (targetLive.totalMined || 0) + 1;
-
-              performInventorySync(targetLive.id);
             }
+            targetLive.totalComments = (targetLive.totalComments || 0) + 1;
+            performInventorySync(targetLive.id);
           }
         }
       }
@@ -1544,27 +1545,28 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           for (const c of commentsList) {
             if (c.id && !seenCommentIds.has(c.id)) {
               seenCommentIds.add(c.id);
-              const parsed = parseLiveSellingClaim(c.message || '');
-              if (parsed && parsed.isClaim) {
+              const specs = parseClaimSpecsFromRaw(c.message || '');
+              for (const spec of specs) {
+                if (spec.isChatter || spec.isAmendmentNote) continue;
                 orders.push({
                   id: `ord_graph_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
                   liveId: targetLive.id,
                   buyerName: cleanBuyerName(c.from?.name || (c.from?.id ? `FB Buyer ${String(c.from.id).slice(-4)}` : 'FB Live Buyer')),
                   channel: 'live_chat',
                   sourceCommentId: c.id,
-                  itemCode: parsed.code,
-                  itemName: parsed.code,
-                  size: parsed.size || 'FREE SIZE (PLUS)',
-                  colour: parsed.colour || 'ASSORTED',
-                  quantity: parsed.quantity || 1,
-                  statedUnitPricePhp: parsed.price || 550,
+                  itemCode: spec.itemCode,
+                  itemName: spec.itemName,
+                  size: spec.size || 'FREE SIZE (PLUS)',
+                  colour: spec.colour || 'ASSORTED',
+                  quantity: spec.quantity || 1,
+                  statedUnitPricePhp: spec.price || 550,
                   orderedAt: c.created_time || nowIso,
-                  status: 'pending',
+                  status: spec.itemCode === 'PENDING SPEC' ? 'pending' : 'confirmed',
                   invoiced: false,
                   lane: 'live',
                   version: 1,
-                  hostVerificationNote: parsed.reviewNotes || `Captured from live comment: "${c.message || ''}"`,
-                  reviewNotes: parsed.reviewNotes || `Live comment: "${c.message || ''}"`,
+                  hostVerificationNote: spec.reviewNotes || `Captured from live comment: "${c.message || ''}"`,
+                  reviewNotes: spec.reviewNotes || `Live comment: "${c.message || ''}"`,
                   overrideHistory: [],
                 });
                 backfilledComments++;
@@ -1833,26 +1835,27 @@ app.post('/api/orders/bulk-import', (req, res) => {
       commentText = line.slice(dashIdx + 3).trim();
     }
 
-    const parsed = parseLiveSellingClaim(commentText);
-    if (parsed && parsed.isClaim) {
+    const specs = parseClaimSpecsFromRaw(commentText);
+    for (const spec of specs) {
+      if (spec.isChatter || spec.isAmendmentNote) continue;
       orders.push({
         id: `ord_imp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         liveId: targetLive.id,
         buyerName: cleanBuyerName(buyerName),
         channel: 'live_chat',
-        itemCode: parsed.code,
-        itemName: parsed.code,
-        size: parsed.size || 'FREE SIZE (PLUS)',
-        colour: parsed.colour || 'ASSORTED',
-        quantity: parsed.quantity || 1,
-        statedUnitPricePhp: parsed.price || 550,
+        itemCode: spec.itemCode,
+        itemName: spec.itemName,
+        size: spec.size || 'FREE SIZE (PLUS)',
+        colour: spec.colour || 'ASSORTED',
+        quantity: spec.quantity || 1,
+        statedUnitPricePhp: spec.price || 550,
         orderedAt: nowIso,
-        status: 'pending',
+        status: spec.itemCode === 'PENDING SPEC' ? 'pending' : 'confirmed',
         invoiced: false,
         lane: 'live',
         version: 1,
-        hostVerificationNote: parsed.reviewNotes || `Captured from live comment: "${commentText}"`,
-        reviewNotes: parsed.reviewNotes || `Live comment: "${commentText}"`,
+        hostVerificationNote: spec.reviewNotes || `Captured from live comment: "${commentText}"`,
+        reviewNotes: spec.reviewNotes || `Live comment: "${commentText}"`,
         overrideHistory: [],
       });
       importedCount++;

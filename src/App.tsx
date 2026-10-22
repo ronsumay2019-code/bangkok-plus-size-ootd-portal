@@ -916,7 +916,7 @@ export default function App() {
                   const data: any = await res.json();
                   setAmendments((prev) => [...prev, data.amendment]);
                   if (data.summary) setSummary(data.summary);
-                  showToast(`Applied ${amData.type.replace('_', ' ')} for ${amData.buyerName} & synced rack demand!`);
+                  showToast(`Applied ${amData.type.replace('_', ' ')} for ${amData.buyerName} & synced live demand!`);
                   return;
                 }
               } catch (e) {}

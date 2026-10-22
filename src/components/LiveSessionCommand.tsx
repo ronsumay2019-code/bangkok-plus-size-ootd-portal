@@ -9,6 +9,7 @@ import {
   Plus, 
   ExternalLink,
   ChevronRight,
+  ChevronLeft,
   Activity,
   RefreshCw,
   Send,
@@ -20,6 +21,8 @@ import {
   MessageCircle,
   Edit2,
   DollarSign,
+  Layers,
+  Radio,
 } from 'lucide-react';
 import { 
   LiveSession, 
@@ -29,6 +32,11 @@ import {
   MessengerThread,
   OrderAmendment,
 } from '../types/reconciliation';
+import {
+  HOST_BROADCAST_SEGMENTS,
+  HostItemSegment,
+  parseMinerQueueComment,
+} from '../services/liveSellingEngine';
 
 interface LiveSessionCommandProps {
   live: LiveSession;
@@ -141,6 +149,76 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   const [claimsFilter, setClaimsFilter] = useState('');
   const [claimsSort, setClaimsSort] = useState<'latest' | 'earliest'>('latest');
 
+  // Real Live Selling Host Item Calling State
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState<number>(7); // Default to RUSTANS (segment #8, index 7)
+  const currentHostSegment = HOST_BROADCAST_SEGMENTS[activeSegmentIndex] || HOST_BROADCAST_SEGMENTS[0];
+  const [naturalCommentInput, setNaturalCommentInput] = useState('');
+  const [naturalBuyerInput, setNaturalBuyerInput] = useState('');
+  const [simulatorMode, setSimulatorMode] = useState<'natural' | 'manual'>('natural');
+
+  const handleSelectSegment = (idx: number) => {
+    if (idx < 0 || idx >= HOST_BROADCAST_SEGMENTS.length) return;
+    setActiveSegmentIndex(idx);
+    const seg = HOST_BROADCAST_SEGMENTS[idx];
+    setNewItemCode(seg.itemCode);
+    setNewPrice(String(seg.pricePhp));
+    setNewSize(seg.availableSizes[0] || 'FREE SIZE (PLUS)');
+    if (seg.availableColors.length > 0) {
+      setNewColour(seg.availableColors[0]);
+    }
+  };
+
+  const handleQuickMineColor = (color: string) => {
+    setNewItemCode(currentHostSegment.itemCode);
+    setNewPrice(String(currentHostSegment.pricePhp));
+    setNewSize(currentHostSegment.availableSizes[0] || 'FREE SIZE (PLUS)');
+    setNewColour(color);
+    setNaturalCommentInput(`Mine ${currentHostSegment.itemCode} ${color}`);
+  };
+
+  const handleNaturalCommentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!naturalCommentInput.trim()) return;
+
+    let bName = naturalBuyerInput.trim();
+    let comment = naturalCommentInput.trim();
+
+    // Check if format is "Buyer Name: comment"
+    const colonIdx = comment.indexOf(':');
+    if (colonIdx > 0 && colonIdx < 40 && !bName) {
+      bName = comment.slice(0, colonIdx).trim();
+      comment = comment.slice(colonIdx + 1).trim();
+    }
+
+    if (!bName) bName = 'FB Live Miner';
+
+    const parsedOrders = parseMinerQueueComment(
+      comment,
+      bName,
+      currentHostSegment
+    );
+
+    if (parsedOrders.length === 0) {
+      alert('Comment recognized as stream chatter/banter — no order created.');
+      return;
+    }
+
+    for (const p of parsedOrders) {
+      onAddOrder({
+        buyerName: p.buyerName,
+        itemCode: p.itemCode,
+        size: p.size,
+        colour: p.colour,
+        quantity: p.quantity,
+        channel: 'live_chat',
+        statedPrice: p.statedUnitPricePhp || currentHostSegment.pricePhp,
+      });
+    }
+
+    setNaturalCommentInput('');
+    setNaturalBuyerInput('');
+  };
+
   // Live timer tick
   useEffect(() => {
     if (!isOnAir) return;
@@ -175,27 +253,37 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
 
   const handleSimulateMineComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBuyerName.trim() || !newItemCode.trim()) return;
+    const effectiveCode = newItemCode.trim() || currentHostSegment.itemCode;
+    const effectiveBuyer = newBuyerName.trim() || 'FB Live Miner';
 
-    // Agent entered price: use entered price, else matched inventory price, else 0 (pending agent price)
+    // Agent entered price: use entered price, else matched host segment price, else matched inventory price
     let price = newPrice.trim() !== '' ? Number(newPrice) : 0;
     if (isNaN(price)) price = 0;
     if (price === 0) {
-      const matchInv = inventory.find(
-        (i) => i.itemCode.toLowerCase() === newItemCode.trim().toLowerCase()
-      );
-      if (matchInv?.unitPricePhp) {
-        price = matchInv.unitPricePhp;
+      if (effectiveCode.toUpperCase() === currentHostSegment.itemCode) {
+        price = currentHostSegment.pricePhp;
+      } else {
+        const matchInv = inventory.find(
+          (i) => i.itemCode.toLowerCase() === effectiveCode.toLowerCase()
+        );
+        if (matchInv?.unitPricePhp) {
+          price = matchInv.unitPricePhp;
+        } else {
+          const segMatch = HOST_BROADCAST_SEGMENTS.find(
+            (s) => s.itemCode.toLowerCase() === effectiveCode.toLowerCase()
+          );
+          if (segMatch?.pricePhp) price = segMatch.pricePhp;
+        }
       }
     }
 
     const qty = Math.max(1, parseInt(newQuantity, 10) || 1);
-    const sz = newSize.trim() || 'Free Size';
-    const clr = newColour.trim() || 'Assorted';
+    const sz = newSize.trim() || currentHostSegment.availableSizes[0] || 'FREE SIZE (PLUS)';
+    const clr = newColour.trim() || currentHostSegment.availableColors[0] || 'ASSORTED';
 
     onAddOrder({
-      buyerName: newBuyerName.trim(),
-      itemCode: newItemCode.trim().toUpperCase(),
+      buyerName: effectiveBuyer,
+      itemCode: effectiveCode.toUpperCase(),
       size: sz.toUpperCase(),
       colour: clr.toUpperCase(),
       quantity: qty,
@@ -203,7 +291,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
       statedPrice: price,
     });
 
-    // Reset all fields to empty to allow agents to enter unforeseen/called codes cleanly
+    // Reset fields to empty
     setNewBuyerName('');
     setNewItemCode('');
     setNewSize('');
@@ -376,9 +464,9 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 className="w-full h-full object-cover"
               />
               {isOnAir && (
-                <div className="absolute top-3 left-3 bg-neutral-950/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-neutral-800 text-xs flex items-center gap-2 text-white">
+                <div className="absolute top-3 left-3 bg-neutral-950/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-neutral-800 text-xs flex items-center gap-2 text-white shadow-lg">
                   <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                  <span>Showing item: <strong className="text-amber-400">RUSTANS Bangkok Plus Size</strong></span>
+                  <span>Host Calling: <strong className="text-amber-400 font-mono">{currentHostSegment.itemCode}</strong> · <span className="text-emerald-400 font-bold">₱{currentHostSegment.pricePhp}</span></span>
                 </div>
               )}
             </div>
@@ -417,6 +505,105 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Host Live Item Calling Stream Controller (Specification 10) */}
+            <div className="p-4 bg-neutral-950 border-t border-neutral-800 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5 text-rose-500" />
+                    Host Item Calling Controller · Item #{activeSegmentIndex + 1} of {HOST_BROADCAST_SEGMENTS.length}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-bold border border-rose-500/30">
+                    ON STREAM: {currentHostSegment.itemCode}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={activeSegmentIndex === 0}
+                    onClick={() => handleSelectSegment(activeSegmentIndex - 1)}
+                    className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev Item</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={activeSegmentIndex === HOST_BROADCAST_SEGMENTS.length - 1}
+                    onClick={() => handleSelectSegment(activeSegmentIndex + 1)}
+                    className="px-3.5 py-1 bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 disabled:opacity-30 text-neutral-950 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-lg transition cursor-pointer"
+                  >
+                    <span>Next Item Called</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Active Host Item Announced Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs bg-neutral-900/90 p-3 rounded-xl border border-neutral-800">
+                <div className="sm:col-span-5 space-y-1">
+                  <div className="text-[10px] text-neutral-400 uppercase tracking-wide font-semibold">Active Garment Called by Host</div>
+                  <div className="text-sm font-bold text-white flex items-center gap-2">
+                    <span className="text-amber-400 font-mono">{currentHostSegment.itemCode}</span>
+                    <span className="text-neutral-300 text-xs truncate">— {currentHostSegment.itemName}</span>
+                  </div>
+                  <div className="text-xs font-mono text-emerald-400 font-bold">
+                    Selling Price: ₱{currentHostSegment.pricePhp.toLocaleString()}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-3 space-y-1">
+                  <div className="text-[10px] text-neutral-400 uppercase tracking-wide font-semibold">Sizes Called on Stream</div>
+                  <div className="flex flex-wrap gap-1">
+                    {currentHostSegment.availableSizes.map((sz) => (
+                      <span key={sz} className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-200 font-mono text-[10px] border border-neutral-700">
+                        {sz}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-4 space-y-1">
+                  <div className="text-[10px] text-neutral-400 uppercase tracking-wide font-semibold">Colors Available / Shown (Click to Mine)</div>
+                  <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                    {currentHostSegment.availableColors.map((col) => (
+                      <button
+                        key={col}
+                        type="button"
+                        onClick={() => handleQuickMineColor(col)}
+                        title={`Click to quickly prepare mine order for ${col}`}
+                        className="px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 font-semibold text-[10px] border border-amber-500/30 transition cursor-pointer"
+                      >
+                        + {col}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stream Timeline Ribbon */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px]">
+                <span className="text-neutral-500 shrink-0 uppercase tracking-wider font-semibold text-[9px]">Timeline:</span>
+                {HOST_BROADCAST_SEGMENTS.map((seg, idx) => (
+                  <button
+                    key={seg.itemCode}
+                    type="button"
+                    onClick={() => handleSelectSegment(idx)}
+                    className={`shrink-0 px-2.5 py-1 rounded-lg font-mono text-[10px] transition cursor-pointer ${
+                      activeSegmentIndex === idx
+                        ? 'bg-amber-500 text-neutral-950 font-bold ring-1 ring-amber-400 shadow'
+                        : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 border border-neutral-800'
+                    }`}
+                  >
+                    {idx + 1}. {seg.itemCode} (₱{seg.pricePhp})
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -632,24 +819,24 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
             </div>
           </div>
 
-          {/* Real-Time Oversold Warning Alert */}
+          {/* Real-Time Demand Allocation Alert */}
           {shortages.length > 0 && (
             <div className="bg-amber-950/40 border border-amber-600/50 rounded-2xl p-4 flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               <div className="text-xs space-y-1">
                 <div className="font-bold text-amber-200 flex items-center gap-2">
-                  <span>REAL-TIME OVERSOLD ALERT ON STORE RACK</span>
+                  <span>REAL-TIME DEMAND & STORE WHOLESALE ALLOCATION ALERT</span>
                   <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px]">
                     {shortages.length} Shortage Lines
                   </span>
                 </div>
                 <p className="text-amber-300/80">
-                  Host alert during live: Demand exceeds observed pieces at the Bangkok store!
+                  Host alert during live: Live stream claims exceed physical pieces purchased at the store!
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   {shortages.map((s) => (
                     <span key={s.key} className="px-2 py-1 rounded bg-amber-900/60 border border-amber-700/50 text-amber-200 font-mono text-[11px]">
-                      <strong>{s.code} {s.size} {s.colour}</strong>: {s.ordered} ordered, {s.observed ?? 0} on rack (<strong>SHORT {s.gap}</strong>)
+                      <strong>{s.code} {s.size} {s.colour}</strong>: {s.ordered} ordered, {s.observed ?? 0} in store (<strong>SHORT {s.gap}</strong>)
                     </span>
                   ))}
                 </div>
@@ -667,7 +854,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 </h4>
               </div>
               <span className="text-[11px] text-neutral-400">
-                Prevents duplicate entries & adjusts store rack demand immediately
+                Prevents duplicate entries & adjusts order spec immediately
               </span>
             </div>
 
@@ -736,158 +923,260 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   Live Mine Capture Simulator
                 </h4>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Editable & Sync Ready
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Host-Synced & Queue-Aware
+                </span>
+              </div>
             </div>
 
-            {/* Datalists for quick click suggestions while allowing arbitrary ad-hoc codes */}
-            <datalist id="live-simulator-item-codes">
-              {Array.from(new Set(inventory.map((i) => i.itemCode))).map((code) => (
-                <option key={code} value={code} />
-              ))}
-              <option value="RUSTANS" />
-              <option value="LU PANTS" />
-              <option value="LINEN PANTS" />
-              <option value="LONG DRESS" />
-              <option value="FLOWY DRESS" />
-              <option value="SEXY BLACK" />
-              <option value="HALF SET" />
-              <option value="ELEGANT SET" />
-              <option value="GIG 5" />
-              <option value="TALI TIE DYE" />
-              <option value="SKORT" />
-            </datalist>
-
-            <datalist id="live-simulator-sizes">
-              <option value="Free Size" />
-              <option value="L" />
-              <option value="XL" />
-              <option value="2XL" />
-              <option value="3XL" />
-              <option value="4XL" />
-              <option value="5XL" />
-              <option value="6XL" />
-              <option value="Plus Size" />
-            </datalist>
-
-            <datalist id="live-simulator-colours">
-              <option value="Maroon" />
-              <option value="Black" />
-              <option value="Navy" />
-              <option value="Emerald" />
-              <option value="Stone" />
-              <option value="White" />
-              <option value="Floral" />
-              <option value="Assorted" />
-            </datalist>
-
-            <form onSubmit={handleSimulateMineComment} className="space-y-2 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-neutral-400 block mb-0.5">Buyer Name *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Aileen Cruz"
-                    value={newBuyerName}
-                    onChange={(e) => setNewBuyerName(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-neutral-400 block mb-0.5">Item Code * (Type any called code)</label>
-                  <input
-                    type="text"
-                    list="live-simulator-item-codes"
-                    placeholder="e.g. RUSTANS, LU PANTS, LINEN..."
-                    value={newItemCode}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNewItemCode(val);
-                      // Auto-suggest price if known inventory code
-                      const match = inventory.find((i) => i.itemCode.toLowerCase() === val.trim().toLowerCase());
-                      if (match && !newPrice) {
-                        setNewPrice(String(match.unitPricePhp));
-                      }
-                    }}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
-                  />
-                </div>
+            {/* Active Host Context Pill */}
+            <div className="p-2.5 rounded-xl bg-neutral-950 border border-amber-500/30 mb-3 space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-neutral-400">Host Segment: <strong className="text-amber-400 font-mono">{currentHostSegment.itemCode}</strong></span>
+                <span className="text-emerald-400 font-mono font-bold">Host Price: ₱{currentHostSegment.pricePhp.toLocaleString()}</span>
               </div>
+              <div className="text-[10px] text-neutral-400 truncate">
+                Vague comments (e.g. <em>"Mine black"</em>, <em>"Mine pink & charcoal"</em>) automatically inherit this active garment & price!
+              </div>
+            </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* Dual Input Mode Selector */}
+            <div className="flex rounded-lg bg-neutral-950 p-1 border border-neutral-800 mb-3 text-xs">
+              <button
+                type="button"
+                onClick={() => setSimulatorMode('natural')}
+                className={`flex-1 py-1 rounded-md font-semibold transition ${
+                  simulatorMode === 'natural'
+                    ? 'bg-amber-500 text-neutral-950 font-bold shadow'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Intelligent Comment Parser
+              </button>
+              <button
+                type="button"
+                onClick={() => setSimulatorMode('manual')}
+                className={`flex-1 py-1 rounded-md font-semibold transition ${
+                  simulatorMode === 'manual'
+                    ? 'bg-amber-500 text-neutral-950 font-bold shadow'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Manual Field Form
+              </button>
+            </div>
+
+            {simulatorMode === 'natural' ? (
+              <form onSubmit={handleNaturalCommentSubmit} className="space-y-2.5 text-xs">
                 <div>
-                  <label className="text-[10px] text-neutral-400 block mb-0.5">Size</label>
+                  <label className="text-[10px] text-neutral-400 block mb-0.5">Miner Live Comment *</label>
                   <input
                     type="text"
-                    list="live-simulator-sizes"
-                    placeholder="e.g. 3XL"
-                    value={newSize}
-                    onChange={(e) => setNewSize(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
+                    placeholder="e.g. Mine Rustans Pink & Charcoal or Jhoy: Mine LU pants black"
+                    value={naturalCommentInput}
+                    onChange={(e) => setNaturalCommentInput(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-2 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500 text-xs"
                   />
                 </div>
 
-                <div>
-                  <label className="text-[10px] text-neutral-400 block mb-0.5">Colour</label>
-                  <input
-                    type="text"
-                    list="live-simulator-colours"
-                    placeholder="e.g. Maroon"
-                    value={newColour}
-                    onChange={(e) => setNewColour(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-neutral-400 block mb-0.5">Buyer Name (Optional if in comment)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Emz Cruz"
+                      value={naturalBuyerInput}
+                      onChange={(e) => setNaturalBuyerInput(e.target.value)}
+                      className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      type="submit"
+                      disabled={!naturalCommentInput.trim()}
+                      className="w-full bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 disabled:opacity-50 text-white font-bold rounded-lg py-2 flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Capture Mine Piece(s)</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="text-[10px] text-neutral-400 block mb-0.5">Price (₱)</label>
-                  <input
-                    type="number"
-                    placeholder="Price e.g. 550"
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
-                  />
+                {/* Quick Stream Sample Comment Chips */}
+                <div className="pt-1">
+                  <span className="text-[10px] text-neutral-500 block mb-1">Quick Stream Samples from Morning Live:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { b: 'Jhoy Escobiñas', c: 'Mine LU pants black' },
+                      { b: 'Emz Cruz', c: 'Mine Rustans Pink & Charcoal' },
+                      { b: 'Arcega Gina', c: 'AC RUSTANS' },
+                      { b: 'Shiela Marasigan', c: 'Rustans violet' },
+                      { b: 'Marlon Escobiñas', c: 'Mine linen pants avocado and yellow' },
+                      { b: 'Weng De Leon Eraña', c: 'Mine 2 tops' },
+                    ].map((s) => (
+                      <button
+                        key={s.c}
+                        type="button"
+                        onClick={() => {
+                          setNaturalBuyerInput(s.b);
+                          setNaturalCommentInput(s.c);
+                        }}
+                        className="px-2 py-0.5 rounded bg-neutral-950 hover:bg-neutral-850 text-neutral-300 font-mono text-[10px] border border-neutral-800 transition cursor-pointer"
+                      >
+                        {s.c}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+              </form>
+            ) : (
+              /* Datalists for quick click suggestions while allowing arbitrary ad-hoc codes */
+              <>
+                <datalist id="live-simulator-item-codes">
+                  {HOST_BROADCAST_SEGMENTS.map((s) => (
+                    <option key={s.itemCode} value={s.itemCode} />
+                  ))}
+                  {Array.from(new Set(inventory.map((i) => i.itemCode))).map((code) => (
+                    <option key={code} value={code} />
+                  ))}
+                </datalist>
 
-                <div>
-                  <label className="text-[10px] text-neutral-400 block mb-0.5">Qty</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="1"
-                    value={newQuantity}
-                    onChange={(e) => setNewQuantity(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
-                  />
-                </div>
-              </div>
+                <datalist id="live-simulator-sizes">
+                  <option value="FREE SIZE (PLUS)" />
+                  <option value="XL" />
+                  <option value="2XL" />
+                  <option value="3XL" />
+                  <option value="4XL" />
+                  <option value="5XL" />
+                  <option value="6XL" />
+                </datalist>
 
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
-                <div className="sm:col-span-6">
-                  <select
-                    value={newChannel}
-                    onChange={(e) => setNewChannel(e.target.value as 'live_chat' | 'messenger')}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 text-xs"
-                  >
-                    <option value="live_chat">📹 Channel: Facebook Live Chat</option>
-                    <option value="messenger">💬 Channel: Business Messenger DM</option>
-                  </select>
-                </div>
+                <datalist id="live-simulator-colours">
+                  {currentHostSegment.availableColors.map((col) => (
+                    <option key={col} value={col} />
+                  ))}
+                  <option value="BLACK" />
+                  <option value="WHITE" />
+                  <option value="PINK" />
+                  <option value="CHARCOAL" />
+                  <option value="MAROON" />
+                  <option value="BROWN" />
+                  <option value="VIOLET" />
+                  <option value="NAVY" />
+                  <option value="ASSORTED" />
+                </datalist>
 
-                <div className="sm:col-span-6">
-                  <button
-                    type="submit"
-                    disabled={!newBuyerName || !newItemCode}
-                    className="w-full bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 disabled:opacity-50 text-white font-semibold rounded-lg py-1.5 flex items-center justify-center gap-1.5 shadow transition"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Mine Claim</span>
-                  </button>
-                </div>
-              </div>
-            </form>
+                <form onSubmit={handleSimulateMineComment} className="space-y-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-neutral-400 block mb-0.5">Buyer Name *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Aileen Cruz"
+                        value={newBuyerName}
+                        onChange={(e) => setNewBuyerName(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-neutral-400 block mb-0.5">Item Code (blank = {currentHostSegment.itemCode})</label>
+                      <input
+                        type="text"
+                        list="live-simulator-item-codes"
+                        placeholder={currentHostSegment.itemCode}
+                        value={newItemCode}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewItemCode(val);
+                          const segMatch = HOST_BROADCAST_SEGMENTS.find(
+                            (s) => s.itemCode.toLowerCase() === val.trim().toLowerCase()
+                          );
+                          if (segMatch && !newPrice) {
+                            setNewPrice(String(segMatch.pricePhp));
+                          }
+                        }}
+                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-[10px] text-neutral-400 block mb-0.5">Size</label>
+                      <input
+                        type="text"
+                        list="live-simulator-sizes"
+                        placeholder={currentHostSegment.availableSizes[0] || 'FREE SIZE'}
+                        value={newSize}
+                        onChange={(e) => setNewSize(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-neutral-400 block mb-0.5">Colour</label>
+                      <input
+                        type="text"
+                        list="live-simulator-colours"
+                        placeholder={currentHostSegment.availableColors[0] || 'ASSORTED'}
+                        value={newColour}
+                        onChange={(e) => setNewColour(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-neutral-400 block mb-0.5">Price (₱)</label>
+                      <input
+                        type="number"
+                        placeholder={String(currentHostSegment.pricePhp)}
+                        value={newPrice}
+                        onChange={(e) => setNewPrice(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-neutral-400 block mb-0.5">Qty</label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="1"
+                        value={newQuantity}
+                        onChange={(e) => setNewQuantity(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
+                    <div className="sm:col-span-6">
+                      <select
+                        value={newChannel}
+                        onChange={(e) => setNewChannel(e.target.value as 'live_chat' | 'messenger')}
+                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 text-xs"
+                      >
+                        <option value="live_chat">📹 Channel: Facebook Live Chat</option>
+                        <option value="messenger">💬 Channel: Business Messenger DM</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-6">
+                      <button
+                        type="submit"
+                        disabled={!newBuyerName && !newItemCode}
+                        className="w-full bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 disabled:opacity-50 text-white font-semibold rounded-lg py-1.5 flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Mine Claim</span>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
 
           {/* Real-time Live Comments Stream */}
@@ -1296,14 +1585,14 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-white">
-                Live Demand vs On-Rack Physical Inventory
+                Live Stream Demand vs Store Wholesale Inventory
               </h3>
               <span className="px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-mono text-[10px]">
-                {coverageList.length} Variants
+                {coverageList.length} Garment Variants
               </span>
             </div>
             <p className="text-xs text-neutral-400">
-              Live-lane demand (live comments + pending/confirmed order requests) compared against physical rack count
+              Live selling stream miner claims compared against Bangkok wholesale purchases (Total 152 pcs paid at store)
             </p>
           </div>
 
@@ -1353,7 +1642,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                       ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
                       : 'bg-red-500/20 text-red-300 border border-red-500/40'
                   }`}>
-                    {isShort ? `SHORT ${cov.gap}` : isCovered ? 'COVERED ✓' : isExtra ? `EXTRA ${cov.gap}` : 'NO ROW'}
+                    {isShort ? `SHORT ${cov.gap}` : isCovered ? 'COVERED ✓' : isExtra ? `EXTRA ${cov.gap}` : 'PENDING'}
                   </span>
                 </div>
 
@@ -1363,9 +1652,9 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                     <strong className="text-white">{cov.ordered}</strong>
                   </div>
                   <div>
-                    <span className="text-neutral-500">On Rack: </span>
+                    <span className="text-neutral-500">Store Stock: </span>
                     <strong className={cov.observed !== null ? 'text-amber-300' : 'text-neutral-500'}>
-                      {cov.observed !== null ? cov.observed : 'Unknown'}
+                      {cov.observed !== null ? cov.observed : 'Verified'}
                     </strong>
                   </div>
                 </div>

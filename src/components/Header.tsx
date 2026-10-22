@@ -49,13 +49,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navItems = [
     { id: 'live_command', label: 'Live Session Command', icon: Radio, badge: isOnAir ? 'ON AIR' : 'ENDED' },
-    { id: 'reconciliation', label: 'Auto-Reconciliation & Invoicing', icon: FileCheck, badge: summary ? `${summary.buyerBags.length} Bags` : undefined },
-    { id: 'order_review', label: 'Order Review & Approval', icon: CheckCircle2, badge: activeLive.reconciliationStatus === 'awaiting_owner_review' ? 'Awaiting Review' : 'Manual Review' },
+    { id: 'messenger_adjustments', label: 'Page Messenger Orders', icon: ShieldCheck, badge: 'Direct DMs' },
+    { id: 'order_review', label: 'Order Review & Verification', icon: CheckCircle2, badge: activeLive.reconciliationStatus === 'awaiting_owner_review' ? 'Awaiting Review' : 'Verified Orders' },
+    { id: 'reconciliation', label: 'Reconciliation & Invoices', icon: FileCheck, badge: summary ? `${summary.buyerBags.length} Bags` : undefined },
     { id: 'pre_orders', label: 'Pre-Orders Lane', icon: ShoppingBag, badge: `${preOrdersCount} Pre-orders` },
-    { id: 'buying_analytics', label: 'Buying Behavior Analytics', icon: ShieldCheck, badge: 'Insights' },
-    { id: 'inventory_board', label: 'Store Inventory Board', icon: Store, badge: readyToLeave ? 'Ready ✓' : 'In Progress' },
-    { id: 'messenger_adjustments', label: 'Messenger Adjustments', icon: ShieldCheck, badge: 'Live & Post-Live' },
     { id: 'replay_studio', label: 'Replay Review Studio', icon: CheckCircle2 },
+    { id: 'buying_analytics', label: 'Sales & Demand Analytics', icon: Sparkles },
     { id: 'pola_ai', label: 'Pola AI Co-Pilot', icon: Sparkles, badge: 'Gemini' },
   ];
 
