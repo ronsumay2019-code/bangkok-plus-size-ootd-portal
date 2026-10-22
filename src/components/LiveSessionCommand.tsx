@@ -137,6 +137,10 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   const [isApplyingBatch, setIsApplyingBatch] = useState(false);
   const [batchStatusMsg, setBatchStatusMsg] = useState('');
 
+  // Live claims stream search & sorting
+  const [claimsFilter, setClaimsFilter] = useState('');
+  const [claimsSort, setClaimsSort] = useState<'latest' | 'earliest'>('latest');
+
   // Live timer tick
   useEffect(() => {
     if (!isOnAir) return;
@@ -276,7 +280,23 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   };
 
   // Filter current live orders
-  const liveOrders = orders.filter((o) => o.liveId === live.id);
+  const liveOrders = orders.filter((o) => !o.liveId || o.liveId === live.id);
+  const filteredLiveOrders = liveOrders
+    .filter((o) => {
+      if (!claimsFilter.trim()) return true;
+      const q = claimsFilter.toLowerCase();
+      return (
+        o.buyerName.toLowerCase().includes(q) ||
+        o.itemCode.toLowerCase().includes(q) ||
+        o.colour.toLowerCase().includes(q) ||
+        (o.itemName && o.itemName.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      const timeA = new Date(a.orderedAt).getTime() || 0;
+      const timeB = new Date(b.orderedAt).getTime() || 0;
+      return claimsSort === 'latest' ? timeB - timeA : timeA - timeB;
+    });
   const coverageList = summary?.coverage || [];
   const shortages = coverageList.filter((c) => c.status === 'short');
   const covered = coverageList.filter((c) => c.status === 'covered');
@@ -869,14 +889,30 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
 
           {/* Real-time Live Comments Stream */}
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col h-[460px]">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-800 mb-2">
+            <div className="flex flex-wrap items-center justify-between pb-2 border-b border-neutral-800 mb-2 gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Live Stream Claims ({liveOrders.length} Captured)
+                  Today's Live Claims ({filteredLiveOrders.length})
                 </h4>
               </div>
-              <span className="text-[11px] text-neutral-400">Earliest comments first</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={claimsFilter}
+                  onChange={(e) => setClaimsFilter(e.target.value)}
+                  placeholder="Filter (e.g. RUSTANS, LU)..."
+                  className="bg-neutral-950 border border-neutral-800 rounded px-2 py-0.5 text-[11px] text-white placeholder:text-neutral-500 focus:outline-none focus:border-amber-500 w-36"
+                />
+                <button
+                  type="button"
+                  onClick={() => setClaimsSort((s) => (s === 'latest' ? 'earliest' : 'latest'))}
+                  className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] rounded transition cursor-pointer font-mono"
+                  title="Toggle sorting"
+                >
+                  {claimsSort === 'latest' ? 'Latest ↓' : 'Earliest ↑'}
+                </button>
+              </div>
             </div>
 
             {/* Quick Agent Price Setter Bar by Item Code */}
@@ -926,7 +962,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
-              {liveOrders.map((ord, idx) => (
+              {filteredLiveOrders.map((ord, idx) => (
                 <div
                   key={ord.id}
                   className={`p-2.5 rounded-xl border transition ${

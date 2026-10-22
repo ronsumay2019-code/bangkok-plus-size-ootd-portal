@@ -218,7 +218,9 @@ function loadRuntimeState() {
         orders = parsed.orders.filter(
           (o: any) =>
             !o.id?.startsWith('sim_') &&
-            !o.hostVerificationNote?.includes('Mined during live stream:')
+            !o.id?.startsWith('ord_cl_cl_') &&
+            !o.hostVerificationNote?.includes('Mined during live stream:') &&
+            (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
         );
         for (const o of orders) {
           if (o.statedUnitPricePhp === 1890) {
@@ -245,7 +247,9 @@ inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
 orders = orders.filter(
   (o: any) =>
     !o.id?.startsWith('sim_') &&
-    !o.hostVerificationNote?.includes('Mined during live stream:')
+    !o.id?.startsWith('ord_cl_cl_') &&
+    !o.hostVerificationNote?.includes('Mined during live stream:') &&
+    (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
 );
 if (orders.length === 0) {
   orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
@@ -508,7 +512,7 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
       const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
       if (bridgeRes.ok) {
         const bData: any = await bridgeRes.json();
-        for (const clRow of bData.bridge?.claims || []) {
+        for (const clRow of (bData.bridge?.claims || []).filter((c: any) => (c.created_at || c.at || '').includes('2026-10-22'))) {
           const cid = `bridge_cl_${clRow.id}`;
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
@@ -1389,7 +1393,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           effectiveStatus = st === 'live' ? 'LIVE' : st === 'ended' ? 'VOD' : st;
         }
 
-        for (const reqRow of bData.bridge?.orderRequests || []) {
+        for (const reqRow of (bData.bridge?.orderRequests || []).filter((r: any) => !r.created_at || r.created_at.includes('2026-10-22'))) {
           const cid = `bridge_req_${reqRow.id}`;
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
@@ -1417,7 +1421,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
             backfilledComments++;
           }
         }
-        for (const clRow of bData.bridge?.claims || []) {
+        for (const clRow of (bData.bridge?.claims || []).filter((c: any) => (c.created_at || c.at || '').includes('2026-10-22'))) {
           const cid = `bridge_cl_${clRow.id}`;
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
