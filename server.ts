@@ -1169,6 +1169,111 @@ app.post('/api/facebook/live-sync', async (req, res) => {
     } catch (err: any) {
       graphError = err?.message || 'Network error contacting graph.facebook.com';
     }
+  } else {
+    // Automatic bridge fallback to main Bangkok Plus Size OOTD backend (which holds the connected Facebook Page token in Supabase)
+    try {
+      const bridgeUrl = process.env.BRIDGE_SYNC_URL || 'https://bangkokplussizeootd.vercel.app/api/facebook/live-sync?bridge=1';
+      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
+      if (bridgeRes.ok) {
+        const bData: any = await bridgeRes.json();
+        graphSyncStats.mode = 'live_graph_api';
+        const recentVid = (bData.recentBroadcasts || [])[0] || (bData.bridge?.lives || [])[0];
+        if (recentVid) {
+          const vidId = recentVid.videoId || recentVid.fb_video_id;
+          if (vidId) {
+            targetLive.fbVideoId = String(vidId);
+            graphSyncStats.onAirVideoId = String(vidId);
+            targetLive.videoUrl = `https://www.facebook.com/watch/?v=${vidId}`;
+          }
+          if (recentVid.title) targetLive.title = recentVid.title;
+          const st = recentVid.status || (bData.onAir ? 'LIVE' : 'VOD');
+          effectiveStatus = st === 'live' ? 'LIVE' : st === 'ended' ? 'VOD' : st;
+        }
+        for (const reqRow of bData.bridge?.orderRequests || []) {
+          const cid = `bridge_req_${reqRow.id}`;
+          if (!seenCommentIds.has(cid)) {
+            seenCommentIds.add(cid);
+            orders.push({
+              id: `ord_br_${reqRow.id}`,
+              liveId: targetLive.id,
+              buyerName: reqRow.buyer_name || 'FB Live Buyer',
+              channel: 'live_chat',
+              sourceCommentId: cid,
+              itemCode: (reqRow.item_code || 'LIVE').toUpperCase(),
+              itemName: reqRow.item_description || reqRow.raw_message || reqRow.item_code || 'Live Item',
+              size: (reqRow.size || '3XL').toUpperCase(),
+              colour: (reqRow.colour || 'MAROON').toUpperCase(),
+              quantity: Number(reqRow.quantity) || 1,
+              statedUnitPricePhp: Number(reqRow.unit_price_php) || 1890,
+              orderedAt: reqRow.created_at || nowIso,
+              status: reqRow.status === 'confirmed' ? 'confirmed' : 'pending',
+              invoiced: false,
+              lane: reqRow.lane === 'preorder' ? 'preorder' : 'live',
+              version: 1,
+              overrideHistory: [],
+            });
+            backfilledComments++;
+          }
+        }
+        for (const clRow of bData.bridge?.claims || []) {
+          const cid = `bridge_cl_${clRow.id}`;
+          if (!seenCommentIds.has(cid)) {
+            seenCommentIds.add(cid);
+            orders.push({
+              id: `ord_cl_${clRow.id}`,
+              liveId: targetLive.id,
+              buyerName: clRow.customer_id || 'FB Live Buyer',
+              channel: 'live_chat',
+              sourceCommentId: clRow.comment_id || cid,
+              itemCode: (clRow.code || 'LIVE').toUpperCase(),
+              itemName: clRow.raw_text || clRow.code || 'Live Claim',
+              size: (clRow.size || '3XL').toUpperCase(),
+              colour: 'MAROON',
+              quantity: Number(clRow.qty) || 1,
+              statedUnitPricePhp: 1890,
+              orderedAt: clRow.created_at || nowIso,
+              status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
+              invoiced: false,
+              lane: 'live',
+              version: 1,
+              overrideHistory: [],
+            });
+            backfilledComments++;
+          }
+        }
+        totalCommentsFetched = Math.max(bData.imported?.read || 0, orders.filter((o) => o.liveId === targetLive.id).length);
+        targetLive.totalComments = Math.max(targetLive.totalComments || 0, totalCommentsFetched);
+        targetLive.totalMined = orders.filter((o) => o.liveId === targetLive.id).length;
+
+        for (const conv of bData.bridge?.conversations || []) {
+          const existingIdx = messengerThreads.findIndex((t) => t.id === conv.id || t.psid === conv.psid);
+          const mappedMessages = (conv.messages || []).map((m: any) => ({
+            id: m.id,
+            mid: m.id,
+            sender: (m.fromPage ? 'page_agent' : 'buyer') as 'buyer' | 'page_agent',
+            text: m.message || '',
+            timestamp: m.createdAt || nowIso,
+          }));
+          const lastBuyerMsg = [...mappedMessages].reverse().find((m: any) => m.sender === 'buyer');
+          const intent = detectMessengerIntent(lastBuyerMsg?.text || conv.snippet || '', conv.buyerName || 'Buyer');
+          const threadObj: MessengerThread = {
+            id: conv.id,
+            psid: conv.psid,
+            buyerName: conv.buyerName || 'Messenger Buyer',
+            buyerHandle: `fb.com/${conv.psid}`,
+            windowExpiresAt: new Date(new Date(conv.updatedAt || nowIso).getTime() + 24 * 3600 * 1000).toISOString(),
+            unreadCount: conv.unreadCount || 0,
+            detectedIntent: intent,
+            messages: mappedMessages,
+          };
+          if (existingIdx >= 0) messengerThreads[existingIdx] = threadObj;
+          else messengerThreads.push(threadObj);
+          syncedThreadsCount++;
+        }
+      }
+    } catch (bridgeErr: any) {
+      graphError = bridgeErr?.message || null;
+    }
   }
 
   if (effectiveStatus) {
