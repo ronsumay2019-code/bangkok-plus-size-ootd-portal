@@ -1386,15 +1386,6 @@ app.post('/api/facebook/live-sync', async (req, res) => {
             backfilledComments++;
           }
         }
-              status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
-              invoiced: false,
-              lane: 'live',
-              version: 1,
-              overrideHistory: [],
-            });
-            backfilledComments++;
-          }
-        }
 
         totalCommentsFetched = Math.max(bData.imported?.read || 0, orders.filter((o) => o.liveId === targetLive.id).length);
         targetLive.totalComments = Math.max(targetLive.totalComments || 0, totalCommentsFetched);
