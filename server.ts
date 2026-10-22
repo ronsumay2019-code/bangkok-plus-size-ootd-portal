@@ -1296,13 +1296,17 @@ app.post('/api/facebook/live-sync', async (req, res) => {
       targetLive.reconciledAt = latestSummary.generatedAt;
       targetLive.reconciliationStatus = 'awaiting_owner_review';
     } else {
+      if (effectiveStatus === 'LIVE') {
+        targetLive.status = 'live';
+        targetLive.endedAt = null;
+      }
       performInventorySync(targetLive.id);
     }
   }
 
   graphSyncStats.lastStatusCheck = graphError
     ? `Graph API Error: ${graphError}`
-    : fbToken
+    : fbToken || graphSyncStats.mode === 'live_graph_api'
     ? `Synced Graph API v22.0 at ${new Date().toLocaleTimeString()} (${totalCommentsFetched} comments scanned, +${backfilledComments} claims mined, ${syncedThreadsCount} Messenger threads)`
     : `Checked at ${new Date().toLocaleTimeString()} — Enter FB Live Video ID & Page Access Token to pull morning live data`;
 
