@@ -218,15 +218,11 @@ function loadRuntimeState() {
         orders = parsed.orders.filter(
           (o: any) =>
             !o.id?.startsWith('sim_') &&
-            !o.id?.startsWith('ord_cl_cl_') &&
+            !o.id?.startsWith('ord_br_') &&
+            !o.id?.startsWith('ord_cl_') &&
             !o.hostVerificationNote?.includes('Mined during live stream:') &&
             (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
         );
-        for (const o of orders) {
-          if (o.statedUnitPricePhp === 1890) {
-            o.statedUnitPricePhp = 0;
-          }
-        }
       }
       if (Array.isArray(parsed.amendments)) amendments = parsed.amendments;
       if (Array.isArray(parsed.preOrders)) preOrders = parsed.preOrders;
@@ -250,17 +246,13 @@ if (inventory.length === 0) {
 orders = orders.filter(
   (o: any) =>
     !o.id?.startsWith('sim_') &&
-    !o.id?.startsWith('ord_cl_cl_') &&
+    !o.id?.startsWith('ord_br_') &&
+    !o.id?.startsWith('ord_cl_') &&
     !o.hostVerificationNote?.includes('Mined during live stream:') &&
     (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
 );
 if (orders.length === 0) {
   orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
-}
-for (const o of orders) {
-  if (o.statedUnitPricePhp === 1890) {
-    o.statedUnitPricePhp = 0;
-  }
 }
 saveRuntimeState();
 
@@ -1647,75 +1639,78 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           effectiveStatus = st === 'live' ? 'LIVE' : st === 'ended' ? 'VOD' : st;
         }
 
-        for (const reqRow of (bData.bridge?.orderRequests || []).filter((r: any) => !r.created_at || r.created_at.includes('2026-10-22'))) {
-          const cid = `bridge_req_${reqRow.id}`;
-          if (!seenCommentIds.has(cid)) {
-            seenCommentIds.add(cid);
-            const raw = reqRow.raw_message || reqRow.item_description || reqRow.item_code || '';
-            const specs = parseClaimSpecsFromRaw(raw, reqRow.item_code || 'LIVE');
+        const hasAuthenticOrders = orders.some((o) => o.id.startsWith('ord_live_'));
+        if (!hasAuthenticOrders) {
+          for (const reqRow of (bData.bridge?.orderRequests || []).filter((r: any) => !r.created_at || r.created_at.includes('2026-10-22'))) {
+            const cid = `bridge_req_${reqRow.id}`;
+            if (!seenCommentIds.has(cid)) {
+              seenCommentIds.add(cid);
+              const raw = reqRow.raw_message || reqRow.item_description || reqRow.item_code || '';
+              const specs = parseClaimSpecsFromRaw(raw, reqRow.item_code || 'LIVE');
 
-            for (let sIdx = 0; sIdx < specs.length; sIdx++) {
-              const spec = specs[sIdx];
-              if (spec.isChatter) continue;
+              for (let sIdx = 0; sIdx < specs.length; sIdx++) {
+                const spec = specs[sIdx];
+                if (spec.isChatter) continue;
 
-              orders.push({
-                id: specs.length > 1 ? `ord_br_${reqRow.id}_${sIdx + 1}` : `ord_br_${reqRow.id}`,
-                liveId: targetLive.id,
-                buyerName: cleanBuyerName(reqRow.buyer_name),
-                channel: 'live_chat',
-                sourceCommentId: cid,
-                itemCode: spec.itemCode,
-                itemName: spec.itemName,
-                size: spec.size,
-                colour: spec.colour,
-                quantity: spec.quantity || 1,
-                statedUnitPricePhp: Number(reqRow.unit_price_php) || spec.price || 550,
-                orderedAt: reqRow.created_at || nowIso,
-                status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (reqRow.status === 'confirmed' ? 'confirmed' : 'pending'),
-                invoiced: false,
-                lane: reqRow.lane === 'preorder' ? 'preorder' : 'live',
-                version: 1,
-                hostVerificationNote: spec.reviewNotes,
-                reviewNotes: spec.reviewNotes,
-                overrideHistory: [],
-              });
-              backfilledComments++;
+                orders.push({
+                  id: specs.length > 1 ? `ord_br_${reqRow.id}_${sIdx + 1}` : `ord_br_${reqRow.id}`,
+                  liveId: targetLive.id,
+                  buyerName: cleanBuyerName(reqRow.buyer_name),
+                  channel: 'live_chat',
+                  sourceCommentId: cid,
+                  itemCode: spec.itemCode,
+                  itemName: spec.itemName,
+                  size: spec.size,
+                  colour: spec.colour,
+                  quantity: spec.quantity || 1,
+                  statedUnitPricePhp: Number(reqRow.unit_price_php) || spec.price || 550,
+                  orderedAt: reqRow.created_at || nowIso,
+                  status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (reqRow.status === 'confirmed' ? 'confirmed' : 'pending'),
+                  invoiced: false,
+                  lane: reqRow.lane === 'preorder' ? 'preorder' : 'live',
+                  version: 1,
+                  hostVerificationNote: spec.reviewNotes,
+                  reviewNotes: spec.reviewNotes,
+                  overrideHistory: [],
+                });
+                backfilledComments++;
+              }
             }
           }
-        }
-        for (const clRow of (bData.bridge?.claims || []).filter((c: any) => (c.created_at || c.at || '').includes('2026-10-22'))) {
-          const cid = `bridge_cl_${clRow.id}`;
-          if (!seenCommentIds.has(cid)) {
-            seenCommentIds.add(cid);
-            const raw = clRow.raw || clRow.raw_text || '';
-            const specs = parseClaimSpecsFromRaw(raw, clRow.code || 'LIVE');
+          for (const clRow of (bData.bridge?.claims || []).filter((c: any) => (c.created_at || c.at || '').includes('2026-10-22'))) {
+            const cid = `bridge_cl_${clRow.id}`;
+            if (!seenCommentIds.has(cid)) {
+              seenCommentIds.add(cid);
+              const raw = clRow.raw || clRow.raw_text || '';
+              const specs = parseClaimSpecsFromRaw(raw, clRow.code || 'LIVE');
 
-            for (let sIdx = 0; sIdx < specs.length; sIdx++) {
-              const spec = specs[sIdx];
-              if (spec.isChatter) continue;
+              for (let sIdx = 0; sIdx < specs.length; sIdx++) {
+                const spec = specs[sIdx];
+                if (spec.isChatter) continue;
 
-              orders.push({
-                id: specs.length > 1 ? `ord_cl_${clRow.id}_${sIdx + 1}` : `ord_cl_${clRow.id}`,
-                liveId: targetLive.id,
-                buyerName: cleanBuyerName(clRow.customer_name || clRow.customer_id),
-                channel: 'live_chat',
-                sourceCommentId: clRow.comment_id || cid,
-                itemCode: spec.itemCode,
-                itemName: spec.itemName,
-                size: spec.size,
-                colour: spec.colour,
-                quantity: spec.quantity || 1,
-                statedUnitPricePhp: Number(clRow.unit_price_php || clRow.price) || spec.price || 550,
-                orderedAt: clRow.created_at || clRow.at || nowIso,
-                status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (clRow.status === 'confirmed' ? 'confirmed' : 'pending'),
-                invoiced: false,
-                lane: 'live',
-                version: 1,
-                hostVerificationNote: spec.reviewNotes,
-                reviewNotes: spec.reviewNotes,
-                overrideHistory: [],
-              });
-              backfilledComments++;
+                orders.push({
+                  id: specs.length > 1 ? `ord_cl_${clRow.id}_${sIdx + 1}` : `ord_cl_${clRow.id}`,
+                  liveId: targetLive.id,
+                  buyerName: cleanBuyerName(clRow.customer_name || clRow.customer_id),
+                  channel: 'live_chat',
+                  sourceCommentId: clRow.comment_id || cid,
+                  itemCode: spec.itemCode,
+                  itemName: spec.itemName,
+                  size: spec.size,
+                  colour: spec.colour,
+                  quantity: spec.quantity || 1,
+                  statedUnitPricePhp: Number(clRow.unit_price_php || clRow.price) || spec.price || 550,
+                  orderedAt: clRow.created_at || clRow.at || nowIso,
+                  status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (clRow.status === 'confirmed' ? 'confirmed' : 'pending'),
+                  invoiced: false,
+                  lane: 'live',
+                  version: 1,
+                  hostVerificationNote: spec.reviewNotes,
+                  reviewNotes: spec.reviewNotes,
+                  overrideHistory: [],
+                });
+                backfilledComments++;
+              }
             }
           }
         }
