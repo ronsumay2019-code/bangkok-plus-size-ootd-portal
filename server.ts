@@ -250,7 +250,11 @@ function performInventorySync(targetLiveId?: string): InventorySyncResult {
 }
 
 if (activeLive) {
-  performInventorySync(activeLive.id);
+  try {
+    performInventorySync(activeLive.id);
+  } catch (bootErr) {
+    console.warn('[Boot] Initial performInventorySync non-fatal warning:', bootErr);
+  }
 }
 
 // Helper: Detect buyer intent in Business Messenger DMs
@@ -334,18 +338,27 @@ function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: st
 
 // 1. Get full state
 app.get('/api/state', (_req, res) => {
-  res.json({
-    lives,
-    inventory,
-    orders,
-    amendments,
-    preOrders,
-    messengerThreads,
-    webhookEventsLog,
-    graphSyncStats,
-    latestSummary,
-    phpPerThbRate,
-  });
+  try {
+    if (!latestSummary && activeLive) {
+      try {
+        performInventorySync(activeLive.id);
+      } catch (e) {}
+    }
+    res.json({
+      lives,
+      inventory,
+      orders,
+      amendments,
+      preOrders,
+      messengerThreads,
+      webhookEventsLog,
+      graphSyncStats,
+      latestSummary,
+      phpPerThbRate,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
 });
 
 // 1b. Reset runtime state back to clean seed data
