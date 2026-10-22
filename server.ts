@@ -211,7 +211,9 @@ function loadRuntimeState() {
     if (fs.existsSync(STATE_FILE_PATH)) {
       const parsed = JSON.parse(fs.readFileSync(STATE_FILE_PATH, 'utf8'));
       if (Array.isArray(parsed.lives) && parsed.lives.length) lives = parsed.lives;
-      if (Array.isArray(parsed.inventory) && parsed.inventory.length) inventory = parsed.inventory;
+      if (Array.isArray(parsed.inventory) && parsed.inventory.length) {
+        inventory = parsed.inventory.filter((item: any) => !item.id?.startsWith('inv_'));
+      }
       if (Array.isArray(parsed.orders) && parsed.orders.length) orders = parsed.orders;
       if (Array.isArray(parsed.amendments)) amendments = parsed.amendments;
       if (Array.isArray(parsed.preOrders)) preOrders = parsed.preOrders;
@@ -227,10 +229,15 @@ function loadRuntimeState() {
 
 loadRuntimeState();
 
+// Purge any mock/extra inventory items that the user requested to delete
+inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
+saveRuntimeState();
+
 // Run initial reconciliation on boot for active session
 const activeLive = lives[0];
 
 function performInventorySync(targetLiveId?: string): InventorySyncResult {
+  inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
   const targetLive = lives.find((l) => l.id === (targetLiveId || activeLive?.id)) || lives[0];
   const syncResult = computeInventorySyncResult(targetLive.id, inventory, orders, amendments);
 
@@ -339,6 +346,7 @@ function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: st
 // 1. Get full state
 app.get('/api/state', (_req, res) => {
   try {
+    inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
     if (!latestSummary && activeLive) {
       try {
         performInventorySync(activeLive.id);
@@ -364,7 +372,7 @@ app.get('/api/state', (_req, res) => {
 // 1b. Reset runtime state back to clean seed data
 app.post('/api/state/reset', (_req, res) => {
   lives = JSON.parse(JSON.stringify(SEED_LIVE_SESSIONS));
-  inventory = JSON.parse(JSON.stringify(SEED_INVENTORY_ITEMS));
+  inventory = [];
   orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
   amendments = JSON.parse(JSON.stringify(SEED_AMENDMENTS));
   preOrders = JSON.parse(JSON.stringify(SEED_PRE_ORDERS));
@@ -398,13 +406,8 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
     phpPerThbRate = Number(phpRate);
   }
 
-  // Ensure inventory is populated with physical store rack items
-  if (inventory.length === 0) {
-    inventory = SEED_INVENTORY_ITEMS.map((item) => ({
-      ...item,
-      liveId: targetLive.id,
-    }));
-  }
+  // Purge any mock inventory items requested to be deleted
+  inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
 
   // If orders are empty, attempt bridge sync from Facebook Live
   if (orders.length === 0) {
@@ -1317,13 +1320,6 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           }
         }
 
-        // Ensure inventory rack items are populated for targetLive
-        if (inventory.length === 0) {
-          inventory = SEED_INVENTORY_ITEMS.map((item) => ({
-            ...item,
-            liveId: targetLive.id,
-          }));
-        }
         totalCommentsFetched = Math.max(bData.imported?.read || 0, orders.filter((o) => o.liveId === targetLive.id).length);
         targetLive.totalComments = Math.max(targetLive.totalComments || 0, totalCommentsFetched);
         targetLive.totalMined = orders.filter((o) => o.liveId === targetLive.id).length;

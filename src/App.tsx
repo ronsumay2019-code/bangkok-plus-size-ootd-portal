@@ -89,7 +89,7 @@ export default function App() {
           const syncData: any = await syncRes.json();
           if (syncData.targetLive) setLives((prev) => prev.map((l) => (l.id === syncData.targetLive.id ? syncData.targetLive : l)));
           if (Array.isArray(syncData.orders)) setOrders(syncData.orders);
-          if (Array.isArray(syncData.inventory)) setInventory(syncData.inventory);
+          if (Array.isArray(syncData.inventory)) setInventory(syncData.inventory.filter((i: any) => !i.id?.startsWith('inv_')));
           if (Array.isArray(syncData.messengerThreads)) setMessengerThreads(syncData.messengerThreads);
           if (syncData.latestSummary) setSummary(syncData.latestSummary);
           if (syncData.graphSyncStats) setGraphSyncStats(syncData.graphSyncStats);
@@ -109,7 +109,7 @@ export default function App() {
             setLives(data.lives);
             currentLiveId = data.lives[0].id;
           }
-          if (Array.isArray(data.inventory)) setInventory(data.inventory);
+          if (Array.isArray(data.inventory)) setInventory(data.inventory.filter((i: any) => !i.id?.startsWith('inv_')));
           if (Array.isArray(data.orders)) setOrders(data.orders);
           if (Array.isArray(data.amendments)) setAmendments(data.amendments);
           if (Array.isArray(data.preOrders)) setPreOrders(data.preOrders);
@@ -316,7 +316,7 @@ export default function App() {
         const data: any = await res.json();
         setSummary(data.summary);
         if (Array.isArray(data.orders)) setOrders(data.orders);
-        if (Array.isArray(data.inventory)) setInventory(data.inventory);
+        if (Array.isArray(data.inventory)) setInventory(data.inventory.filter((i: any) => !i.id?.startsWith('inv_')));
         if (data.targetLive) {
           setLives((prev) => prev.map((l) => (l.id === data.targetLive.id ? data.targetLive : l)));
         }
@@ -423,7 +423,7 @@ export default function App() {
       });
       if (res.ok) {
         const data: any = await res.json();
-        if (data.inventory) setInventory(data.inventory);
+        if (Array.isArray(data.inventory)) setInventory(data.inventory.filter((i: any) => !i.id?.startsWith('inv_')));
         if (data.summary) setSummary(data.summary);
         const sr: InventorySyncResult = data.syncResult;
         showToast(
