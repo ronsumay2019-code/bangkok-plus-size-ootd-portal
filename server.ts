@@ -220,6 +220,11 @@ function loadRuntimeState() {
             !o.id?.startsWith('sim_') &&
             !o.hostVerificationNote?.includes('Mined during live stream:')
         );
+        for (const o of orders) {
+          if (o.statedUnitPricePhp === 1890) {
+            o.statedUnitPricePhp = 0;
+          }
+        }
       }
       if (Array.isArray(parsed.amendments)) amendments = parsed.amendments;
       if (Array.isArray(parsed.preOrders)) preOrders = parsed.preOrders;
@@ -244,6 +249,11 @@ orders = orders.filter(
 );
 if (orders.length === 0) {
   orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
+}
+for (const o of orders) {
+  if (o.statedUnitPricePhp === 1890) {
+    o.statedUnitPricePhp = 0;
+  }
 }
 saveRuntimeState();
 
@@ -345,13 +355,17 @@ function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: st
   const qtyMatch = text.match(/\b(\d+)\s*(?:PCS?|PIECES?|X)?\b/i);
   const quantity = qtyMatch && Number(qtyMatch[1]) > 0 && Number(qtyMatch[1]) < 20 ? Number(qtyMatch[1]) : 1;
 
+  // Extract price if specified with PHP / ₱ / P prefix or suffix, otherwise 0 (entered by agent)
+  const priceMatch = text.match(/(?:(?:₱|PHP|P)\s*(\d{2,5})|(\d{2,5})\s*(?:PHP|PESOS))/i);
+  const price = priceMatch ? Number(priceMatch[1] || priceMatch[2]) : 0;
+
   return {
     isClaim: true,
     code,
     size,
     colour: foundColour,
     quantity,
-    price: 1890,
+    price,
   };
 }
 
@@ -397,7 +411,7 @@ function parseClaimSpecFromRaw(rawInput: any, fallbackCode = 'LIVE') {
           .replace(/\b(MINE|MYN|MIEN|KUHA|STEAL|PO|KO|SIS|PLS|PLEASE|MAAM|MAM|HM|HOW\s*MUCH|SANA|PA)\b/gi, '')
           .trim();
         const firstWords = stripped.split(/\s+/).slice(0, 2).join(' ');
-        if (firstWords.length >= 2 && !firstWords.includes('1890')) {
+        if (firstWords.length >= 2 && !/^\d+$/.test(firstWords)) {
           itemCode = firstWords;
         }
       }
@@ -512,7 +526,7 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
               size: clRow.size ? clRow.size.toUpperCase() : spec.size,
               colour: spec.colour,
               quantity: Number(clRow.qty) || 1,
-              statedUnitPricePhp: 1890,
+              statedUnitPricePhp: Number(clRow.price || clRow.unit_price_php) || 0,
               orderedAt: clRow.created_at || clRow.at || new Date().toISOString(),
               status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
               invoiced: false,
@@ -576,7 +590,7 @@ app.post('/api/orders/add', (req, res) => {
     size: (size || '3XL').trim().toUpperCase(),
     colour: (colour || 'MAROON').trim().toUpperCase(),
     quantity: Number(quantity) || 1,
-    statedUnitPricePhp: statedPrice ? Number(statedPrice) : 1890,
+    statedUnitPricePhp: statedPrice !== undefined && statedPrice !== '' ? Number(statedPrice) : 0,
     orderedAt: new Date().toISOString(),
     status: 'pending',
     invoiced: false,
@@ -595,6 +609,8 @@ app.post('/api/orders/add', (req, res) => {
     null,
     'rolling_pass'
   );
+
+  saveRuntimeState();
 
   res.json({ success: true, order: newOrder, summary: latestSummary });
 });
@@ -627,7 +643,45 @@ app.post('/api/orders/update', (req, res) => {
     'rolling_pass'
   );
 
+  saveRuntimeState();
+
   res.json({ success: true, order, summary: latestSummary });
+});
+
+// 3b-2. Batch set price by item code (Agent price entry during live)
+app.post('/api/orders/batch-set-price', (req, res) => {
+  const { itemCode, pricePhp, liveId } = req.body;
+  if (!itemCode || pricePhp === undefined) {
+    return res.status(400).json({ error: 'itemCode and pricePhp are required' });
+  }
+
+  const cleanCode = String(itemCode).trim().toUpperCase();
+  const price = Math.max(0, Number(pricePhp) || 0);
+  let updatedCount = 0;
+
+  for (const o of orders) {
+    if (!liveId || o.liveId === liveId) {
+      if (o.itemCode.toUpperCase() === cleanCode) {
+        o.statedUnitPricePhp = price;
+        updatedCount++;
+      }
+    }
+  }
+
+  const targetLive = lives.find((l) => l.id === liveId) || lives[0];
+  latestSummary = runAutomaticLiveReconciliation(
+    targetLive,
+    orders.filter((o) => o.liveId === targetLive.id),
+    amendments,
+    inventory.filter((i) => i.liveId === targetLive.id),
+    phpPerThbRate,
+    null,
+    'rolling_pass'
+  );
+
+  saveRuntimeState();
+
+  res.json({ success: true, updatedCount, itemCode: cleanCode, pricePhp: price, orders, summary: latestSummary });
 });
 
 // 3c. Approve order (confirm claim)
@@ -782,7 +836,7 @@ app.post('/api/inventory/add', (req, res) => {
     observed: observed !== undefined && observed !== '' ? Number(observed) : null,
     purchased: purchased !== undefined && purchased !== '' ? Number(purchased) : null,
     cost: cost !== undefined && cost !== '' ? Number(cost) : 450,
-    price: price !== undefined && price !== '' ? Number(price) : 1890,
+    price: price !== undefined && price !== '' ? Number(price) : 0,
     evidence: 'Added via portal inventory board.',
     supplierStore: store || 'Pratunam Soi 3',
     supplierReceiptRef: 'PENDING',
@@ -1076,7 +1130,7 @@ app.post('/api/meta/webhook', (req, res) => {
                 size: parsed.size || '3XL',
                 colour: parsed.colour || 'MAROON',
                 quantity: parsed.quantity || 1,
-                statedUnitPricePhp: parsed.price || 1890,
+                statedUnitPricePhp: parsed.price || 0,
                 orderedAt: nowIso,
                 status: 'pending',
                 invoiced: false,
@@ -1249,7 +1303,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
                   size: parsed.size || '3XL',
                   colour: parsed.colour || 'MAROON',
                   quantity: parsed.quantity || 1,
-                  statedUnitPricePhp: parsed.price || 1890,
+                  statedUnitPricePhp: parsed.price || 0,
                   orderedAt: c.created_time || nowIso,
                   status: 'pending',
                   invoiced: false,
@@ -1352,7 +1406,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
               size: reqRow.size ? reqRow.size.toUpperCase() : spec.size,
               colour: reqRow.colour && reqRow.colour !== 'MAROON' ? reqRow.colour.toUpperCase() : spec.colour,
               quantity: Number(reqRow.quantity) || 1,
-              statedUnitPricePhp: Number(reqRow.unit_price_php) || 1890,
+              statedUnitPricePhp: Number(reqRow.unit_price_php) || 0,
               orderedAt: reqRow.created_at || nowIso,
               status: reqRow.status === 'confirmed' ? 'confirmed' : 'pending',
               invoiced: false,
@@ -1380,7 +1434,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
               size: clRow.size ? clRow.size.toUpperCase() : spec.size,
               colour: spec.colour,
               quantity: Number(clRow.qty) || 1,
-              statedUnitPricePhp: 1890,
+              statedUnitPricePhp: Number(clRow.unit_price_php || clRow.price) || 0,
               orderedAt: clRow.created_at || clRow.at || nowIso,
               status: clRow.status === 'confirmed' ? 'confirmed' : 'pending',
               invoiced: false,
@@ -1519,7 +1573,7 @@ app.post('/api/orders/bulk-import', (req, res) => {
         size: parsed.size || '3XL',
         colour: parsed.colour || 'MAROON',
         quantity: parsed.quantity || 1,
-        statedUnitPricePhp: parsed.price || 1890,
+        statedUnitPricePhp: parsed.price || 0,
         orderedAt: nowIso,
         status: 'pending',
         invoiced: false,
@@ -1855,7 +1909,7 @@ app.post('/api/pre-orders/add', (req, res) => {
     size: (size || '3XL').trim().toUpperCase(),
     colour: (colour || 'MAROON').trim().toUpperCase(),
     quantity: Number(quantity) || 1,
-    statedUnitPricePhp: statedUnitPricePhp ? Number(statedUnitPricePhp) : 1890,
+    statedUnitPricePhp: statedUnitPricePhp !== undefined && statedUnitPricePhp !== '' ? Number(statedUnitPricePhp) : 0,
     channel: channel || 'messenger',
     createdAt: new Date().toISOString(),
     status: 'pending',

@@ -787,7 +787,7 @@ export function computeBuyingBehaviorAnalytics(
       demand: c.ordered,
       stock: c.observed ?? 0,
       shortage: c.gap ?? (c.ordered - (c.observed ?? 0)),
-      lostRevenuePhp: (c.gap ?? 1) * 1890,
+      lostRevenuePhp: (c.gap ?? 1) * (c.unitPricePhp || 0),
     }))
     .slice(0, 5);
 

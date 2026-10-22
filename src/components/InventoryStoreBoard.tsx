@@ -177,7 +177,7 @@ export const InventoryStoreBoard: React.FC<InventoryStoreBoardProps> = ({
       observed: newObserved ? Number(newObserved) : null,
       purchased: newPurchased ? Number(newPurchased) : null,
       cost: newCost ? Number(newCost) : 450,
-      price: newPrice ? Number(newPrice) : 1890,
+      price: newPrice ? Number(newPrice) : 0,
       store: newStore,
     });
     setShowAddModal(false);

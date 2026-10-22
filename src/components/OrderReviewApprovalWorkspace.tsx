@@ -100,7 +100,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
     setEditingOrder(ord);
     setEditSize(ord.size);
     setEditColour(ord.colour);
-    setEditPrice(String(ord.statedUnitPricePhp || 1890));
+    setEditPrice(String(ord.statedUnitPricePhp || ''));
     setEditNotes(ord.reviewNotes || '');
   };
 
@@ -111,7 +111,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
     onUpdateOrder(editingOrder.id, {
       size: editSize.toUpperCase(),
       colour: editColour.toUpperCase(),
-      statedUnitPricePhp: Number(editPrice) || editingOrder.statedUnitPricePhp,
+      statedUnitPricePhp: editPrice !== '' ? Number(editPrice) : 0,
       reviewNotes: editNotes,
       reviewedBy: 'Owner / Admin',
       reviewedAt: new Date().toISOString(),

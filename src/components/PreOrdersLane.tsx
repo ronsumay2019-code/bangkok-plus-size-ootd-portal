@@ -55,7 +55,7 @@ export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
   const [size, setSize] = useState('3XL');
   const [colour, setColour] = useState('MAROON');
   const [quantity, setQuantity] = useState(1);
-  const [statedPrice, setStatedPrice] = useState(1890);
+  const [statedPrice, setStatedPrice] = useState<number | ''>('');
   const [channel, setChannel] = useState<PreOrder['channel']>('messenger');
   const [targetStore, setTargetStore] = useState('Pratunam Market Wholesale');
   const [notes, setNotes] = useState('');
@@ -532,8 +532,9 @@ export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
                   <label className="block text-neutral-400 mb-1">Price (PHP)</label>
                   <input
                     type="number"
+                    placeholder="Enter price (e.g. 550)"
                     value={statedPrice}
-                    onChange={(e) => setStatedPrice(Number(e.target.value))}
+                    onChange={(e) => setStatedPrice(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold focus:border-purple-500"
                   />
                 </div>

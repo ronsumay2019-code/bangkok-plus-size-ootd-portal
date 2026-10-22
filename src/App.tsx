@@ -544,6 +544,43 @@ export default function App() {
     showToast(`Order spec updated and synced with store inventory.`);
   };
 
+  const handleBatchSetPrice = async (itemCode: string, pricePhp: number) => {
+    const cleanCode = itemCode.trim().toUpperCase();
+    try {
+      const res = await fetch('/api/orders/batch-set-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemCode: cleanCode, pricePhp, liveId: activeLive.id }),
+      });
+      if (res.ok) {
+        const data: any = await res.json();
+        if (data.orders) setOrders(data.orders);
+        if (data.summary) setSummary(data.summary);
+        showToast(`Agent price set to ₱${pricePhp.toLocaleString()} for all ${cleanCode} (${data.updatedCount || 0} claims).`);
+        return;
+      }
+    } catch (e) {
+      console.warn('Batch set price remote failed, updating locally', e);
+    }
+
+    // Local fallback
+    const updated = orders.map((o) =>
+      o.itemCode.toUpperCase() === cleanCode ? { ...o, statedUnitPricePhp: pricePhp } : o
+    );
+    setOrders(updated);
+    const newSummary = runAutomaticLiveReconciliation(
+      activeLive,
+      updated.filter((o) => o.liveId === activeLive.id),
+      amendments,
+      inventory.filter((i) => i.liveId === activeLive.id),
+      phpRate,
+      null,
+      'rolling_pass'
+    );
+    setSummary(newSummary);
+    showToast(`Agent price set to ₱${pricePhp.toLocaleString()} for all ${cleanCode}.`);
+  };
+
   // 12. Owner / Admin Approval Gate for Reconciliation
   const handleOwnerApproval = async (action: 'approve' | 'request_amendment', notes?: string) => {
     try {
@@ -777,6 +814,8 @@ export default function App() {
             graphSyncStats={graphSyncStats}
             onToggleLive={handleToggleLive}
             onAddOrder={handleAddOrder}
+            onUpdateOrder={handleUpdateOrder}
+            onBatchSetPrice={handleBatchSetPrice}
             onQuickAmendment={handleQuickAmendment}
             onTriggerReconciliation={handleTriggerReconciliation}
             onSwitchToSummary={() => setActiveTab('reconciliation')}

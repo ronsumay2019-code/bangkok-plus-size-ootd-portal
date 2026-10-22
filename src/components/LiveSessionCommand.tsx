@@ -18,6 +18,8 @@ import {
   Check,
   CheckCircle2,
   MessageCircle,
+  Edit2,
+  DollarSign,
 } from 'lucide-react';
 import { 
   LiveSession, 
@@ -60,6 +62,8 @@ interface LiveSessionCommandProps {
     channel: 'live_chat' | 'messenger';
     statedPrice: number;
   }) => void;
+  onUpdateOrder?: (orderId: string, updates: Partial<BuyerOrder>) => Promise<void> | void;
+  onBatchSetPrice?: (itemCode: string, pricePhp: number) => Promise<void> | void;
   onQuickAmendment: (originalOrderId: string, newSpec: { size: string; colour: string }) => void;
   onTriggerReconciliation: () => void;
   onSwitchToSummary: () => void;
@@ -83,6 +87,8 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   graphSyncStats,
   onToggleLive,
   onAddOrder,
+  onUpdateOrder,
+  onBatchSetPrice,
   onQuickAmendment,
   onTriggerReconciliation,
   onSwitchToSummary,
@@ -118,6 +124,18 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   const [fbAccessTokenInput, setFbAccessTokenInput] = useState('');
   const [rawBatchComments, setRawBatchComments] = useState('');
   const [showBatchImport, setShowBatchImport] = useState(false);
+
+  // Inline claim price editing by agent
+  const [editingPriceOrderId, setEditingPriceOrderId] = useState<string | null>(null);
+  const [tempPriceInput, setTempPriceInput] = useState<string>('');
+  const [applyToAllSameItem, setApplyToAllSameItem] = useState(false);
+  const [isSavingPrice, setIsSavingPrice] = useState(false);
+
+  // Quick batch item price setter for agent during live
+  const [batchItemCode, setBatchItemCode] = useState('');
+  const [batchPriceInput, setBatchPriceInput] = useState('');
+  const [isApplyingBatch, setIsApplyingBatch] = useState(false);
+  const [batchStatusMsg, setBatchStatusMsg] = useState('');
 
   // Live timer tick
   useEffect(() => {
@@ -155,13 +173,16 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
     e.preventDefault();
     if (!newBuyerName.trim() || !newItemCode.trim()) return;
 
-    // Auto lookup price if not explicitly typed
-    let price = Number(newPrice);
-    if (!price || isNaN(price)) {
+    // Agent entered price: use entered price, else matched inventory price, else 0 (pending agent price)
+    let price = newPrice.trim() !== '' ? Number(newPrice) : 0;
+    if (isNaN(price)) price = 0;
+    if (price === 0) {
       const matchInv = inventory.find(
         (i) => i.itemCode.toLowerCase() === newItemCode.trim().toLowerCase()
       );
-      price = matchInv ? matchInv.unitPricePhp : 1890;
+      if (matchInv?.unitPricePhp) {
+        price = matchInv.unitPricePhp;
+      }
     }
 
     const qty = Math.max(1, parseInt(newQuantity, 10) || 1);
@@ -185,6 +206,51 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
     setNewColour('');
     setNewPrice('');
     setNewQuantity('1');
+  };
+
+  const handleSaveClaimPrice = async (orderId: string, itemCode: string) => {
+    const p = Math.max(0, Number(tempPriceInput) || 0);
+    setIsSavingPrice(true);
+    try {
+      if (applyToAllSameItem && onBatchSetPrice) {
+        await onBatchSetPrice(itemCode, p);
+      } else if (onUpdateOrder) {
+        await onUpdateOrder(orderId, { statedUnitPricePhp: p });
+      }
+      setEditingPriceOrderId(null);
+      setApplyToAllSameItem(false);
+    } catch (e) {
+      console.error('Failed to update price', e);
+    } finally {
+      setIsSavingPrice(false);
+    }
+  };
+
+  const handleApplyBatchItemPrice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!batchItemCode.trim() || !batchPriceInput.trim()) return;
+    const p = Math.max(0, Number(batchPriceInput) || 0);
+    setIsApplyingBatch(true);
+    try {
+      if (onBatchSetPrice) {
+        await onBatchSetPrice(batchItemCode.trim(), p);
+      } else if (onUpdateOrder) {
+        const matching = liveOrders.filter(
+          (o) => o.itemCode.toUpperCase() === batchItemCode.trim().toUpperCase()
+        );
+        for (const m of matching) {
+          await onUpdateOrder(m.id, { statedUnitPricePhp: p });
+        }
+      }
+      setBatchStatusMsg(`Set ₱${p.toLocaleString()} for all ${batchItemCode.toUpperCase()}`);
+      setTimeout(() => setBatchStatusMsg(''), 3500);
+      setBatchItemCode('');
+      setBatchPriceInput('');
+    } catch (e) {
+      console.error('Failed to batch set price', e);
+    } finally {
+      setIsApplyingBatch(false);
+    }
   };
 
   const handleSendMessengerQuickReply = async (e: React.FormEvent) => {
@@ -755,7 +821,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   <label className="text-[10px] text-neutral-400 block mb-0.5">Price (₱)</label>
                   <input
                     type="number"
-                    placeholder="1890"
+                    placeholder="Price e.g. 550"
                     value={newPrice}
                     onChange={(e) => setNewPrice(e.target.value)}
                     className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
@@ -802,8 +868,8 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
           </div>
 
           {/* Real-time Live Comments Stream */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col h-[400px]">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-800 mb-3">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col h-[460px]">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800 mb-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
@@ -811,6 +877,52 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 </h4>
               </div>
               <span className="text-[11px] text-neutral-400">Earliest comments first</span>
+            </div>
+
+            {/* Quick Agent Price Setter Bar by Item Code */}
+            <div className="p-2 rounded-xl bg-amber-950/30 border border-amber-500/30 text-xs mb-2 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                  <DollarSign className="w-3.5 h-3.5 text-amber-400" /> Agent Price Setter by Item Code
+                </span>
+                {batchStatusMsg && (
+                  <span className="text-[10px] text-emerald-400 font-semibold animate-pulse">
+                    ✓ {batchStatusMsg}
+                  </span>
+                )}
+              </div>
+              <form onSubmit={handleApplyBatchItemPrice} className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={batchItemCode}
+                  onChange={(e) => setBatchItemCode(e.target.value)}
+                  placeholder="Code (e.g. RUSTANS, 40)"
+                  list="live-claims-item-codes"
+                  className="flex-1 bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-xs text-white uppercase placeholder:text-neutral-500 focus:border-amber-500 focus:outline-none"
+                />
+                <datalist id="live-claims-item-codes">
+                  {Array.from(new Set(liveOrders.map((o) => o.itemCode).filter(Boolean))).map((code) => (
+                    <option key={code} value={code} />
+                  ))}
+                </datalist>
+                <div className="flex items-center gap-1">
+                  <span className="text-amber-400 text-xs font-bold">₱</span>
+                  <input
+                    type="number"
+                    value={batchPriceInput}
+                    onChange={(e) => setBatchPriceInput(e.target.value)}
+                    placeholder="Price"
+                    className="w-20 bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-xs text-white font-mono placeholder:text-neutral-500 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!batchItemCode.trim() || !batchPriceInput.trim() || isApplyingBatch}
+                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-neutral-950 font-bold text-xs rounded transition flex items-center gap-1 cursor-pointer"
+                >
+                  Apply
+                </button>
+              </form>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
@@ -850,9 +962,82 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                       <span className="text-neutral-400">×{ord.quantity}</span>
                     </div>
 
-                    <span className="font-semibold text-amber-300">
-                      ₱{(ord.statedUnitPricePhp || 0).toLocaleString()}
-                    </span>
+                    {editingPriceOrderId === ord.id ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleSaveClaimPrice(ord.id, ord.itemCode);
+                        }}
+                        className="flex flex-col items-end gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="text-amber-400 font-bold text-xs">₱</span>
+                          <input
+                            type="number"
+                            autoFocus
+                            value={tempPriceInput}
+                            onChange={(e) => setTempPriceInput(e.target.value)}
+                            placeholder="Price"
+                            className="w-20 bg-neutral-950 border border-amber-500 rounded px-1.5 py-0.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                          <button
+                            type="submit"
+                            disabled={isSavingPrice}
+                            className="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-[10px] rounded cursor-pointer"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPriceOrderId(null);
+                              setApplyToAllSameItem(false);
+                            }}
+                            className="px-1 text-neutral-400 hover:text-white text-xs"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <label className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-200 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={applyToAllSameItem}
+                            onChange={(e) => setApplyToAllSameItem(e.target.checked)}
+                            className="rounded border-neutral-700 bg-neutral-900 text-amber-500 text-[10px]"
+                          />
+                          <span>Apply to all {ord.itemCode}</span>
+                        </label>
+                      </form>
+                    ) : ord.statedUnitPricePhp && ord.statedUnitPricePhp > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingPriceOrderId(ord.id);
+                          setTempPriceInput(String(ord.statedUnitPricePhp));
+                          setApplyToAllSameItem(false);
+                        }}
+                        title="Click to change price entered by agent"
+                        className="group flex items-center gap-1 font-semibold text-amber-300 hover:text-amber-200 hover:bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-500/20 hover:border-amber-500/60 transition cursor-pointer"
+                      >
+                        <span className="font-mono">₱{ord.statedUnitPricePhp.toLocaleString()}</span>
+                        <Edit2 className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100 text-amber-400 transition" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingPriceOrderId(ord.id);
+                          setTempPriceInput('');
+                          setApplyToAllSameItem(false);
+                        }}
+                        title="Price pending agent entry - Click to enter price"
+                        className="group flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 hover:border-amber-400 transition cursor-pointer"
+                      >
+                        <Edit2 className="w-2.5 h-2.5 text-amber-300" />
+                        <span className="font-semibold text-[10px] uppercase tracking-wide">Enter Price</span>
+                      </button>
+                    )}
                   </div>
 
                   {ord.hostVerificationNote && (

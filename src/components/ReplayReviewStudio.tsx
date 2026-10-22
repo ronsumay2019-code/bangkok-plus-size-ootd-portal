@@ -59,7 +59,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
   const [showAddMarker, setShowAddMarker] = useState(false);
   const [newMarkerCode, setNewMarkerCode] = useState('BP01');
   const [newMarkerBuyer, setNewMarkerBuyer] = useState('');
-  const [newMarkerPrice, setNewMarkerPrice] = useState('1890');
+  const [newMarkerPrice, setNewMarkerPrice] = useState('550');
   const [newMarkerQuote, setNewMarkerQuote] = useState('');
 
   // Microphone speech transcription state (gemini-3.5-transcribe)
@@ -171,12 +171,12 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
       });
       const data: any = await res.json();
       if (type === 'sample1') {
-        const text = data.text || 'Ito pong BP01 House patchwork doodle, 1,890 lang po! Yours na Maricel Santos!';
+        const text = data.text || 'Ito pong BP01 House patchwork doodle, 550 lang po! Yours na Maricel Santos!';
         setAudioTranscript(text);
-        const calls = [{ code: 'BP01', price: 1890, buyer: 'Maricel Santos' }];
+        const calls = [{ code: 'BP01', price: 550, buyer: 'Maricel Santos' }];
         setExtractedCalls(calls);
         setNewMarkerCode('BP01');
-        setNewMarkerPrice('1890');
+        setNewMarkerPrice('550');
         setNewMarkerBuyer('Maricel Santos');
         setNewMarkerQuote(text);
       } else {
@@ -691,7 +691,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                     ₱{(currentActiveOrder.statedUnitPricePhp || 0).toLocaleString()}
                   </div>
                   <button
-                    onClick={() => handleVerifyOrder(currentActiveOrder.id, currentActiveOrder.statedUnitPricePhp || 1890, currentActiveOrder.formattedTimestamp)}
+                    onClick={() => handleVerifyOrder(currentActiveOrder.id, currentActiveOrder.statedUnitPricePhp || 0, currentActiveOrder.formattedTimestamp)}
                     className="mt-1 px-2.5 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white font-semibold text-[10px] transition flex items-center gap-1"
                   >
                     <Check className="w-3 h-3" />
@@ -838,7 +838,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleVerifyOrder(ord.id, ord.statedUnitPricePhp || 1890, ord.formattedTimestamp);
+                            handleVerifyOrder(ord.id, ord.statedUnitPricePhp || 0, ord.formattedTimestamp);
                           }}
                           className="text-amber-400 hover:text-amber-300 font-semibold underline"
                         >

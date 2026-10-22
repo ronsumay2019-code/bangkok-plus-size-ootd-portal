@@ -425,7 +425,7 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
                       );
                       setReplyText(
                         bag?.suggestedMessageDraft ||
-                          `Hi Sis ${activeThread.buyerName}! Reconciled bag confirmed (${bag?.totalPiecesGot || 1} pcs = ₱${(bag?.subtotalPhp || 1890).toLocaleString('en-PH')} PHP).`
+                          `Hi Sis ${activeThread.buyerName}! Reconciled bag confirmed (${bag?.totalPiecesGot || 1} pcs = ₱${(bag?.subtotalPhp || 0).toLocaleString('en-PH')} PHP).`
                       );
                     }}
                     title="Insert Reconciled Bag Summary"
