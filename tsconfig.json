@@ -12,6 +12,7 @@
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "moduleResolution": "node",
     "isolatedModules": true,
     "moduleDetection": "force",

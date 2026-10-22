@@ -6,6 +6,7 @@ import {
   PreOrder,
   MessengerThread,
 } from '../types/reconciliation';
+import liveOrdersSnapshot from './liveOrdersSnapshot.json';
 
 const todayDate = new Date().toISOString().slice(0, 10);
 const morningStartIso = new Date(new Date().setHours(9, 0, 0, 0)).toISOString();
@@ -21,17 +22,17 @@ export const SEED_LIVE_SESSIONS: LiveSession[] = [
     videoUrl: 'https://www.facebook.com/watch/?v=1126219396590785',
     storeName: 'Pratunam Market Wholesale Floor',
     storeDate: todayDate,
-    lineup: [],
-    totalComments: 0,
-    totalMined: 0,
+    lineup: ['RUSTANS', 'LU PANTS', 'LINEN PANTS', 'S1', '40', '1', 'D3'],
+    totalComments: 331,
+    totalMined: 331,
     reconciledAt: null,
-    reconciliationStatus: 'unreconciled',
+    reconciliationStatus: 'awaiting_owner_review',
   },
 ];
 
 export const SEED_INVENTORY_ITEMS: InventoryItem[] = [];
 
-export const SEED_BUYER_ORDERS: BuyerOrder[] = [];
+export const SEED_BUYER_ORDERS: BuyerOrder[] = liveOrdersSnapshot as BuyerOrder[];
 
 export const SEED_AMENDMENTS: OrderAmendment[] = [];
 

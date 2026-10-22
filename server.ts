@@ -218,10 +218,7 @@ function loadRuntimeState() {
         orders = parsed.orders.filter(
           (o: any) =>
             !o.id?.startsWith('sim_') &&
-            !o.hostVerificationNote?.includes('Mined during live stream:') &&
-            o.buyerName !== 'Anne Murillo-Gapusan' &&
-            o.buyerName !== 'Jennifer Tan Borromeo' &&
-            o.buyerName !== 'Mildred Paule-Magalang'
+            !o.hostVerificationNote?.includes('Mined during live stream:')
         );
       }
       if (Array.isArray(parsed.amendments)) amendments = parsed.amendments;
@@ -243,11 +240,11 @@ inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
 orders = orders.filter(
   (o: any) =>
     !o.id?.startsWith('sim_') &&
-    !o.hostVerificationNote?.includes('Mined during live stream:') &&
-    o.buyerName !== 'Anne Murillo-Gapusan' &&
-    o.buyerName !== 'Jennifer Tan Borromeo' &&
-    o.buyerName !== 'Mildred Paule-Magalang'
+    !o.hostVerificationNote?.includes('Mined during live stream:')
 );
+if (orders.length === 0) {
+  orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
+}
 saveRuntimeState();
 
 // Run initial reconciliation on boot for active session
@@ -420,6 +417,9 @@ app.get('/api/state', (_req, res) => {
   try {
     if (orders.length === 0) {
       loadRuntimeState();
+    }
+    if (orders.length === 0) {
+      orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
     }
     inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
     if (!latestSummary && activeLive) {
