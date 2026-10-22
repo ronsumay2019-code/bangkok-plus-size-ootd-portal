@@ -358,54 +358,59 @@ function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: st
   };
 }
 
-function parseClaimSpecFromRaw(rawText: string, fallbackCode = 'LIVE') {
-  const clean = (rawText || '').trim();
-  const upper = clean.toUpperCase();
+function parseClaimSpecFromRaw(rawInput: any, fallbackCode = 'LIVE') {
+  try {
+    const rawText = typeof rawInput === 'string' ? rawInput : (rawInput?.message || rawInput?.raw || rawInput?.text || '');
+    const clean = String(rawText || '').trim();
+    const upper = clean.toUpperCase();
 
-  const KNOWN_COLOURS = [
-    'CHARCOAL', 'PINK', 'VIOLET', 'BLUSH', 'BUTTER', 'LILAC', 'CREAM', 'NAVY', 
-    'MAROON', 'BLACK', 'WHITE', 'BROWN', 'GRAY', 'GREY', 'STONE', 'BLUE', 
-    'OLIVE', 'EMERALD', 'RUST', 'MUSTARD', 'BEIGE', 'YELLOW', 'RED', 'GREEN', 'PURPLE'
-  ];
-  const matchedColours: string[] = [];
-  for (const c of KNOWN_COLOURS) {
-    if (new RegExp(`\\b${c}\\b`, 'i').test(upper)) {
-      matchedColours.push(c);
-    }
-  }
-  const colour = matchedColours.length > 0 ? matchedColours.join(' / ') : 'ASSORTED';
-
-  const sizeMatch = upper.match(/\b(6XL|5XL|4XL|3XL|2XL|XL|SIZE\s*40|40|FS|FREE\s*SIZE)\b/i);
-  const size = sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : 'FREE SIZE';
-
-  let itemCode = fallbackCode;
-  if (/\b(?:AC\s+)?RUSTANS\b/i.test(upper)) {
-    itemCode = 'RUSTANS';
-  } else if (/\bLU\s*PANTS\b/i.test(upper)) {
-    itemCode = 'LU PANTS';
-  } else if (/\bLINEN\s*PANTS\b/i.test(upper)) {
-    itemCode = 'LINEN PANTS';
-  } else if (/\bPANTS\b/i.test(upper)) {
-    itemCode = 'PANTS';
-  } else if (fallbackCode && fallbackCode !== 'LIVE') {
-    itemCode = fallbackCode.toUpperCase();
-  } else {
-    const codeMatch = upper.match(/(?<![A-Z0-9])([A-Z]{1,4}\d{1,4}|\d{1,2})(?![A-Z0-9])/);
-    if (codeMatch && !['MINE', 'MIN', 'PO', 'KO', 'SA', 'PA', 'NG', 'NA', 'HM'].includes(codeMatch[1])) {
-      itemCode = codeMatch[1];
-    } else {
-      const stripped = upper
-        .replace(/\b(MINE|MYN|MIEN|KUHA|STEAL|PO|KO|SIS|PLS|PLEASE|MAAM|MAM|HM|HOW\s*MUCH|SANA|PA)\b/gi, '')
-        .trim();
-      const firstWords = stripped.split(/\s+/).slice(0, 2).join(' ');
-      if (firstWords.length >= 2 && !firstWords.includes('1890')) {
-        itemCode = firstWords;
+    const KNOWN_COLOURS = [
+      'CHARCOAL', 'PINK', 'VIOLET', 'BLUSH', 'BUTTER', 'LILAC', 'CREAM', 'NAVY', 
+      'MAROON', 'BLACK', 'WHITE', 'BROWN', 'GRAY', 'GREY', 'STONE', 'BLUE', 
+      'OLIVE', 'EMERALD', 'RUST', 'MUSTARD', 'BEIGE', 'YELLOW', 'RED', 'GREEN', 'PURPLE'
+    ];
+    const matchedColours: string[] = [];
+    for (const c of KNOWN_COLOURS) {
+      if (new RegExp(`\\b${c}\\b`, 'i').test(upper)) {
+        matchedColours.push(c);
       }
     }
-  }
+    const colour = matchedColours.length > 0 ? matchedColours.join(' / ') : 'ASSORTED';
 
-  const itemName = clean.length > 0 ? clean : `${itemCode} - ${colour}`;
-  return { itemCode: itemCode.toUpperCase(), size: size.toUpperCase(), colour: colour.toUpperCase(), itemName };
+    const sizeMatch = upper.match(/\b(6XL|5XL|4XL|3XL|2XL|XL|SIZE\s*40|40|FS|FREE\s*SIZE)\b/i);
+    const size = sizeMatch ? sizeMatch[0].replace(/\s+/g, '') : 'FREE SIZE';
+
+    let itemCode = String(fallbackCode || 'LIVE').toUpperCase();
+    if (/\b(?:AC\s+)?RUSTANS\b/i.test(upper)) {
+      itemCode = 'RUSTANS';
+    } else if (/\bLU\s*PANTS\b/i.test(upper)) {
+      itemCode = 'LU PANTS';
+    } else if (/\bLINEN\s*PANTS\b/i.test(upper)) {
+      itemCode = 'LINEN PANTS';
+    } else if (/\bPANTS\b/i.test(upper)) {
+      itemCode = 'PANTS';
+    } else if (fallbackCode && fallbackCode !== 'LIVE') {
+      itemCode = String(fallbackCode).toUpperCase();
+    } else {
+      const codeMatch = upper.match(/(?<![A-Z0-9])([A-Z]{1,4}\d{1,4}|\d{1,2})(?![A-Z0-9])/);
+      if (codeMatch && !['MINE', 'MIN', 'PO', 'KO', 'SA', 'PA', 'NG', 'NA', 'HM'].includes(codeMatch[1])) {
+        itemCode = codeMatch[1];
+      } else {
+        const stripped = upper
+          .replace(/\b(MINE|MYN|MIEN|KUHA|STEAL|PO|KO|SIS|PLS|PLEASE|MAAM|MAM|HM|HOW\s*MUCH|SANA|PA)\b/gi, '')
+          .trim();
+        const firstWords = stripped.split(/\s+/).slice(0, 2).join(' ');
+        if (firstWords.length >= 2 && !firstWords.includes('1890')) {
+          itemCode = firstWords;
+        }
+      }
+    }
+
+    const itemName = clean.length > 0 ? clean : `${itemCode} - ${colour}`;
+    return { itemCode: itemCode.toUpperCase(), size: size.toUpperCase(), colour: colour.toUpperCase(), itemName };
+  } catch {
+    return { itemCode: String(fallbackCode || 'LIVE').toUpperCase(), size: 'FREE SIZE', colour: 'ASSORTED', itemName: String(rawInput || fallbackCode || 'Live Item') };
+  }
 }
 
 /* ==================== API ENDPOINTS ==================== */
