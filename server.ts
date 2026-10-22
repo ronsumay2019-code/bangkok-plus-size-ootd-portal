@@ -214,7 +214,16 @@ function loadRuntimeState() {
       if (Array.isArray(parsed.inventory) && parsed.inventory.length) {
         inventory = parsed.inventory.filter((item: any) => !item.id?.startsWith('inv_'));
       }
-      if (Array.isArray(parsed.orders) && parsed.orders.length) orders = parsed.orders;
+      if (Array.isArray(parsed.orders) && parsed.orders.length) {
+        orders = parsed.orders.filter(
+          (o: any) =>
+            !o.id?.startsWith('sim_') &&
+            !o.hostVerificationNote?.includes('Mined during live stream:') &&
+            o.buyerName !== 'Anne Murillo-Gapusan' &&
+            o.buyerName !== 'Jennifer Tan Borromeo' &&
+            o.buyerName !== 'Mildred Paule-Magalang'
+        );
+      }
       if (Array.isArray(parsed.amendments)) amendments = parsed.amendments;
       if (Array.isArray(parsed.preOrders)) preOrders = parsed.preOrders;
       if (Array.isArray(parsed.messengerThreads) && parsed.messengerThreads.length) {
@@ -231,6 +240,14 @@ loadRuntimeState();
 
 // Purge any mock/extra inventory items that the user requested to delete
 inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
+orders = orders.filter(
+  (o: any) =>
+    !o.id?.startsWith('sim_') &&
+    !o.hostVerificationNote?.includes('Mined during live stream:') &&
+    o.buyerName !== 'Anne Murillo-Gapusan' &&
+    o.buyerName !== 'Jennifer Tan Borromeo' &&
+    o.buyerName !== 'Mildred Paule-Magalang'
+);
 saveRuntimeState();
 
 // Run initial reconciliation on boot for active session
@@ -373,11 +390,14 @@ app.get('/api/state', (_req, res) => {
 app.post('/api/state/reset', (_req, res) => {
   lives = JSON.parse(JSON.stringify(SEED_LIVE_SESSIONS));
   inventory = [];
-  orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
-  amendments = JSON.parse(JSON.stringify(SEED_AMENDMENTS));
-  preOrders = JSON.parse(JSON.stringify(SEED_PRE_ORDERS));
-  messengerThreads = JSON.parse(JSON.stringify(SEED_MESSENGER_THREADS));
+  orders = [];
+  amendments = [];
+  preOrders = [];
+  messengerThreads = [];
+  seenCommentIds.clear();
   phpPerThbRate = 1.62;
+  latestSummary = null;
+  saveRuntimeState();
   performInventorySync(lives[0].id);
   res.json({
     success: true,
@@ -413,7 +433,7 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
   if (orders.length === 0) {
     try {
       const bridgeUrl = process.env.BRIDGE_SYNC_URL || 'https://bangkokplussizeootd.vercel.app/api/facebook/live-sync?bridge=1';
-      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(3000) });
+      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
       if (bridgeRes.ok) {
         const bData: any = await bridgeRes.json();
         for (const clRow of bData.bridge?.claims || []) {
@@ -1244,7 +1264,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
     // Automatic bridge fallback to main Bangkok Plus Size OOTD backend (which holds the connected Facebook Page token in Supabase)
     try {
       const bridgeUrl = process.env.BRIDGE_SYNC_URL || 'https://bangkokplussizeootd.vercel.app/api/facebook/live-sync?bridge=1';
-      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(3500) });
+      const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
       if (bridgeRes.ok) {
         const bData: any = await bridgeRes.json();
         graphSyncStats.mode = 'live_graph_api';
