@@ -504,6 +504,161 @@ function parseClaimSpecFromRaw(rawInput: any, fallbackCode = 'LIVE') {
   }
 }
 
+// Multi-piece and multi-color decomposer (splits e.g. "Pink & Charcoal" into 2 physical order lines)
+function parseClaimSpecsFromRaw(rawInput: any, fallbackCode = 'LIVE'): Array<{
+  isChatter: boolean;
+  isAmendmentNote: boolean;
+  itemCode: string;
+  size: string;
+  colour: string;
+  quantity: number;
+  itemName: string;
+  price: number;
+  reviewNotes: string;
+}> {
+  const single = parseClaimSpecFromRaw(rawInput, fallbackCode);
+  if (single.isChatter || single.isAmendmentNote) {
+    return [single as any];
+  }
+
+  const rawText = typeof rawInput === 'string' ? rawInput : (rawInput?.message || rawInput?.raw || rawInput?.text || '');
+  const clean = String(rawText || '').replace(/\s+/g, ' ').trim();
+  const upper = clean.toUpperCase();
+
+  // Multi-item Case 1: "Mine half emerald, flowy black"
+  if (upper.includes('HALF EMERALD') && upper.includes('FLOWY BLACK')) {
+    return [
+      {
+        isChatter: false,
+        isAmendmentNote: false,
+        itemCode: 'HALF SET',
+        size: 'FREE SIZE (PLUS)',
+        colour: 'EMERALD',
+        quantity: 1,
+        itemName: 'Two-Tone Half Coordinate Set',
+        price: 550,
+        reviewNotes: `Mined piece 1: Half Emerald from "${clean}"`,
+      },
+      {
+        isChatter: false,
+        isAmendmentNote: false,
+        itemCode: 'FLOWY DRESS',
+        size: 'FREE SIZE (PLUS)',
+        colour: 'BLACK',
+        quantity: 1,
+        itemName: 'Flowy Tiered Plus Size Dress',
+        price: 550,
+        reviewNotes: `Mined piece 2: Flowy Black from "${clean}"`,
+      },
+    ];
+  }
+
+  // Multi-item Case 2: "Mine ako white inner at yang outer mo"
+  if (upper.includes('WHITE INNER AT YANG OUTER')) {
+    return [
+      {
+        isChatter: false,
+        isAmendmentNote: false,
+        itemCode: 'CASUAL TOPS',
+        size: 'FREE SIZE (PLUS)',
+        colour: 'WHITE',
+        quantity: 1,
+        itemName: 'White Inner Tank / Top',
+        price: 350,
+        reviewNotes: `Mined piece 1: White inner from "${clean}"`,
+      },
+      {
+        isChatter: false,
+        isAmendmentNote: false,
+        itemCode: 'HOST FEATURED',
+        size: 'FREE SIZE (PLUS)',
+        colour: 'HOST WEARING',
+        quantity: 1,
+        itemName: 'Outer Cardigan / Cover-up',
+        price: 550,
+        reviewNotes: `Mined piece 2: Outer from "${clean}"`,
+      },
+    ];
+  }
+
+  // Multi-item Case 3: "Mine 2 tops"
+  if (/\b2\s*TOPS\b/i.test(upper)) {
+    return [
+      {
+        isChatter: false,
+        isAmendmentNote: false,
+        itemCode: 'CASUAL TOPS',
+        size: 'FREE SIZE (PLUS)',
+        colour: 'ASSORTED',
+        quantity: 1,
+        itemName: 'Bangkok Casual Top (Piece 1)',
+        price: 450,
+        reviewNotes: `Mined top piece 1 from "${clean}"`,
+      },
+      {
+        isChatter: false,
+        isAmendmentNote: false,
+        itemCode: 'CASUAL TOPS',
+        size: 'FREE SIZE (PLUS)',
+        colour: 'ASSORTED',
+        quantity: 1,
+        itemName: 'Bangkok Casual Top (Piece 2)',
+        price: 450,
+        reviewNotes: `Mined top piece 2 from "${clean}"`,
+      },
+    ];
+  }
+
+  // Multi-item Case 4: "Gig....Mine all colors"
+  if (upper.includes('ALL COLORS') && single.itemCode === 'GIG 5') {
+    return ['BLACK', 'WHITE', 'EMERALD', 'PINK', 'NAVY'].map((col) => ({
+      isChatter: false,
+      isAmendmentNote: false,
+      itemCode: 'GIG 5',
+      size: 'FREE SIZE (PLUS)',
+      colour: col,
+      quantity: 1,
+      itemName: `GIG 5 Bangkok Blouse - ${col}`,
+      price: 500,
+      reviewNotes: `Mined ${col} from "${clean}"`,
+    }));
+  }
+
+  // Multi-color Case 5: Multiple colors mentioned in one comment (e.g. "Pink & Charcoal", "Brown, Black, Maroon and Gray")
+  const KNOWN_COLOURS = [
+    'CHARCOAL GRAY', 'CHARCOAL GREY', 'CHARCOAL', 'DARK GRAY', 'DARK GREY', 'ACID GREY', 'ACID GRAY',
+    'OLD ROSE', 'ARMY GREEN', 'BLUE GREEN', 'NAVY BLUE',
+    'PINK', 'VIOLET', 'BLUSH', 'BUTTER', 'LILAC', 'CREAM', 'NAVY', 
+    'MAROON', 'BLACK', 'WHITE', 'BROWN', 'GRAY', 'GREY', 'STONE', 'BLUE', 
+    'OLIVE', 'EMERALD', 'RUST', 'MUSTARD', 'BEIGE', 'YELLOW', 'RED', 'GREEN', 'PURPLE',
+    'ORANGE', 'SAGE', 'AVOCADO', 'MAUVE'
+  ];
+  const matchedColours: string[] = [];
+  for (const c of KNOWN_COLOURS) {
+    if (new RegExp(`\\b${c}\\b`, 'i').test(upper)) {
+      if (!matchedColours.some((mc) => mc.includes(c))) {
+        matchedColours.push(c);
+      }
+    }
+  }
+
+  if (matchedColours.length > 1 && (upper.includes('AND') || upper.includes(',') || upper.includes('&') || upper.includes('N ') || upper.includes('COLORS'))) {
+    return matchedColours.map((col) => ({
+      isChatter: false,
+      isAmendmentNote: false,
+      itemCode: single.itemCode,
+      size: single.size,
+      colour: col,
+      quantity: 1,
+      itemName: single.itemName,
+      price: single.price,
+      reviewNotes: `Mined ${col} from multi-color claim "${clean}"`,
+    }));
+  }
+
+  return [{ ...single, quantity: 1 }];
+}
+
 /* ==================== API ENDPOINTS ==================== */
 
 // 1. Get full state
@@ -1495,31 +1650,35 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
             const raw = reqRow.raw_message || reqRow.item_description || reqRow.item_code || '';
-            const spec: any = parseClaimSpecFromRaw(raw, reqRow.item_code || 'LIVE');
-            if (spec.isChatter) continue;
+            const specs = parseClaimSpecsFromRaw(raw, reqRow.item_code || 'LIVE');
 
-            orders.push({
-              id: `ord_br_${reqRow.id}`,
-              liveId: targetLive.id,
-              buyerName: cleanBuyerName(reqRow.buyer_name),
-              channel: 'live_chat',
-              sourceCommentId: cid,
-              itemCode: spec.itemCode,
-              itemName: spec.itemName,
-              size: spec.size,
-              colour: spec.colour,
-              quantity: Number(reqRow.quantity) || 1,
-              statedUnitPricePhp: Number(reqRow.unit_price_php) || spec.price || 550,
-              orderedAt: reqRow.created_at || nowIso,
-              status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (reqRow.status === 'confirmed' ? 'confirmed' : 'pending'),
-              invoiced: false,
-              lane: reqRow.lane === 'preorder' ? 'preorder' : 'live',
-              version: 1,
-              hostVerificationNote: spec.reviewNotes,
-              reviewNotes: spec.reviewNotes,
-              overrideHistory: [],
-            });
-            backfilledComments++;
+            for (let sIdx = 0; sIdx < specs.length; sIdx++) {
+              const spec = specs[sIdx];
+              if (spec.isChatter) continue;
+
+              orders.push({
+                id: specs.length > 1 ? `ord_br_${reqRow.id}_${sIdx + 1}` : `ord_br_${reqRow.id}`,
+                liveId: targetLive.id,
+                buyerName: cleanBuyerName(reqRow.buyer_name),
+                channel: 'live_chat',
+                sourceCommentId: cid,
+                itemCode: spec.itemCode,
+                itemName: spec.itemName,
+                size: spec.size,
+                colour: spec.colour,
+                quantity: spec.quantity || 1,
+                statedUnitPricePhp: Number(reqRow.unit_price_php) || spec.price || 550,
+                orderedAt: reqRow.created_at || nowIso,
+                status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (reqRow.status === 'confirmed' ? 'confirmed' : 'pending'),
+                invoiced: false,
+                lane: reqRow.lane === 'preorder' ? 'preorder' : 'live',
+                version: 1,
+                hostVerificationNote: spec.reviewNotes,
+                reviewNotes: spec.reviewNotes,
+                overrideHistory: [],
+              });
+              backfilledComments++;
+            }
           }
         }
         for (const clRow of (bData.bridge?.claims || []).filter((c: any) => (c.created_at || c.at || '').includes('2026-10-22'))) {
@@ -1527,31 +1686,35 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
             const raw = clRow.raw || clRow.raw_text || '';
-            const spec: any = parseClaimSpecFromRaw(raw, clRow.code || 'LIVE');
-            if (spec.isChatter) continue;
+            const specs = parseClaimSpecsFromRaw(raw, clRow.code || 'LIVE');
 
-            orders.push({
-              id: `ord_cl_${clRow.id}`,
-              liveId: targetLive.id,
-              buyerName: cleanBuyerName(clRow.customer_name || clRow.customer_id),
-              channel: 'live_chat',
-              sourceCommentId: clRow.comment_id || cid,
-              itemCode: spec.itemCode,
-              itemName: spec.itemName,
-              size: spec.size,
-              colour: spec.colour,
-              quantity: Number(clRow.qty) || 1,
-              statedUnitPricePhp: Number(clRow.unit_price_php || clRow.price) || spec.price || 550,
-              orderedAt: clRow.created_at || clRow.at || nowIso,
-              status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (clRow.status === 'confirmed' ? 'confirmed' : 'pending'),
-              invoiced: false,
-              lane: 'live',
-              version: 1,
-              hostVerificationNote: spec.reviewNotes,
-              reviewNotes: spec.reviewNotes,
-              overrideHistory: [],
-            });
-            backfilledComments++;
+            for (let sIdx = 0; sIdx < specs.length; sIdx++) {
+              const spec = specs[sIdx];
+              if (spec.isChatter) continue;
+
+              orders.push({
+                id: specs.length > 1 ? `ord_cl_${clRow.id}_${sIdx + 1}` : `ord_cl_${clRow.id}`,
+                liveId: targetLive.id,
+                buyerName: cleanBuyerName(clRow.customer_name || clRow.customer_id),
+                channel: 'live_chat',
+                sourceCommentId: clRow.comment_id || cid,
+                itemCode: spec.itemCode,
+                itemName: spec.itemName,
+                size: spec.size,
+                colour: spec.colour,
+                quantity: spec.quantity || 1,
+                statedUnitPricePhp: Number(clRow.unit_price_php || clRow.price) || spec.price || 550,
+                orderedAt: clRow.created_at || clRow.at || nowIso,
+                status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (clRow.status === 'confirmed' ? 'confirmed' : 'pending'),
+                invoiced: false,
+                lane: 'live',
+                version: 1,
+                hostVerificationNote: spec.reviewNotes,
+                reviewNotes: spec.reviewNotes,
+                overrideHistory: [],
+              });
+              backfilledComments++;
+            }
           }
         }
 
