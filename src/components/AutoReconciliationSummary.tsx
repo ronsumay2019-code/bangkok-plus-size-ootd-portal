@@ -654,6 +654,7 @@ PAYMENT OPTIONS:
             </button>
           </div>
         </div>
+      </div>
 
         {/* Customer Bags List */}
         <div className="divide-y divide-neutral-800">
