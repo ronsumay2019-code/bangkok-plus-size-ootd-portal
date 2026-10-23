@@ -281,7 +281,7 @@ function getMetaPageId(): string {
     process.env.PAGE_ID ||
     process.env.FACEBOOK_PAGE_ID ||
     storedFbPageId ||
-    'me'
+    '109603071381200'
   ).trim();
   if (candidate) {
     process.env.META_PAGE_ID = candidate;

@@ -13,7 +13,7 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
   onTokenSaved,
 }) => {
   const [tokenInput, setTokenInput] = useState('');
-  const [pageIdInput, setPageIdInput] = useState('me');
+  const [pageIdInput, setPageIdInput] = useState('109603071381200');
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentTokenInfo, setCurrentTokenInfo] = useState<{
