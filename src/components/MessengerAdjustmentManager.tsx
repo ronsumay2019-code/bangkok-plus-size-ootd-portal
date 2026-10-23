@@ -13,6 +13,7 @@ import {
   Zap,
   Inbox,
   FileText,
+  ExternalLink,
 } from 'lucide-react';
 import { OrderAmendment, BuyerOrder, MessengerThread, PreOrder, ReconciliationSummary } from '../types/reconciliation';
 import { SEED_MESSENGER_THREADS } from '../data/seedData';
@@ -442,6 +443,28 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
                     <Send className="w-3.5 h-3.5" />
                     <span>Send DM</span>
                   </button>
+                  <a
+                    href={
+                      activeThread.buyerHandle && activeThread.buyerHandle.includes('m.me')
+                        ? activeThread.buyerHandle
+                        : activeThread.psid && /^\d{8,}$/.test(activeThread.psid)
+                        ? `https://m.me/${activeThread.psid}`
+                        : `https://business.facebook.com/latest/inbox/messenger?asset_id=100064426114382`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => {
+                      if (replyText.trim()) {
+                        navigator.clipboard.writeText(replyText.trim());
+                      }
+                    }}
+                    title="Open Facebook Messenger directly (copies message text to clipboard)"
+                    className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-sky-400 border border-neutral-700 hover:border-sky-500 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Open in Messenger</span>
+                    <ExternalLink className="w-3 h-3 opacity-70" />
+                  </a>
                 </div>
               </form>
             </>

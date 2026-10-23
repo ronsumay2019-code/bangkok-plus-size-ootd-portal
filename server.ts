@@ -2303,20 +2303,45 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
 
   // If META_PAGE_ACCESS_TOKEN or FB_PAGE_ACCESS_TOKEN is configured, dispatch real outbound Graph API v22.0 Send API request
   const fbToken = getMetaPageAccessToken();
-  if (fbToken && thread.psid) {
+  let metaApiStatus: 'sent_to_facebook' | 'local_only' | 'error' = 'local_only';
+  let metaApiDetail = '';
+
+  const isRealNumericPsid = thread.psid && /^\d{10,25}$/.test(String(thread.psid).trim());
+
+  if (fbToken && isRealNumericPsid) {
     try {
-      await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messaging_type: 'RESPONSE',
-          recipient: { id: thread.psid },
-          message: { text },
-        }),
-      });
-    } catch (e) {
-      console.warn('[Messenger Send API] Local fallback:', e);
+      const metaRes = await fetch(
+        `https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messaging_type: 'RESPONSE',
+            recipient: { id: String(thread.psid).trim() },
+            message: { text: text.trim() },
+          }),
+        }
+      );
+      const metaData: any = await metaRes.json();
+      if (metaRes.ok && metaData.message_id) {
+        metaApiStatus = 'sent_to_facebook';
+        metaApiDetail = `Delivered to Facebook Messenger (Message ID: ${metaData.message_id})`;
+      } else {
+        metaApiStatus = 'error';
+        metaApiDetail = metaData?.error?.message || `Meta API Error (${metaRes.status})`;
+        console.warn('[Messenger Send API Error]:', metaData);
+      }
+    } catch (e: any) {
+      metaApiStatus = 'error';
+      metaApiDetail = e?.message || 'Network error reaching graph.facebook.com';
+      console.warn('[Messenger Send API Network Error]:', e);
     }
+  } else if (!fbToken) {
+    metaApiStatus = 'local_only';
+    metaApiDetail = 'No Meta Page Access Token configured on the server. Please add META_PAGE_ACCESS_TOKEN to Vercel Environment Variables or connect via Header.';
+  } else if (!isRealNumericPsid) {
+    metaApiStatus = 'local_only';
+    metaApiDetail = `Buyer ${thread.buyerName} does not have a real Meta PSID yet (PSID: ${thread.psid || 'none'}). On Facebook, a buyer must send an initial DM to the Page before the API can send them messages. Use 1-tap 'Open Messenger' instead.`;
   }
 
   const newMsg = {
@@ -2330,7 +2355,13 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
   thread.unreadCount = 0;
   saveRuntimeState();
 
-  res.json({ success: true, thread, message: newMsg });
+  res.json({
+    success: metaApiStatus !== 'error',
+    thread,
+    message: newMsg,
+    metaApiStatus,
+    metaApiDetail,
+  });
 });
 
 // 8d-3. Simulate Incoming Buyer Business Messenger DM (POST /api/meta/messenger/simulate-dm)

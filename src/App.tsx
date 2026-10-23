@@ -875,9 +875,17 @@ export default function App() {
       const data: any = await res.json();
       if (res.ok && data.thread) {
         setMessengerThreads((prev) => prev.map((t) => (t.id === threadId ? data.thread : t)));
-        showToast(`Sent Business Messenger reply to ${data.thread.buyerName}`);
+        if (data.metaApiStatus === 'sent_to_facebook') {
+          showToast(`✅ Delivered to Facebook Messenger: ${data.thread.buyerName}`);
+        } else if (data.metaApiStatus === 'error') {
+          showToast(`⚠️ Meta API: ${data.metaApiDetail}`);
+        } else if (data.metaApiDetail) {
+          showToast(`ℹ️ ${data.metaApiDetail}`);
+        } else {
+          showToast(`Sent Business Messenger reply to ${data.thread.buyerName}`);
+        }
       } else {
-        showToast(data.error || 'Could not send Messenger reply');
+        showToast(data.metaApiDetail || data.error || 'Could not send Messenger reply');
       }
     } catch (e) {
       showToast('Messenger reply logged locally.');
