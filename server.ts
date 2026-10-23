@@ -254,21 +254,40 @@ let storedFbAccessToken: string = process.env.META_PAGE_ACCESS_TOKEN || process.
 let storedFbPageId: string = process.env.META_PAGE_ID || process.env.FB_PAGE_ID || 'me';
 
 function getMetaPageAccessToken(): string {
-  return (
+  const candidate = (
     process.env.META_PAGE_ACCESS_TOKEN ||
     process.env.FB_PAGE_ACCESS_TOKEN ||
+    process.env.META_ACCESS_TOKEN ||
+    process.env.PAGE_ACCESS_TOKEN ||
+    process.env.FB_ACCESS_TOKEN ||
+    process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
+    process.env.FACEBOOK_ACCESS_TOKEN ||
+    process.env.META_TOKEN ||
+    process.env.FB_TOKEN ||
     storedFbAccessToken ||
     ''
   ).trim();
+  if (candidate) {
+    process.env.META_PAGE_ACCESS_TOKEN = candidate;
+    process.env.FB_PAGE_ACCESS_TOKEN = candidate;
+  }
+  return candidate;
 }
 
 function getMetaPageId(): string {
-  return (
+  const candidate = (
     process.env.META_PAGE_ID ||
     process.env.FB_PAGE_ID ||
+    process.env.PAGE_ID ||
+    process.env.FACEBOOK_PAGE_ID ||
     storedFbPageId ||
     'me'
   ).trim();
+  if (candidate) {
+    process.env.META_PAGE_ID = candidate;
+    process.env.FB_PAGE_ID = candidate;
+  }
+  return candidate;
 }
 
 function setMetaCredentials(token?: string, pageId?: string) {
@@ -328,6 +347,9 @@ function loadRuntimeState() {
             !o.id?.startsWith('sim_') &&
             !o.id?.startsWith('ord_br_') &&
             !o.id?.startsWith('ord_cl_') &&
+            !o.id?.startsWith('ord_graph_') &&
+            o.buyerName !== 'FB Live Buyer' &&
+            !o.buyerName?.startsWith('FB Buyer ') &&
             !o.hostVerificationNote?.includes('Mined during live stream:') &&
             (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
         );
@@ -369,6 +391,9 @@ orders = orders.filter(
     !o.id?.startsWith('sim_') &&
     !o.id?.startsWith('ord_br_') &&
     !o.id?.startsWith('ord_cl_') &&
+    !o.id?.startsWith('ord_graph_') &&
+    o.buyerName !== 'FB Live Buyer' &&
+    !o.buyerName?.startsWith('FB Buyer ') &&
     !o.hostVerificationNote?.includes('Mined during live stream:') &&
     (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
 );
@@ -777,6 +802,17 @@ function parseClaimSpecsFromRaw(rawInput: any, fallbackCode = 'LIVE'): Array<{
 // 1. Get full state
 app.get('/api/state', (_req, res) => {
   try {
+    orders = orders.filter(
+      (o: any) =>
+        !o.id?.startsWith('sim_') &&
+        !o.id?.startsWith('ord_br_') &&
+        !o.id?.startsWith('ord_cl_') &&
+        !o.id?.startsWith('ord_graph_') &&
+        o.buyerName !== 'FB Live Buyer' &&
+        !o.buyerName?.startsWith('FB Buyer ') &&
+        !o.hostVerificationNote?.includes('Mined during live stream:') &&
+        (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
+    );
     if (orders.length === 0) {
       loadRuntimeState();
     }
@@ -808,6 +844,26 @@ app.get('/api/state', (_req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message, stack: err.stack });
   }
+});
+
+// Purge anonymous FB Live comments and restore verified authentic live orders
+app.post('/api/orders/purge-anonymous', (_req, res) => {
+  orders = orders.filter(
+    (o: any) =>
+      !o.id?.startsWith('ord_graph_') &&
+      o.buyerName !== 'FB Live Buyer' &&
+      !o.buyerName?.startsWith('FB Buyer ')
+  );
+  if (orders.length === 0) {
+    orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
+  }
+  saveRuntimeState();
+  if (activeLive) {
+    try {
+      performInventorySync(activeLive.id);
+    } catch (e) {}
+  }
+  res.json({ success: true, count: orders.length });
 });
 
 // 1b-2. Multi-login and mobile auth endpoints
@@ -881,12 +937,16 @@ app.post('/api/auth/heartbeat', (req, res) => {
 // Meta Facebook Page Access Token Management (supports META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN)
 app.get('/api/meta/token', (_req, res) => {
   const activeToken = getMetaPageAccessToken();
+  const detectedEnvKeys = Object.keys(process.env).filter((k) => 
+    /meta|fb|token|page|access/i.test(k) && !/npm|pnpm|node|path|gemini/i.test(k)
+  );
   res.json({
     success: true,
     hasToken: !!activeToken,
     maskedToken: activeToken ? `${activeToken.slice(0, 8)}...${activeToken.slice(-6)}` : null,
     pageId: getMetaPageId(),
     mode: activeToken ? 'live_graph_api' : 'manual_messenger',
+    detectedEnvKeys,
   });
 });
 
@@ -1900,34 +1960,9 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           for (const c of commentsList) {
             if (c.id && !seenCommentIds.has(c.id)) {
               seenCommentIds.add(c.id);
-              const specs = parseClaimSpecsFromRaw(c.message || '');
-              for (const spec of specs) {
-                if (spec.isChatter || spec.isAmendmentNote) continue;
-                orders.push({
-                  id: `ord_graph_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
-                  liveId: targetLive.id,
-                  buyerName: cleanBuyerName(c.from?.name || (c.from?.id ? `FB Buyer ${String(c.from.id).slice(-4)}` : 'FB Live Buyer')),
-                  channel: 'live_chat',
-                  sourceCommentId: c.id,
-                  itemCode: spec.itemCode,
-                  itemName: spec.itemName,
-                  size: spec.size || 'FREE SIZE (PLUS)',
-                  colour: spec.colour || 'ASSORTED',
-                  quantity: spec.quantity || 1,
-                  statedUnitPricePhp: spec.price || 550,
-                  orderedAt: c.created_time || nowIso,
-                  status: spec.itemCode === 'PENDING SPEC' ? 'pending' : 'confirmed',
-                  invoiced: false,
-                  lane: 'live',
-                  version: 1,
-                  hostVerificationNote: spec.reviewNotes || `Captured from live comment: "${c.message || ''}"`,
-                  reviewNotes: spec.reviewNotes || `Live comment: "${c.message || ''}"`,
-                  overrideHistory: [],
-                });
-                backfilledComments++;
-              }
             }
           }
+          // Preserve authentic live orders - do not create anonymous orders from public video comments
           targetLive.totalMined = orders.filter((o) => o.liveId === targetLive.id).length;
         } else {
           const errJson: any = await commentsRes.json().catch(() => ({}));
