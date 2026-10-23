@@ -31,8 +31,10 @@ import {
   Image as ImageIcon,
   ExternalLink,
   Share2,
+  Search,
 } from 'lucide-react';
 import { ReconciliationSummary, BuyerBag, BuyerOrder, MessengerThread } from '../types/reconciliation';
+import { MetaGraphApiBadge, MetaGraphApiIcon } from './MetaGraphApiBadge';
 
 interface AutoReconciliationSummaryProps {
   summary: ReconciliationSummary | null;
@@ -55,6 +57,15 @@ interface AutoReconciliationSummaryProps {
   }) => Promise<void> | void;
   messengerThreads?: MessengerThread[];
   onReplyMessenger?: (threadId: string, text: string) => Promise<void> | void;
+  onAddOrder?: (order: {
+    buyerName: string;
+    itemCode: string;
+    size: string;
+    colour: string;
+    quantity: number;
+    channel: 'live_chat' | 'messenger';
+    statedPrice: number;
+  }) => void;
 }
 
 export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps> = ({
@@ -65,11 +76,24 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
   onUpdateBag,
   messengerThreads,
   onReplyMessenger,
+  onAddOrder,
 }) => {
   const [selectedBuyer, setSelectedBuyer] = useState<string | null>(null);
   const [copiedDraft, setCopiedDraft] = useState<string | null>(null);
   const [invoicingSuccess, setInvoicingSuccess] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'ready' | 'needs_resolution'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Add Manual Order Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newBuyerName, setNewBuyerName] = useState('');
+  const [newItemCode, setNewItemCode] = useState('');
+  const [newSize, setNewSize] = useState('FREE SIZE (PLUS)');
+  const [newColour, setNewColour] = useState('ASSORTED');
+  const [newQty, setNewQty] = useState('1');
+  const [newPrice, setNewPrice] = useState('550');
+  const [newChannel, setNewChannel] = useState<'live_chat' | 'messenger'>('live_chat');
+  const [isAddingOrder, setIsAddingOrder] = useState(false);
 
   // Invoice Preview, Handwritten Note & Garment Photo state
   const [previewBag, setPreviewBag] = useState<BuyerBag | null>(null);
@@ -303,6 +327,8 @@ PAYMENT OPTIONS:
 💳 GCash: 0917-XXX-XXXX (Bangkok Plus Size OOTD)
 💳 Maya / BDO Bank Transfer Available
 (Please send payment confirmation slip within 24 hours to secure your items)
+===============================
+🔗 Connected via Meta Official Graph API • Verified Live Selling Intake
 ===============================${photoNotice}`;
   };
 
@@ -394,6 +420,12 @@ PAYMENT OPTIONS:
   };
 
   const filteredBags = summary.buyerBags.filter((b) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesBuyer = b.buyerName.toLowerCase().includes(q);
+      const matchesItem = b.lines.some((l) => l.itemCode.toLowerCase().includes(q) || l.colour.toLowerCase().includes(q));
+      if (!matchesBuyer && !matchesItem) return false;
+    }
     if (filterMode === 'ready') return b.totalPiecesGot > 0 && b.isComplete;
     if (filterMode === 'needs_resolution') return !b.isComplete;
     return true;
@@ -579,18 +611,30 @@ PAYMENT OPTIONS:
             </h3>
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <button
-              onClick={() => setFilterMode('all')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                filterMode === 'all'
-                  ? 'bg-rose-600 text-white'
-                  : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              All Bags ({summary.buyerBags.length})
-            </button>
+          {/* Search & Filter Pills */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search buyer name or item..."
+                className="pl-8 pr-3 py-1.5 bg-neutral-950 border border-neutral-700 rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 w-48 sm:w-60"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs">
+              <button
+                onClick={() => setFilterMode('all')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition ${
+                  filterMode === 'all'
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                All Bags ({summary.buyerBags.length})
+              </button>
             <button
               onClick={() => setFilterMode('ready')}
               className={`px-3 py-1.5 rounded-lg font-medium transition ${
@@ -1440,6 +1484,14 @@ PAYMENT OPTIONS:
                     <span>GCash / Maya / BDO bank transfer instructions attached on dispatch.</span>
                   </div>
                   <span className="text-emerald-400 font-mono text-[10px]">100% Zero-Refund Safety</span>
+                </div>
+
+                {/* Official Meta Graph API Verification in Smaller Text with Official Icon */}
+                <div className="pt-2 px-1 border-t border-neutral-900 flex flex-wrap items-center justify-between gap-2">
+                  <MetaGraphApiBadge variant="invoice" />
+                  <span className="font-mono text-[9px] text-neutral-500 uppercase tracking-wider">
+                    Graph API v22.0 Certified
+                  </span>
                 </div>
               </div>
             </div>

@@ -1028,6 +1028,7 @@ export default function App() {
             onUpdateBag={handleUpdateBag}
             messengerThreads={messengerThreads}
             onReplyMessenger={handleReplyMessenger}
+            onAddOrder={handleAddOrder}
           />
         )}
 
@@ -1047,6 +1048,7 @@ export default function App() {
             onTriggerReconciliation={handleTriggerReconciliation}
             onOwnerApproval={handleOwnerApproval}
             onOpenOverride={(order, isPreOrder) => setOverrideModal({ isOpen: true, order, isPreOrder })}
+            onAddOrder={handleAddOrder}
           />
         )}
 

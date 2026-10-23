@@ -142,9 +142,11 @@ export const KNOWN_COLOUR_DICTIONARY = [
 ];
 
 export function cleanBuyerName(name: any): string {
-  if (!name) return 'FB Live Buyer';
+  if (!name) return 'Customer';
   return String(name)
     .replace(/\u00C3\u00B1/g, 'ñ')
+    .replace(/Ã±/g, 'ñ')
+    .replace(/Ã/g, '')
     .replace(/Escobi.*?as/gi, 'Escobiñas')
     .replace(/Era.*?a/gi, 'Eraña')
     .replace(/Tua.*?o/gi, 'Tuaño')

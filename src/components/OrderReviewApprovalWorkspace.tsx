@@ -46,6 +46,15 @@ interface OrderReviewApprovalWorkspaceProps {
   onTriggerReconciliation: () => void;
   onOwnerApproval: (action: 'approve' | 'request_amendment', notes?: string) => Promise<void>;
   onOpenOverride: (order: BuyerOrder, isPreOrder: boolean) => void;
+  onAddOrder?: (order: {
+    buyerName: string;
+    itemCode: string;
+    size: string;
+    colour: string;
+    quantity: number;
+    channel: 'live_chat' | 'messenger';
+    statedPrice: number;
+  }) => void;
 }
 
 export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspaceProps> = ({
@@ -63,6 +72,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   onTriggerReconciliation,
   onOwnerApproval,
   onOpenOverride,
+  onAddOrder,
 }) => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'confirmed' | 'short' | 'duplicates'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,6 +83,17 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   const [approvalNotes, setApprovalNotes] = useState('');
   const [selectedMessengerSnapshot, setSelectedMessengerSnapshot] = useState<MessengerThread | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+
+  // Add Manual Order Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newBuyerName, setNewBuyerName] = useState('');
+  const [newItemCode, setNewItemCode] = useState('');
+  const [newSize, setNewSize] = useState('FREE SIZE (PLUS)');
+  const [newColour, setNewColour] = useState('ASSORTED');
+  const [newQty, setNewQty] = useState('1');
+  const [newPrice, setNewPrice] = useState('550');
+  const [newChannel, setNewChannel] = useState<'live_chat' | 'messenger'>('live_chat');
+  const [isAddingOrder, setIsAddingOrder] = useState(false);
 
   // Edit form state
   const [editItemCode, setEditItemCode] = useState('');
@@ -101,17 +122,21 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   const duplicateOrders = orders.filter((o) => o.isDuplicateFlagged);
 
   const filteredOrders = orders.filter((o) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        o.buyerName.toLowerCase().includes(q) ||
+        o.itemCode.toLowerCase().includes(q) ||
+        o.size.toLowerCase().includes(q) ||
+        o.colour.toLowerCase().includes(q)
+      );
+    }
     if (filterStatus === 'pending') return o.status === 'pending';
     if (filterStatus === 'confirmed') return o.status === 'confirmed' || o.status === 'invoiced';
     if (filterStatus === 'short') return o.status === 'short';
     if (filterStatus === 'duplicates') return o.isDuplicateFlagged;
     return true;
-  }).filter((o) => 
-    o.buyerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.itemCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.size.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.colour.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  });
 
   const handleOpenEdit = (ord: BuyerOrder) => {
     setEditingOrder(ord);
@@ -388,6 +413,17 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                 className="bg-neutral-950 border border-neutral-700 rounded-xl pl-9 pr-4 py-2 text-xs text-white w-64 focus:outline-none focus:border-rose-500"
               />
             </div>
+
+            {onAddOrder && (
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                className="px-3.5 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add Buyer / Order</span>
+              </button>
+            )}
 
             {selectedOrderIds.size > 0 && (
               <button

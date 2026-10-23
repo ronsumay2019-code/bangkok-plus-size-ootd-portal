@@ -15,6 +15,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { LiveSession, ReconciliationSummary } from '../types/reconciliation';
+import { MetaGraphApiBadge } from './MetaGraphApiBadge';
 
 interface HeaderProps {
   activeTab: string;
@@ -130,18 +131,11 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Meta Webhook & Graph API Status / Token Config */}
-          <button
-            type="button"
+          <MetaGraphApiBadge 
+            variant="header" 
             onClick={onOpenMetaTokenModal}
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 hover:bg-neutral-700/80 border border-neutral-700/80 text-xs text-neutral-300 transition cursor-pointer"
-            title="Click to connect or view your Facebook Page Access Token for automated Messenger DM dispatch"
-          >
-            <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="text-neutral-400">Meta API:</span>
-            <span className="font-semibold text-emerald-300">
-              {graphSyncStats?.mode === 'live_graph_api' ? 'Graph API Active' : 'Connect Token 🔑'}
-            </span>
-          </button>
+            className="hidden lg:flex" 
+          />
 
           {/* User Executive Role Switcher & Current User */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-800/90 border border-neutral-700 text-xs">

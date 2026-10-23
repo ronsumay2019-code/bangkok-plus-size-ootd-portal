@@ -342,17 +342,17 @@ function loadRuntimeState() {
         inventory = parsed.inventory.filter((item: any) => !item.id?.startsWith('inv_'));
       }
       if (Array.isArray(parsed.orders) && parsed.orders.length) {
-        orders = parsed.orders.filter(
-          (o: any) =>
-            !o.id?.startsWith('sim_') &&
-            !o.id?.startsWith('ord_br_') &&
-            !o.id?.startsWith('ord_cl_') &&
-            !o.id?.startsWith('ord_graph_') &&
-            o.buyerName !== 'FB Live Buyer' &&
-            !o.buyerName?.startsWith('FB Buyer ') &&
-            !o.hostVerificationNote?.includes('Mined during live stream:') &&
-            (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
-        );
+        orders = parsed.orders
+          .filter(
+            (o: any) =>
+              !o.id?.startsWith('ord_graph_') &&
+              o.buyerName !== 'FB Live Buyer' &&
+              !o.buyerName?.startsWith('FB Buyer ')
+          )
+          .map((o: any) => ({
+            ...o,
+            buyerName: cleanBuyerName(o.buyerName),
+          }));
       }
       if (Array.isArray(parsed.amendments)) amendments = parsed.amendments;
       if (Array.isArray(parsed.preOrders)) preOrders = parsed.preOrders;
@@ -386,17 +386,17 @@ inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
 if (inventory.length === 0) {
   inventory = JSON.parse(JSON.stringify(SEED_INVENTORY_ITEMS));
 }
-orders = orders.filter(
-  (o: any) =>
-    !o.id?.startsWith('sim_') &&
-    !o.id?.startsWith('ord_br_') &&
-    !o.id?.startsWith('ord_cl_') &&
-    !o.id?.startsWith('ord_graph_') &&
-    o.buyerName !== 'FB Live Buyer' &&
-    !o.buyerName?.startsWith('FB Buyer ') &&
-    !o.hostVerificationNote?.includes('Mined during live stream:') &&
-    (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
-);
+orders = orders
+  .filter(
+    (o: any) =>
+      !o.id?.startsWith('ord_graph_') &&
+      o.buyerName !== 'FB Live Buyer' &&
+      !o.buyerName?.startsWith('FB Buyer ')
+  )
+  .map((o: any) => ({
+    ...o,
+    buyerName: cleanBuyerName(o.buyerName),
+  }));
 if (orders.length === 0) {
   orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
 }
@@ -497,9 +497,11 @@ function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: st
 }
 
 function cleanBuyerName(name: any): string {
-  if (!name) return 'FB Live Buyer';
+  if (!name) return 'Customer';
   return String(name)
     .replace(/\u00C3\u00B1/g, 'ñ')
+    .replace(/Ã±/g, 'ñ')
+    .replace(/Ã/g, '')
     .replace(/Escobi.*?as/gi, 'Escobiñas')
     .replace(/Era.*?a/gi, 'Eraña')
     .replace(/Tua.*?o/gi, 'Tuaño')
@@ -802,17 +804,17 @@ function parseClaimSpecsFromRaw(rawInput: any, fallbackCode = 'LIVE'): Array<{
 // 1. Get full state
 app.get('/api/state', (_req, res) => {
   try {
-    orders = orders.filter(
-      (o: any) =>
-        !o.id?.startsWith('sim_') &&
-        !o.id?.startsWith('ord_br_') &&
-        !o.id?.startsWith('ord_cl_') &&
-        !o.id?.startsWith('ord_graph_') &&
-        o.buyerName !== 'FB Live Buyer' &&
-        !o.buyerName?.startsWith('FB Buyer ') &&
-        !o.hostVerificationNote?.includes('Mined during live stream:') &&
-        (!o.orderedAt || o.orderedAt.includes('2026-10-22'))
-    );
+    orders = orders
+      .filter(
+        (o: any) =>
+          !o.id?.startsWith('ord_graph_') &&
+          o.buyerName !== 'FB Live Buyer' &&
+          !o.buyerName?.startsWith('FB Buyer ')
+      )
+      .map((o: any) => ({
+        ...o,
+        buyerName: cleanBuyerName(o.buyerName),
+      }));
     if (orders.length === 0) {
       loadRuntimeState();
     }
@@ -1019,7 +1021,7 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
       const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
       if (bridgeRes.ok) {
         const bData: any = await bridgeRes.json();
-        for (const clRow of (bData.bridge?.claims || []).filter((c: any) => (c.created_at || c.at || '').includes('2026-10-22'))) {
+        for (const clRow of bData.bridge?.claims || []) {
           const cid = `bridge_cl_${clRow.id}`;
           if (!seenCommentIds.has(cid)) {
             seenCommentIds.add(cid);
@@ -2039,7 +2041,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
 
         const hasAuthenticOrders = orders.some((o) => o.id.startsWith('ord_live_'));
         if (!hasAuthenticOrders) {
-          for (const reqRow of (bData.bridge?.orderRequests || []).filter((r: any) => !r.created_at || r.created_at.includes('2026-10-22'))) {
+          for (const reqRow of bData.bridge?.orderRequests || []) {
             const cid = `bridge_req_${reqRow.id}`;
             if (!seenCommentIds.has(cid)) {
               seenCommentIds.add(cid);
@@ -2075,7 +2077,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
               }
             }
           }
-          for (const clRow of (bData.bridge?.claims || []).filter((c: any) => (c.created_at || c.at || '').includes('2026-10-22'))) {
+          for (const clRow of bData.bridge?.claims || []) {
             const cid = `bridge_cl_${clRow.id}`;
             if (!seenCommentIds.has(cid)) {
               seenCommentIds.add(cid);
