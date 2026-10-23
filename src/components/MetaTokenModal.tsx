@@ -129,18 +129,18 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
         <form onSubmit={handleSaveToken} className="space-y-4 text-xs">
           <div>
             <label className="block text-xs font-bold text-neutral-200 mb-1.5">
-              Facebook Page Access Token (FB_PAGE_ACCESS_TOKEN)
+              Meta Page Access Token (<code className="text-sky-300 font-mono">META_PAGE_ACCESS_TOKEN</code> / <code className="text-neutral-400 font-mono">FB_PAGE_ACCESS_TOKEN</code>)
             </label>
             <textarea
               rows={3}
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="Paste your token here (e.g. EAAB... or EAAG...)"
+              placeholder="Paste your META_PAGE_ACCESS_TOKEN here (e.g. EAAB... or EAAG...)"
               className="w-full bg-neutral-950 border border-neutral-700 focus:border-blue-500 rounded-xl p-3 text-white font-mono text-xs focus:outline-none transition"
               required
             />
-            <span className="text-[10px] text-neutral-500 block mt-1">
-              Token is securely stored in your server runtime and used to dispatch invoices to real Facebook accounts via Graph API v22.0.
+            <span className="text-[10px] text-neutral-400 block mt-1">
+              Supports both <code className="text-sky-300 font-mono">META_PAGE_ACCESS_TOKEN</code> and <code className="text-neutral-300 font-mono">FB_PAGE_ACCESS_TOKEN</code> simultaneously. Setting either synchronizes both across all Graph API v22.0 messaging routes.
             </span>
           </div>
 

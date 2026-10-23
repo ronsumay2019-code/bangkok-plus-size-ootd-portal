@@ -728,10 +728,10 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 <input
                   type="password"
                   name="fbAccessTokenInput"
-                  aria-label="Facebook Page Access Token"
+                  aria-label="META_PAGE_ACCESS_TOKEN"
                   value={fbAccessTokenInput}
                   onChange={(e) => setFbAccessTokenInput(e.target.value)}
-                  placeholder="Page Access Token (or use server .env)"
+                  placeholder="META_PAGE_ACCESS_TOKEN (or FB_PAGE_ACCESS_TOKEN)"
                   className="sm:col-span-3 bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px]"
                 />
                 <button

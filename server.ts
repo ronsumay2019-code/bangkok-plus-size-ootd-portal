@@ -42,6 +42,29 @@ import {
 
 dotenv.config();
 
+// Ensure both META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN are always read and hold identical values
+const initialMetaToken = (
+  process.env.META_PAGE_ACCESS_TOKEN ||
+  process.env.FB_PAGE_ACCESS_TOKEN ||
+  ''
+).trim();
+
+if (initialMetaToken) {
+  process.env.META_PAGE_ACCESS_TOKEN = initialMetaToken;
+  process.env.FB_PAGE_ACCESS_TOKEN = initialMetaToken;
+}
+
+const initialMetaPageId = (
+  process.env.META_PAGE_ID ||
+  process.env.FB_PAGE_ID ||
+  'me'
+).trim();
+
+if (initialMetaPageId) {
+  process.env.META_PAGE_ID = initialMetaPageId;
+  process.env.FB_PAGE_ID = initialMetaPageId;
+}
+
 const ROOT_DIR = process.cwd();
 const STATE_FILE_PATH = process.env.VERCEL
   ? '/tmp/runtime-state.json'
@@ -176,10 +199,10 @@ let graphSyncStats = {
   syncCount: 0,
   onAirVideoId: process.env.FB_LIVE_VIDEO_ID || 'Not connected yet',
   broadcastStatus: 'READY_TO_SYNC',
-  lastStatusCheck: (process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN)
+  lastStatusCheck: (process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN)
     ? 'Live Graph API v22.0 Token Detected — Ready to sync morning broadcast'
     : 'Awaiting Facebook Live Video ID / Page Access Token or Meta Webhook events',
-  mode: (process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN) ? 'live_graph_api' : 'awaiting_credentials',
+  mode: (process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN) ? 'live_graph_api' : 'awaiting_credentials',
 };
 
 // Multi-Login & Mobile Device Sessions Registry
@@ -227,8 +250,42 @@ let activeSessions: UserSession[] = [
   },
 ];
 
-let storedFbAccessToken: string = process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN || '';
-let storedFbPageId: string = process.env.FB_PAGE_ID || process.env.META_PAGE_ID || 'me';
+let storedFbAccessToken: string = process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN || '';
+let storedFbPageId: string = process.env.META_PAGE_ID || process.env.FB_PAGE_ID || 'me';
+
+function getMetaPageAccessToken(): string {
+  return (
+    process.env.META_PAGE_ACCESS_TOKEN ||
+    process.env.FB_PAGE_ACCESS_TOKEN ||
+    storedFbAccessToken ||
+    ''
+  ).trim();
+}
+
+function getMetaPageId(): string {
+  return (
+    process.env.META_PAGE_ID ||
+    process.env.FB_PAGE_ID ||
+    storedFbPageId ||
+    'me'
+  ).trim();
+}
+
+function setMetaCredentials(token?: string, pageId?: string) {
+  if (token && typeof token === 'string' && token.trim()) {
+    const cleanToken = token.trim();
+    storedFbAccessToken = cleanToken;
+    process.env.META_PAGE_ACCESS_TOKEN = cleanToken;
+    process.env.FB_PAGE_ACCESS_TOKEN = cleanToken;
+  }
+  if (pageId && typeof pageId === 'string' && pageId.trim()) {
+    const cleanPageId = pageId.trim();
+    storedFbPageId = cleanPageId;
+    process.env.META_PAGE_ID = cleanPageId;
+    process.env.FB_PAGE_ID = cleanPageId;
+  }
+  saveRuntimeState();
+}
 
 function saveRuntimeState() {
   try {
@@ -286,9 +343,13 @@ function loadRuntimeState() {
       }
       if (typeof parsed.storedFbAccessToken === 'string' && parsed.storedFbAccessToken) {
         storedFbAccessToken = parsed.storedFbAccessToken;
+        process.env.META_PAGE_ACCESS_TOKEN = storedFbAccessToken;
+        process.env.FB_PAGE_ACCESS_TOKEN = storedFbAccessToken;
       }
       if (typeof parsed.storedFbPageId === 'string' && parsed.storedFbPageId) {
         storedFbPageId = parsed.storedFbPageId;
+        process.env.META_PAGE_ID = storedFbPageId;
+        process.env.FB_PAGE_ID = storedFbPageId;
       }
     }
   } catch (e) {
@@ -817,14 +878,14 @@ app.post('/api/auth/heartbeat', (req, res) => {
   res.json({ success: true, sessions: activeSessions });
 });
 
-// Meta Facebook Page Access Token Management
+// Meta Facebook Page Access Token Management (supports META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN)
 app.get('/api/meta/token', (_req, res) => {
-  const activeToken = storedFbAccessToken || process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN || '';
+  const activeToken = getMetaPageAccessToken();
   res.json({
     success: true,
     hasToken: !!activeToken,
     maskedToken: activeToken ? `${activeToken.slice(0, 8)}...${activeToken.slice(-6)}` : null,
-    pageId: storedFbPageId || process.env.FB_PAGE_ID || 'me',
+    pageId: getMetaPageId(),
     mode: activeToken ? 'live_graph_api' : 'manual_messenger',
   });
 });
@@ -832,21 +893,18 @@ app.get('/api/meta/token', (_req, res) => {
 app.post('/api/meta/token', (req, res) => {
   const { token, pageId } = req.body;
   if (token && typeof token === 'string') {
-    storedFbAccessToken = token.trim();
-    process.env.FB_PAGE_ACCESS_TOKEN = token.trim();
+    setMetaCredentials(token, pageId);
     graphSyncStats.mode = 'live_graph_api';
     graphSyncStats.lastStatusCheck = 'Live Graph API Token Configured';
+  } else if (pageId && typeof pageId === 'string') {
+    setMetaCredentials(undefined, pageId);
   }
-  if (pageId && typeof pageId === 'string') {
-    storedFbPageId = pageId.trim();
-    process.env.FB_PAGE_ID = pageId.trim();
-  }
-  saveRuntimeState();
+  const currentToken = getMetaPageAccessToken();
   res.json({
     success: true,
-    hasToken: !!storedFbAccessToken,
-    maskedToken: storedFbAccessToken ? `${storedFbAccessToken.slice(0, 8)}...${storedFbAccessToken.slice(-6)}` : null,
-    pageId: storedFbPageId,
+    hasToken: !!currentToken,
+    maskedToken: currentToken ? `${currentToken.slice(0, 8)}...${currentToken.slice(-6)}` : null,
+    pageId: getMetaPageId(),
   });
 });
 
@@ -1480,8 +1538,8 @@ app.post('/api/invoices/generate', (req, res) => {
     });
     existingThread.unreadCount = 0;
 
-    // Outbound dispatch attempt if token is configured
-    const fbToken = storedFbAccessToken || process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
+    // Outbound dispatch attempt if token is configured (supports META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN)
+    const fbToken = getMetaPageAccessToken();
     if (fbToken && existingThread.psid) {
       fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
         method: 'POST',
@@ -1731,18 +1789,13 @@ app.post('/api/facebook/live-sync', async (req, res) => {
   }
 
   if (accessToken && String(accessToken).trim()) {
-    storedFbAccessToken = String(accessToken).trim();
-    process.env.FB_PAGE_ACCESS_TOKEN = storedFbAccessToken;
-    saveRuntimeState();
-  }
-  if (fbPageId && String(fbPageId).trim()) {
-    storedFbPageId = String(fbPageId).trim();
-    process.env.FB_PAGE_ID = storedFbPageId;
-    saveRuntimeState();
+    setMetaCredentials(String(accessToken).trim(), fbPageId ? String(fbPageId).trim() : undefined);
+  } else if (fbPageId && String(fbPageId).trim()) {
+    setMetaCredentials(undefined, String(fbPageId).trim());
   }
 
-  const fbToken = storedFbAccessToken || (accessToken && String(accessToken).trim()) || process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
-  const pageId = storedFbPageId || (fbPageId && String(fbPageId).trim()) || process.env.FB_PAGE_ID || process.env.META_PAGE_ID || 'me';
+  const fbToken = getMetaPageAccessToken();
+  const pageId = getMetaPageId();
 
   graphSyncStats.lastSyncAt = nowIso;
   graphSyncStats.syncCount += 1;
@@ -2211,8 +2264,8 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
     });
   }
 
-  // If FB_PAGE_ACCESS_TOKEN or META_PAGE_ACCESS_TOKEN is configured, dispatch real outbound Graph API v22.0 Send API request
-  const fbToken = storedFbAccessToken || process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
+  // If META_PAGE_ACCESS_TOKEN or FB_PAGE_ACCESS_TOKEN is configured, dispatch real outbound Graph API v22.0 Send API request
+  const fbToken = getMetaPageAccessToken();
   if (fbToken && thread.psid) {
     try {
       await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
