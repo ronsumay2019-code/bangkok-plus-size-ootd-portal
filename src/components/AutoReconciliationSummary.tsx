@@ -34,7 +34,6 @@ import {
   Search,
 } from 'lucide-react';
 import { ReconciliationSummary, BuyerBag, BuyerOrder, MessengerThread } from '../types/reconciliation';
-import { MetaGraphApiBadge, MetaGraphApiIcon } from './MetaGraphApiBadge';
 
 interface AutoReconciliationSummaryProps {
   summary: ReconciliationSummary | null;
@@ -327,8 +326,6 @@ PAYMENT OPTIONS:
 💳 GCash: 0917-XXX-XXXX (Bangkok Plus Size OOTD)
 💳 Maya / BDO Bank Transfer Available
 (Please send payment confirmation slip within 24 hours to secure your items)
-===============================
-🔗 Connected via Meta Official Graph API • Verified Live Selling Intake
 ===============================${photoNotice}`;
   };
 
@@ -1484,14 +1481,6 @@ PAYMENT OPTIONS:
                     <span>GCash / Maya / BDO bank transfer instructions attached on dispatch.</span>
                   </div>
                   <span className="text-emerald-400 font-mono text-[10px]">100% Zero-Refund Safety</span>
-                </div>
-
-                {/* Official Meta Graph API Verification in Smaller Text with Official Icon */}
-                <div className="pt-2 px-1 border-t border-neutral-900 flex flex-wrap items-center justify-between gap-2">
-                  <MetaGraphApiBadge variant="invoice" />
-                  <span className="font-mono text-[9px] text-neutral-500 uppercase tracking-wider">
-                    Graph API v22.0 Certified
-                  </span>
                 </div>
               </div>
             </div>

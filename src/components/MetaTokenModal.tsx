@@ -157,54 +157,6 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
             />
           </div>
 
-          {/* Meta Brand Safety & Compliance Policy Control */}
-          <div className="p-3.5 bg-neutral-950/80 rounded-2xl border border-neutral-800 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-neutral-200 flex items-center gap-1.5 text-xs">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Meta Brand Policy & Public Badge Safety</span>
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                Safe Mode Active
-              </span>
-            </div>
-            <p className="text-[11px] text-neutral-400 leading-relaxed">
-              To protect your Facebook business page from trademark strikes, public broadcast HUDs and buyer invoices use the compliant BPSO Verified seal by default. Keep this disabled until you receive formal written clearance from the Meta Brand Resource Center.
-            </p>
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="brandApprovalToggle"
-                checked={localStorage.getItem('bpso_meta_public_brand_approved') === 'true'}
-                onChange={(e) => {
-                  localStorage.setItem('bpso_meta_public_brand_approved', e.target.checked ? 'true' : 'false');
-                  window.dispatchEvent(new Event('storage'));
-                  setStatusMessage({
-                    type: 'success',
-                    text: e.target.checked
-                      ? 'Public Meta badge enabled on live HUD and invoices.'
-                      : 'Safe Mode active: Public materials will use the compliant BPSO seal.',
-                  });
-                }}
-                className="w-4 h-4 text-blue-600 rounded bg-neutral-900 border-neutral-700 focus:ring-0 cursor-pointer"
-              />
-              <label htmlFor="brandApprovalToggle" className="text-xs text-neutral-300 cursor-pointer select-none">
-                I have received formal approval from Meta to display the Meta logo on public broadcasts & invoices
-              </label>
-            </div>
-            <div className="pt-1 text-[10px]">
-              <a
-                href="https://about.meta.com/brand/resources/meta/request-brand-permissions/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-sky-400 hover:text-sky-300 underline flex items-center gap-1"
-              >
-                <span>Submit official request to Meta Brand Permissions Center</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </div>
-
           {statusMessage && (
             <div
               className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${

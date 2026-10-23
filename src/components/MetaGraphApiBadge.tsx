@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Lock, Activity } from 'lucide-react';
+import React from 'react';
 
 interface MetaGraphApiIconProps {
   className?: string;
@@ -47,181 +46,36 @@ export const MetaGraphApiIcon: React.FC<MetaGraphApiIconProps> = ({ className = 
 };
 
 interface MetaGraphApiBadgeProps {
-  variant?: 'header' | 'live_overlay' | 'host_bar' | 'invoice' | 'compact';
+  variant?: 'header' | 'compact';
   className?: string;
   onClick?: () => void;
 }
 
 export const MetaGraphApiBadge: React.FC<MetaGraphApiBadgeProps> = ({
-  variant = 'compact',
+  variant = 'header',
   className = '',
   onClick,
 }) => {
-  // Brand Safety Gate: Public video overlay and invoices default to Safe Mode until Meta formal approval
-  const [isMetaPublicApproved, setIsMetaPublicApproved] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('bpso_meta_public_brand_approved');
-      if (stored === 'true') {
-        setIsMetaPublicApproved(true);
-      }
-    } catch {
-      // fallback
-    }
-  }, []);
-
-  // 1. Private Staff Header (Always safe for internal staff & admins)
-  if (variant === 'header') {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-950/70 via-neutral-900 to-sky-950/70 border border-blue-500/40 hover:border-blue-400 text-xs text-neutral-200 transition shadow-sm hover:shadow-blue-900/30 cursor-pointer ${className}`}
-        title="Meta Official Graph API v22.0 Connected - Click to view connection & Brand safety settings"
-      >
-        <div className="relative flex items-center justify-center">
-          <MetaGraphApiIcon className="w-4 h-4" />
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-        </div>
-        <span className="font-semibold tracking-tight text-white flex items-center gap-1.5">
-          <span>Connected via</span>
-          <span className="bg-gradient-to-r from-blue-400 to-sky-300 bg-clip-text text-transparent font-bold">
-            Meta Official Graph API
-          </span>
-        </span>
-        <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono border border-blue-500/30">
-          v22.0
-        </span>
-      </button>
-    );
-  }
-
-  // 2. Public Live Video Screen Overlay
-  if (variant === 'live_overlay') {
-    if (isMetaPublicApproved) {
-      return (
-        <div 
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-950/85 backdrop-blur-md border border-blue-500/40 text-xs shadow-2xl ${className}`}
-        >
-          <div className="relative flex items-center justify-center">
-            <MetaGraphApiIcon className="w-4 h-4" />
-            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-              <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-                Live Selling Stream Sync
-              </span>
-            </div>
-            <span className="text-[11px] font-bold text-white flex items-center gap-1">
-              Connected via <span className="text-sky-300">Meta Official Graph API</span>
-            </span>
-          </div>
-        </div>
-      );
-    }
-
-    // 100% Compliant BPSO Live Shield (Safe Mode while awaiting Meta Brand Approval)
-    return (
-      <div 
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-950/90 backdrop-blur-md border border-emerald-500/40 text-xs shadow-2xl ${className}`}
-      >
-        <div className="relative flex items-center justify-center text-emerald-400">
-          <ShieldCheck className="w-4 h-4" />
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-        </div>
-        <div className="flex flex-col">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-300 font-bold">
-              BPSO LIVE CLAIM ENGINE
-            </span>
-          </div>
-          <span className="text-[11px] font-bold text-white flex items-center gap-1">
-            Automated Real-Time Intake <span className="text-emerald-400 font-mono">✓ Verified</span>
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  // 3. Host Live Bar Controller
-  if (variant === 'host_bar') {
-    if (isMetaPublicApproved) {
-      return (
-        <div 
-          className={`flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-950/80 via-neutral-900 to-indigo-950/80 border border-blue-500/50 shadow-md ${className}`}
-        >
-          <div className="flex items-center gap-1.5">
-            <MetaGraphApiIcon className="w-4 h-4 shrink-0" />
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          </div>
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-neutral-300 font-medium">Connected via</span>
-            <strong className="bg-gradient-to-r from-blue-400 via-sky-300 to-teal-300 bg-clip-text text-transparent font-bold">
-              Meta Official Graph API
-            </strong>
-          </div>
-          <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30 uppercase tracking-wider">
-            Verified Real Time
-          </span>
-        </div>
-      );
-    }
-
-    // 100% Compliant BPSO Live Bar Badge
-    return (
-      <div 
-        className={`flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-950/80 via-neutral-900 to-teal-950/80 border border-emerald-500/50 shadow-md ${className}`}
-      >
-        <div className="flex items-center gap-1.5 text-emerald-400">
-          <ShieldCheck className="w-4 h-4 shrink-0" />
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        </div>
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-neutral-300 font-medium">BPSO Engine:</span>
-          <strong className="text-emerald-300 font-bold">
-            Real-Time Live Claim Lock
-          </strong>
-        </div>
-        <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30 uppercase tracking-wider">
-          Active
-        </span>
-      </div>
-    );
-  }
-
-  // 4. Invoice Footer
-  if (variant === 'invoice') {
-    if (isMetaPublicApproved) {
-      return (
-        <div className={`flex items-center gap-2 text-neutral-400 ${className}`}>
-          <MetaGraphApiIcon className="w-3.5 h-3.5 shrink-0" />
-          <span className="text-[10px] sm:text-[11px] tracking-tight">
-            Connected via <strong className="text-neutral-300 font-semibold">Meta Official Graph API</strong> • Verified Live Selling Intake • <span className="text-neutral-400">Bangkok Plus Size OOTD</span>
-          </span>
-        </div>
-      );
-    }
-
-    // 100% Compliant BPSO Safe Mode on Invoice
-    return (
-      <div className={`flex items-center gap-1.5 text-neutral-400 ${className}`}>
-        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-        <span className="text-[10px] sm:text-[11px] tracking-tight">
-          <strong className="text-neutral-300 font-semibold">Official BPSO Verified Bag</strong> • Zero-Refund Gate Active • <span className="text-neutral-400">Pratunam Curated Fashion</span>
-        </span>
-      </div>
-    );
-  }
-
-  // default 'compact'
   return (
-    <div className={`inline-flex items-center gap-1.5 text-xs text-neutral-300 ${className}`}>
-      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-      <span>BPSO Verified Live Selling Engine</span>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-950/70 via-neutral-900 to-sky-950/70 border border-blue-500/40 hover:border-blue-400 text-xs text-neutral-200 transition shadow-sm hover:shadow-blue-900/30 cursor-pointer ${className}`}
+      title="Meta Official Graph API v22.0 Connected - Click to view connection status"
+    >
+      <div className="relative flex items-center justify-center">
+        <MetaGraphApiIcon className="w-4 h-4" />
+        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+      </div>
+      <span className="font-semibold tracking-tight text-white flex items-center gap-1.5">
+        <span>Connected via</span>
+        <span className="bg-gradient-to-r from-blue-400 to-sky-300 bg-clip-text text-transparent font-bold">
+          Meta Official Graph API
+        </span>
+      </span>
+      <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono border border-blue-500/30">
+        v22.0
+      </span>
+    </button>
   );
 };

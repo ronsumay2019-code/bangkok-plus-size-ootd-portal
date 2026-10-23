@@ -37,7 +37,6 @@ import {
   HostItemSegment,
   parseMinerQueueComment,
 } from '../services/liveSellingEngine';
-import { MetaGraphApiBadge } from './MetaGraphApiBadge';
 
 interface LiveSessionCommandProps {
   live: LiveSession;
@@ -470,10 +469,6 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   <span>Host Calling: <strong className="text-amber-400 font-mono">{currentHostSegment.itemCode}</strong> · <span className="text-emerald-400 font-bold">₱{currentHostSegment.pricePhp}</span></span>
                 </div>
               )}
-              {/* Flash on Screen during Live: Official Meta Graph API Verification */}
-              <div className="absolute top-3 right-3 z-10">
-                <MetaGraphApiBadge variant="live_overlay" />
-              </div>
             </div>
 
             {/* Live Session Controls */}
@@ -528,7 +523,6 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <MetaGraphApiBadge variant="host_bar" className="hidden sm:flex" />
                   <button
                     type="button"
                     disabled={activeSegmentIndex === 0}
