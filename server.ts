@@ -306,8 +306,19 @@ function setMetaCredentials(token?: string, pageId?: string) {
   saveRuntimeState();
 }
 
+function sortMessengerThreads() {
+  messengerThreads.sort((a, b) => {
+    const aLast = a.messages && a.messages.length > 0 ? a.messages[a.messages.length - 1] : null;
+    const bLast = b.messages && b.messages.length > 0 ? b.messages[b.messages.length - 1] : null;
+    const aTime = aLast?.timestamp ? new Date(aLast.timestamp).getTime() : new Date(a.windowExpiresAt || 0).getTime() - 24 * 3600 * 1000;
+    const bTime = bLast?.timestamp ? new Date(bLast.timestamp).getTime() : new Date(b.windowExpiresAt || 0).getTime() - 24 * 3600 * 1000;
+    return bTime - aTime;
+  });
+}
+
 function saveRuntimeState() {
   try {
+    sortMessengerThreads();
     fs.writeFileSync(
       STATE_FILE_PATH,
       JSON.stringify(
@@ -830,6 +841,7 @@ app.get('/api/state', (_req, res) => {
         performInventorySync(activeLive.id);
       } catch (e) {}
     }
+    sortMessengerThreads();
     res.json({
       lives,
       inventory,
@@ -1704,6 +1716,11 @@ app.post('/api/meta/webhook', (req, res) => {
             thread.unreadCount = (thread.unreadCount || 0) + 1;
             thread.windowExpiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
             if (intent) thread.detectedIntent = intent;
+            const curIdx = messengerThreads.indexOf(thread);
+            if (curIdx > 0) {
+              messengerThreads.splice(curIdx, 1);
+              messengerThreads.unshift(thread);
+            }
           }
 
           thread.messages.push({

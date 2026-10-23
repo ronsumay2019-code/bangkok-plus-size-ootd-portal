@@ -14,6 +14,7 @@ import {
   Inbox,
   FileText,
   ExternalLink,
+  Search,
 } from 'lucide-react';
 import { OrderAmendment, BuyerOrder, MessengerThread, PreOrder, ReconciliationSummary } from '../types/reconciliation';
 import { SEED_MESSENGER_THREADS } from '../data/seedData';
@@ -61,11 +62,30 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
 
   // Business Messenger Inbox state
   const [activeThreadId, setActiveThreadId] = useState<string>(messengerThreads[0]?.id || '');
+  const [searchQuery, setSearchQuery] = useState('');
   const [replyText, setReplyText] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
 
+  // Real-time sorting: threads with the latest incoming message are always at the top!
+  const sortedThreads = [...messengerThreads].sort((a, b) => {
+    const aLast = a.messages && a.messages.length > 0 ? a.messages[a.messages.length - 1] : null;
+    const bLast = b.messages && b.messages.length > 0 ? b.messages[b.messages.length - 1] : null;
+    const aTime = aLast?.timestamp ? new Date(aLast.timestamp).getTime() : new Date(a.windowExpiresAt || 0).getTime() - 24 * 3600 * 1000;
+    const bTime = bLast?.timestamp ? new Date(bLast.timestamp).getTime() : new Date(b.windowExpiresAt || 0).getTime() - 24 * 3600 * 1000;
+    return bTime - aTime;
+  });
+
+  const filteredThreads = sortedThreads.filter((t) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const nameMatch = t.buyerName.toLowerCase().includes(q);
+    const msgMatch = (t.messages || []).some((m) => m.text.toLowerCase().includes(q));
+    const handleMatch = (t.buyerHandle || '').toLowerCase().includes(q);
+    return nameMatch || msgMatch || handleMatch;
+  });
+
   const selectedOrder = orders.find((o) => o.id === selectedOrderId);
-  const activeThread = messengerThreads.find((t) => t.id === activeThreadId) || messengerThreads[0];
+  const activeThread = filteredThreads.find((t) => t.id === activeThreadId) || filteredThreads[0] || sortedThreads[0];
 
   const getHoursRemaining = (iso: string) => {
     const diffMs = new Date(iso).getTime() - Date.now();
@@ -255,13 +275,25 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
             </span>
           </div>
 
+          {/* Real-time Messenger Buyer Search Bar */}
+          <div className="relative mb-3">
+            <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search buyer name or message (e.g. Bracx)..."
+              className="w-full bg-neutral-950 border border-neutral-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 transition"
+            />
+          </div>
+
           <div className="space-y-2.5 overflow-y-auto max-h-[430px] pr-1">
-            {messengerThreads.length === 0 ? (
+            {filteredThreads.length === 0 ? (
               <div className="p-6 text-center text-xs text-neutral-500 bg-neutral-950 rounded-xl border border-neutral-800">
-                No Business Messenger threads synced yet. Use <strong>Sync Morning Live</strong> in Live Session Command (or Meta Webhooks) to pull today&apos;s Page Inbox conversations.
+                {searchQuery ? `No buyer matches for "${searchQuery}"` : 'No Business Messenger threads synced yet.'}
               </div>
             ) : (
-              messengerThreads.map((thread) => {
+              filteredThreads.map((thread) => {
               const isSelected = activeThread?.id === thread.id;
               const hrsLeft = getHoursRemaining(thread.windowExpiresAt);
               const lastMsg = thread.messages[thread.messages.length - 1];
