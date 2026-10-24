@@ -14,7 +14,7 @@ let db: FakeDb;
 const copies: ChildProcess[] = [];
 
 function seedRows() {
-  const live = { id: LIVE_ID, title: 'NEW SHOP · 2026-10-22', status: 'ended', storeDate: '2026-10-22', startedAt: '2026-10-22T01:00:00.000Z', endedAt: '2026-10-22T02:48:00.000Z', storeName: 'Pratunam', lineup: [], totalComments: 0, totalMined: 2, reconciledAt: null, reconciliationStatus: 'awaiting_owner_review' };
+  const live = { id: LIVE_ID, title: 'NEW SHOP · 2026-10-22', fbVideoId: 'vid22', status: 'ended', storeDate: '2026-10-22', startedAt: '2026-10-22T01:00:00.000Z', endedAt: '2026-10-22T02:48:00.000Z', storeName: 'Pratunam', lineup: [], totalComments: 0, totalMined: 2, reconciledAt: null, reconciliationStatus: 'awaiting_owner_review' };
   const order = (id: string, price: number, code = 'RUSTANS') => ({ id, liveId: LIVE_ID, buyerName: 'Vera Santos', channel: 'live_chat', itemCode: code, itemName: code, size: 'FREE SIZE (PLUS)', colour: 'PINK', quantity: 1, statedUnitPricePhp: price, orderedAt: '2026-10-22T07:00:00.000Z', status: 'pending', invoiced: false, lane: 'live', version: 1, overrideHistory: [] });
   return {
     portal_records: [
@@ -159,12 +159,36 @@ test('replies and new buyer DMs arriving at the same moment on different copies 
 });
 
 test('the same live comment delivered to two copies at once creates one order', async () => {
-  const comment = { object: 'page', entry: [{ changes: [{ field: 'feed', value: { item: 'comment', comment_id: 'cmt_dup_1', message: 'Mine rustans pink', from: { id: '1', name: 'Joy Tuazon' } } }] }] };
+  const comment = { object: 'page', entry: [{ changes: [{ field: 'feed', value: { item: 'comment', verb: 'add', comment_id: 'cmt_dup_1', post_id: '109603071381200_vid22', message: 'Mine rustans pink', from: { id: '1', name: 'Joy Tuazon' } } }] }] };
   await Promise.all([call(A, '/api/meta/webhook', { body: comment }), call(B, '/api/meta/webhook', { body: comment })]);
   const s = await call(A, '/api/state', { token: ownerToken });
   const made = s.data.orders.filter((o: any) => o.sourceCommentId === 'cmt_dup_1');
   assert.equal(made.length, 1);
   assert.equal(made[0].buyerName, 'Joy Tuazon', 'name kept as written');
+});
+
+test('only real order comments on the live become orders, pending and with no made-up price', async () => {
+  const feed = (value: any) => ({ object: 'page', entry: [{ changes: [{ field: 'feed', value: { verb: 'add', post_id: '109603071381200_vid22', ...value } }] }] });
+  const events = [
+    feed({ item: 'reaction', reaction_type: 'like', from: { id: '2', name: 'Liker' } }),
+    feed({ item: 'comment', comment_id: 'q1', message: 'how much', from: { id: '3', name: 'Asker' } }),
+    feed({ item: 'comment', comment_id: 'q2', message: 'Mgkano', from: { id: '4', name: 'Asker Two' } }),
+    feed({ item: 'comment', comment_id: 'e1', message: '', from: { id: '5', name: 'Sticker Only' } }),
+    { object: 'page', entry: [{ id: 'page_1', changes: [{ field: 'feed', value: { item: 'comment', verb: 'add', post_id: 'page_1_vid22', comment_id: 'p1', message: 'Mine T1', from: { id: 'page_1', name: 'Bangkok Plus Size OOTD' } } }] }] },
+    feed({ item: 'comment', comment_id: 'o1', post_id: '109603071381200_otherpost', message: 'Mine T2', from: { id: '6', name: 'Other Post' } }),
+    feed({ item: 'comment', comment_id: 'n1', message: 'Mine T3', from: { id: '7' } }),
+    feed({ item: 'comment', comment_id: 'm1', message: 'mine T4 2XL', from: { id: '8', name: 'Real Buyer' } }),
+    feed({ item: 'comment', comment_id: 'm2', message: 'D3 po', from: { id: '9', name: 'Code Only' } }),
+  ];
+  for (const e of events) assert.equal((await call(A, '/api/meta/webhook', { body: e })).status, 200);
+  const s = await call(B, '/api/state', { token: ownerToken });
+  const made = s.data.orders.filter((o: any) => ['q1', 'q2', 'e1', 'p1', 'o1', 'n1', 'm1', 'm2'].includes(o.sourceCommentId));
+  assert.deepEqual(made.map((o: any) => o.buyerName).sort(), ['Code Only', 'Real Buyer'], 'reactions, questions, empty, the Page, other posts and nameless comments are not orders');
+  for (const o of made) {
+    assert.equal(o.status, 'pending', 'waits for review');
+    assert.equal(o.statedUnitPricePhp, null, 'no price until the host price is added');
+    assert.equal(o.liveId, LIVE_ID, 'a replay comment on the live video stays with that live');
+  }
 });
 
 test('approving an order on one copy is saved for every copy', async () => {
@@ -223,7 +247,7 @@ test('starting a live after an earlier day’s live ended opens a new live sessi
   const s = await call(B, '/api/state', { token: ownerToken });
   assert.equal(s.data.lives[0].id, r.data.live.id, 'the new live is the active one on every copy');
   assert.equal(s.data.lives.length, 2, 'the earlier live and its orders are kept');
-  assert.equal(s.data.orders.filter((o: any) => o.liveId === LIVE_ID).length, 11);
+  assert.equal(s.data.orders.filter((o: any) => o.liveId === LIVE_ID).length, 13, 'the 11 earlier orders plus the 2 order comments from the replay');
 });
 
 test('webhook signature is checked over the exact bytes Meta sent', async () => {

@@ -41,6 +41,7 @@ import {
 } from './src/types/reconciliation';
 import { AsyncLock, StateSync, SupabaseBackend, storeConfigFromEnv } from './server/portalStore';
 import { DEFAULT_STAFF, PortalAuth, PortalUser, SESSION_HEADER } from './server/auth';
+import { orderComment } from './server/orderIntent';
 import { cleanBuyerName } from './src/utils/buyerName';
 
 dotenv.config();
@@ -2002,6 +2003,94 @@ app.get('/api/meta/webhook', (req, res) => {
 });
 
 // 8c. Meta Webhook Event Ingestion (POST /api/meta/webhook) — Live Broadcasts, Comments & Business Messenger
+/** Which live a comment belongs to: the live whose video it is on (replay comments included), else the live on air. */
+function liveForComment(postId?: string): LiveSession | null {
+  const post = String(postId || '');
+  if (post) {
+    const byVideo = lives.find((l) => l.fbVideoId && l.fbVideoId !== 'Not connected yet' && (post === l.fbVideoId || post.endsWith(`_${l.fbVideoId}`)));
+    if (byVideo) return byVideo;
+  }
+  const onAir = lives.find((l) => l.status === 'live');
+  if (!onAir) return null;
+  // On air with a known video, a comment on a different post is not a live order
+  if (post && onAir.fbVideoId && onAir.fbVideoId !== 'Not connected yet') return null;
+  return onAir;
+}
+
+/**
+ * Saves an order comment as a pending live order (webhook and live sync share this).
+ * Never sets a price: the host's price is added during review. The same comment always gives the same order id.
+ */
+function captureLiveComment(c: {
+  commentId?: string;
+  postId?: string;
+  message: string;
+  senderName?: string;
+  senderId?: string;
+  createdTime: string;
+  live?: LiveSession;
+  /** The Page the event came from (webhook entry id) */
+  pageId?: string;
+}): { captured: number; detail: string } {
+  const message = String(c.message || '').trim();
+  const who = c.senderName || 'unknown buyer';
+  if (!c.commentId) return { captured: 0, detail: 'Comment without an id ignored' };
+  const pageIds = [c.pageId, getMetaPageId()].filter(Boolean).map(String);
+  if (c.senderId && pageIds.includes(String(c.senderId))) return { captured: 0, detail: `Page's own comment ignored: "${message}"` };
+  if (seenCommentIds.has(c.commentId)) return { captured: 0, detail: `Already handled (comment ${c.commentId})` };
+  const live = c.live || liveForComment(c.postId);
+  if (!live) return { captured: 0, detail: `Comment outside a live, not captured: "${message}" by ${who}` };
+  const intent = orderComment(message);
+  // No anonymous orders (handoff 0fc6590). Left unmarked so the webhook, which carries the name, can still save it.
+  if (intent && !c.senderName) return { captured: 0, detail: `Order comment without a buyer name, left for the webhook or replay: "${message}"` };
+  seenCommentIds.add(c.commentId);
+  if (!c.live) live.totalComments = (live.totalComments || 0) + 1; // the live sync counts its own comments
+  if (!intent) return { captured: 0, detail: `Not an order: "${message}" by ${who}` };
+
+  let captured = 0;
+  const specs = parseClaimSpecsFromRaw(message);
+  for (const [specIdx, spec] of specs.entries()) {
+    if (spec.isChatter || spec.isAmendmentNote) continue;
+    const orderId = `ord_wh_${String(c.commentId).replace(/[^\w-]/g, '_')}_${specIdx + 1}`;
+    if (orders.some((o) => o.id === orderId)) continue;
+    const size = spec.size || 'FREE SIZE (PLUS)';
+    const colour = spec.colour || 'ASSORTED';
+    const repeat = orders.some(
+      (o) => o.liveId === live.id && o.buyerName.toLowerCase() === who.toLowerCase() && o.itemCode === spec.itemCode && o.size === size && o.colour === colour
+    );
+    const note = [`Live comment: "${message}"`, intent.note, 'Price: add the host\'s price from the replay.'].filter(Boolean).join(' ');
+    orders.push({
+      id: orderId,
+      liveId: live.id,
+      buyerName: cleanBuyerName(who),
+      channel: 'live_chat',
+      sourceCommentId: c.commentId,
+      itemCode: spec.itemCode,
+      itemName: spec.itemName,
+      size,
+      colour,
+      quantity: spec.quantity || 1,
+      statedUnitPricePhp: null,
+      orderedAt: c.createdTime,
+      status: 'pending',
+      invoiced: false,
+      lane: 'live',
+      version: 1,
+      hostVerificationNote: note,
+      reviewNotes: note,
+      overrideHistory: [],
+      isDuplicateFlagged: repeat,
+      duplicateReason: repeat ? 'Repeat comment for same item/size detected during live stream' : undefined,
+    });
+    captured++;
+  }
+  if (captured) {
+    live.totalMined = (live.totalMined || 0) + captured;
+    performInventorySync(live.id);
+  }
+  return { captured, detail: captured ? `Order comment saved for review: "${message}" by ${who}` : `Not an order: "${message}" by ${who}` };
+}
+
 app.post('/api/meta/webhook', async (req, res) => {
   const appSecret = process.env.META_APP_SECRET;
   const signatureHeader = req.headers['x-hub-signature-256'] as string | undefined;
@@ -2128,66 +2217,24 @@ app.post('/api/meta/webhook', async (req, res) => {
               eventDetails += ' -> Auto-reconciliation & rack sync triggered; awaiting owner review';
             }
           } else if (change.field === 'feed' || change.field === 'comments') {
-            eventType = 'comment_claim';
-            const comment = change.value;
-            const commentId = comment?.comment_id || comment?.id || `c_${Date.now()}`;
-            const message = comment?.message || '';
-            const sender = comment?.from?.name || 'Live Viewer';
-
-            if (seenCommentIds.has(commentId)) {
-              eventDetails = `Duplicate webhook delivery ignored (comment_id: ${commentId})`;
+            const v = change.value || {};
+            // Page feed events also cover reactions, shares and the Page's own posts: only new comments count
+            if ((v.item && v.item !== 'comment') || (v.verb && v.verb !== 'add')) {
+              eventType = 'feed_ignored';
+              eventDetails = `Ignored page activity (${v.item || 'unknown'} ${v.verb || ''})`.trim();
               continue;
             }
-            seenCommentIds.add(commentId);
-
-            eventDetails = `Comment claim: "${message}" by ${sender}`;
-
-            const targetLive = lives.find((l) => l.status === 'live') || lives[0];
-            const specs = parseClaimSpecsFromRaw(message);
-            for (const [specIdx, spec] of specs.entries()) {
-              if (spec.isChatter || spec.isAmendmentNote) continue;
-              const orderId = `ord_wh_${String(commentId).replace(/[^\w-]/g, '_')}_${specIdx + 1}`;
-              if (orders.some((o) => o.id === orderId)) continue;
-              const existingSameBuyerSpec = orders.some(
-                (o) =>
-                  o.liveId === targetLive.id &&
-                  o.buyerName.toLowerCase() === sender.toLowerCase() &&
-                  o.itemCode === spec.itemCode &&
-                  o.size === (spec.size || 'FREE SIZE (PLUS)') &&
-                  o.colour === spec.colour
-              );
-
-              const newOrder: BuyerOrder = {
-                // Same comment → same order id, so a webhook retried by Meta on another copy cannot duplicate it
-                id: orderId,
-                liveId: targetLive.id,
-                buyerName: cleanBuyerName(sender),
-                channel: 'live_chat',
-                sourceCommentId: commentId,
-                itemCode: spec.itemCode,
-                itemName: spec.itemName,
-                size: spec.size || 'FREE SIZE (PLUS)',
-                colour: spec.colour || 'ASSORTED',
-                quantity: spec.quantity || 1,
-                statedUnitPricePhp: spec.price || 550,
-                orderedAt: nowIso,
-                status: spec.itemCode === 'PENDING SPEC' ? 'pending' : 'confirmed',
-                invoiced: false,
-                lane: 'live',
-                version: 1,
-                hostVerificationNote: spec.reviewNotes || `Captured from live: "${message}"`,
-                reviewNotes: spec.reviewNotes || `Live comment: "${message}"`,
-                overrideHistory: [],
-                isDuplicateFlagged: existingSameBuyerSpec,
-                duplicateReason: existingSameBuyerSpec
-                  ? 'Repeat comment for same item/size detected during live stream'
-                  : undefined,
-              };
-              orders.push(newOrder);
-              targetLive.totalMined = (targetLive.totalMined || 0) + 1;
-            }
-            targetLive.totalComments = (targetLive.totalComments || 0) + 1;
-            performInventorySync(targetLive.id);
+            eventType = 'comment';
+            const result = captureLiveComment({
+              commentId: v.comment_id || v.id,
+              postId: v.post_id,
+              message: v.message || '',
+              senderName: v.from?.name,
+              senderId: v.from?.id,
+              createdTime: v.created_time ? new Date(Number(v.created_time) * 1000 || v.created_time).toISOString() : nowIso,
+              pageId: entry.id,
+            });
+            eventDetails = result.detail;
           }
         }
       }
@@ -2353,12 +2400,20 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           totalCommentsFetched = commentsList.length;
           targetLive.totalComments = Math.max(targetLive.totalComments || 0, totalCommentsFetched);
 
-          for (const c of commentsList) {
-            if (c.id && !seenCommentIds.has(c.id)) {
-              seenCommentIds.add(c.id);
+          // While the live is on air, its order comments are saved here too, so a late or missing webhook
+          // never loses an order (same order id as the webhook would give). Ended lives are only counted.
+          if (targetLive.status === 'live' || effectiveStatus === 'LIVE') {
+            for (const c of commentsList) {
+              backfilledComments += captureLiveComment({
+                commentId: c.id,
+                message: c.message || '',
+                senderName: c.from?.name,
+                senderId: c.from?.id,
+                createdTime: c.created_time ? new Date(c.created_time).toISOString() : nowIso,
+                live: targetLive,
+              }).captured;
             }
           }
-          // Preserve authentic live orders - do not create anonymous orders from public video comments
           targetLive.totalMined = orders.filter((o) => o.liveId === targetLive.id).length;
         } else {
           const errJson: any = await commentsRes.json().catch(() => ({}));
