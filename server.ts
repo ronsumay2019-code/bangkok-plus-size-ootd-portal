@@ -41,6 +41,7 @@ import {
 } from './src/types/reconciliation';
 import { AsyncLock, StateSync, SupabaseBackend, storeConfigFromEnv } from './server/portalStore';
 import { DEFAULT_STAFF, PortalAuth, PortalUser, SESSION_HEADER } from './server/auth';
+import { orderComment } from './server/orderIntent';
 import { cleanBuyerName } from './src/utils/buyerName';
 
 dotenv.config();
@@ -348,7 +349,7 @@ function createLiveSession(fromLive?: LiveSession, fbVideoId?: string): LiveSess
   while (lives.some((l) => l.id === id)) id += 'b';
   const live: LiveSession = {
     id,
-    title: `NEW SHOP · ${date}`,
+    title: `Live · ${date}`,
     status: 'live',
     startedAt: now.toISOString(),
     endedAt: null,
@@ -488,6 +489,40 @@ async function sendMessengerText(psid: string, text: string, timeoutMs = 20000):
     return { status: 'failed', detail: metaData?.error?.message || `Meta API Error (${metaRes.status})` };
   } catch (e: any) {
     console.warn('[Messenger Send API Network Error]:', e);
+    return { status: 'failed', detail: e?.message || 'Network error reaching graph.facebook.com' };
+  }
+}
+
+/** Sends one photo (a data: URL from the phone camera, already shrunk in the browser) to a buyer in Messenger. */
+async function sendMessengerImage(psid: string, imageDataUrl: string, timeoutMs = 30000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
+  const fbToken = getMetaPageAccessToken();
+  const cleanPsid = String(psid || '').trim();
+  if (!fbToken) return { status: 'not_sent', detail: 'No Meta Page Access Token configured.' };
+  if (!/^\d{10,25}$/.test(cleanPsid)) {
+    return { status: 'not_sent', detail: "This buyer has no real Messenger ID yet. They must message the Page first — use 'Open in Messenger' instead." };
+  }
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(imageDataUrl || ''));
+  if (!match) return { status: 'not_sent', detail: 'The photo could not be read. Take it again.' };
+  const bytes = Buffer.from(match[2], 'base64');
+  if (bytes.length > 8 * 1024 * 1024) return { status: 'not_sent', detail: 'The photo is too large to send (over 8 MB).' };
+  try {
+    const form = new FormData();
+    form.append('recipient', JSON.stringify({ id: cleanPsid }));
+    form.append('messaging_type', 'RESPONSE');
+    form.append('message', JSON.stringify({ attachment: { type: 'image', payload: { is_reusable: false } } }));
+    form.append('filedata', new Blob([bytes], { type: match[1] }), `invoice-photo.${match[1].split('/')[1]}`);
+    const metaRes = await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const metaData: any = await metaRes.json().catch(() => ({}));
+    if (metaRes.ok && metaData.message_id) {
+      return { status: 'sent', detail: `Photo delivered to Facebook Messenger (Message ID: ${metaData.message_id})`, messageId: metaData.message_id };
+    }
+    console.warn('[Messenger Send API Error (photo)]:', metaData);
+    return { status: 'failed', detail: metaData?.error?.message || `Meta API Error (${metaRes.status})` };
+  } catch (e: any) {
     return { status: 'failed', detail: e?.message || 'Network error reaching graph.facebook.com' };
   }
 }
@@ -1190,7 +1225,7 @@ app.get('/api/auth/sessions', async (_req, res) => {
   res.json({ success: true, authEnabled: false, sessions: publicSessions(), predefinedUsers: PREDEFINED_USERS });
 });
 
-// Owner creates a phone sign-in code for Admin 1 / Admin 2 (the old code stops working)
+// Owner creates a sign-in code for the co-owner or an admin (the old code stops working)
 app.post('/api/auth/invite', async (req, res) => {
   if (!portalAuth.enabled) {
     return res.status(400).json({ error: 'Sign-in is not set up yet. Add PORTAL_OWNER_CODE in Vercel first.' });
@@ -1260,12 +1295,19 @@ app.post('/api/auth/heartbeat', (req, res) => {
 });
 
 // Meta Facebook Page Access Token Management (supports META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN)
+// Admins see only whether a token is set; the masked token and changing it are for owners
+function canManageMetaToken(req: express.Request): boolean {
+  return !portalAuth.enabled || portalUserOf(req)?.role === 'owner';
+}
+
 app.get('/api/meta/token', (req, res) => {
   const activeToken = getMetaPageAccessToken();
+  const showToken = canManageMetaToken(req);
   res.json({
     success: true,
     hasToken: !!activeToken,
-    maskedToken: activeToken ? `${activeToken.slice(0, 8)}...${activeToken.slice(-6)}` : null,
+    canManage: showToken,
+    maskedToken: activeToken && showToken ? `${activeToken.slice(0, 8)}...${activeToken.slice(-6)}` : null,
     pageId: getMetaPageId(),
     mode: activeToken ? 'live_graph_api' : 'manual_messenger',
     tokenSource: process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN
@@ -1277,7 +1319,7 @@ app.get('/api/meta/token', (req, res) => {
 });
 
 app.post('/api/meta/token', (req, res) => {
-  if (!requireRole(req, res, ['owner', 'admin'])) return;
+  if (!requireRole(req, res, ['owner'])) return;
   const { token, pageId } = req.body;
   if (token && typeof token === 'string') {
     setMetaCredentials(token, pageId);
@@ -1864,8 +1906,22 @@ app.post('/api/live/toggle', (req, res) => {
 
 // 8. Generate Official Final Invoices (Strictly Gated to Reconciled Items Only!)
 app.post('/api/invoices/generate', async (req, res) => {
-  const { buyerNames, messageText } = req.body;
-  if (!latestSummary) {
+  const { buyerNames, messageText, liveId } = req.body;
+  // Invoices for the live being viewed (the date filter); its reconciliation is worked out fresh if needed
+  let invoiceSummary = latestSummary;
+  const viewedLive = liveId ? lives.find((l) => l.id === liveId) : undefined;
+  if (viewedLive && invoiceSummary?.liveId !== viewedLive.id) {
+    invoiceSummary = runAutomaticLiveReconciliation(
+      viewedLive,
+      orders.filter((o) => o.liveId === viewedLive.id),
+      amendments,
+      inventory.filter((i) => i.liveId === viewedLive.id),
+      phpPerThbRate,
+      null,
+      'manual_trigger'
+    );
+  }
+  if (!invoiceSummary) {
     return res.status(400).json({ error: 'No reconciled summary available. Please reconcile first.' });
   }
 
@@ -1879,7 +1935,7 @@ app.post('/api/invoices/generate', async (req, res) => {
     deliveryDetail?: string;
   }> = [];
 
-  const eligibleBags = latestSummary.buyerBags.filter((b) => b.totalPiecesGot > 0);
+  const eligibleBags = invoiceSummary.buyerBags.filter((b) => b.totalPiecesGot > 0);
   const targetBags = buyerNames && Array.isArray(buyerNames)
     ? eligibleBags.filter((b) => buyerNames.includes(b.buyerName))
     : eligibleBags;
@@ -1971,7 +2027,7 @@ app.post('/api/invoices/generate', async (req, res) => {
   res.json({
     success: true,
     generatedInvoices,
-    summary: latestSummary,
+    summary: invoiceSummary,
     orders,
     messengerThreads,
   });
@@ -1995,6 +2051,97 @@ app.get('/api/meta/webhook', (req, res) => {
 });
 
 // 8c. Meta Webhook Event Ingestion (POST /api/meta/webhook) — Live Broadcasts, Comments & Business Messenger
+/** Which live a comment belongs to: the live whose video it is on (replay comments included), else the live on air. */
+function liveForComment(postId?: string, commentId?: string): LiveSession | null {
+  const post = String(postId || '');
+  // A comment id starts with the id of what it is on ("<video id>_<comment id>")
+  const object = String(commentId || '').includes('_') ? String(commentId).split('_')[0] : '';
+  const known = (l: LiveSession) => !!l.fbVideoId && l.fbVideoId !== 'Not connected yet';
+  const byVideo = lives.find(
+    (l) => known(l) && ((post && (post === l.fbVideoId || post.endsWith(`_${l.fbVideoId}`))) || object === l.fbVideoId)
+  );
+  if (byVideo) return byVideo;
+  const onAir = lives.find((l) => l.status === 'live');
+  if (!onAir) return null;
+  // On air with a known video, a comment on a different post (a reel, a photo) is not a live order
+  if (known(onAir) && (post || object)) return null;
+  return onAir;
+}
+
+/**
+ * Saves an order comment as a pending live order (webhook and live sync share this).
+ * Never sets a price: the host's price is added during review. The same comment always gives the same order id.
+ */
+function captureLiveComment(c: {
+  commentId?: string;
+  postId?: string;
+  message: string;
+  senderName?: string;
+  senderId?: string;
+  createdTime: string;
+  live?: LiveSession;
+  /** The Page the event came from (webhook entry id) */
+  pageId?: string;
+}): { captured: number; detail: string } {
+  const message = String(c.message || '').trim();
+  const who = c.senderName || 'unknown buyer';
+  if (!c.commentId) return { captured: 0, detail: 'Comment without an id ignored' };
+  const pageIds = [c.pageId, getMetaPageId()].filter(Boolean).map(String);
+  if (c.senderId && pageIds.includes(String(c.senderId))) return { captured: 0, detail: `Page's own comment ignored: "${message}"` };
+  if (seenCommentIds.has(c.commentId)) return { captured: 0, detail: `Already handled (comment ${c.commentId})` };
+  const live = c.live || liveForComment(c.postId, c.commentId);
+  if (!live) return { captured: 0, detail: `Comment outside a live, not captured: "${message}" by ${who}` };
+  const intent = orderComment(message);
+  // No anonymous orders (handoff 0fc6590). Left unmarked so the webhook, which carries the name, can still save it.
+  if (intent && !c.senderName) return { captured: 0, detail: `Order comment without a buyer name, left for the webhook or replay: "${message}"` };
+  seenCommentIds.add(c.commentId);
+  if (!c.live) live.totalComments = (live.totalComments || 0) + 1; // the live sync counts its own comments
+  if (!intent) return { captured: 0, detail: `Not an order: "${message}" by ${who}` };
+
+  let captured = 0;
+  const specs = parseClaimSpecsFromRaw(message);
+  for (const [specIdx, spec] of specs.entries()) {
+    if (spec.isChatter || spec.isAmendmentNote) continue;
+    const orderId = `ord_wh_${String(c.commentId).replace(/[^\w-]/g, '_')}_${specIdx + 1}`;
+    if (orders.some((o) => o.id === orderId)) continue;
+    const size = spec.size || 'FREE SIZE (PLUS)';
+    const colour = spec.colour || 'ASSORTED';
+    const repeat = orders.some(
+      (o) => o.liveId === live.id && o.buyerName.toLowerCase() === who.toLowerCase() && o.itemCode === spec.itemCode && o.size === size && o.colour === colour
+    );
+    const note = [`Live comment: "${message}"`, intent.note, 'Price: add the host\'s price from the replay.'].filter(Boolean).join(' ');
+    orders.push({
+      id: orderId,
+      liveId: live.id,
+      buyerName: cleanBuyerName(who),
+      channel: 'live_chat',
+      sourceCommentId: c.commentId,
+      itemCode: spec.itemCode,
+      itemName: spec.itemName,
+      size,
+      colour,
+      quantity: spec.quantity || 1,
+      statedUnitPricePhp: null,
+      orderedAt: c.createdTime,
+      status: 'pending',
+      invoiced: false,
+      lane: 'live',
+      version: 1,
+      hostVerificationNote: note,
+      reviewNotes: note,
+      overrideHistory: [],
+      isDuplicateFlagged: repeat,
+      duplicateReason: repeat ? 'Repeat comment for same item/size detected during live stream' : undefined,
+    });
+    captured++;
+  }
+  if (captured) {
+    live.totalMined = (live.totalMined || 0) + captured;
+    performInventorySync(live.id);
+  }
+  return { captured, detail: captured ? `Order comment saved for review: "${message}" by ${who}` : `Not an order: "${message}" by ${who}` };
+}
+
 app.post('/api/meta/webhook', async (req, res) => {
   const appSecret = process.env.META_APP_SECRET;
   const signatureHeader = req.headers['x-hub-signature-256'] as string | undefined;
@@ -2121,66 +2268,24 @@ app.post('/api/meta/webhook', async (req, res) => {
               eventDetails += ' -> Auto-reconciliation & rack sync triggered; awaiting owner review';
             }
           } else if (change.field === 'feed' || change.field === 'comments') {
-            eventType = 'comment_claim';
-            const comment = change.value;
-            const commentId = comment?.comment_id || comment?.id || `c_${Date.now()}`;
-            const message = comment?.message || '';
-            const sender = comment?.from?.name || 'Live Viewer';
-
-            if (seenCommentIds.has(commentId)) {
-              eventDetails = `Duplicate webhook delivery ignored (comment_id: ${commentId})`;
+            const v = change.value || {};
+            // Page feed events also cover reactions, shares and the Page's own posts: only new comments count
+            if ((v.item && v.item !== 'comment') || (v.verb && v.verb !== 'add')) {
+              eventType = 'feed_ignored';
+              eventDetails = `Ignored page activity (${v.item || 'unknown'} ${v.verb || ''})`.trim();
               continue;
             }
-            seenCommentIds.add(commentId);
-
-            eventDetails = `Comment claim: "${message}" by ${sender}`;
-
-            const targetLive = lives.find((l) => l.status === 'live') || lives[0];
-            const specs = parseClaimSpecsFromRaw(message);
-            for (const [specIdx, spec] of specs.entries()) {
-              if (spec.isChatter || spec.isAmendmentNote) continue;
-              const orderId = `ord_wh_${String(commentId).replace(/[^\w-]/g, '_')}_${specIdx + 1}`;
-              if (orders.some((o) => o.id === orderId)) continue;
-              const existingSameBuyerSpec = orders.some(
-                (o) =>
-                  o.liveId === targetLive.id &&
-                  o.buyerName.toLowerCase() === sender.toLowerCase() &&
-                  o.itemCode === spec.itemCode &&
-                  o.size === (spec.size || 'FREE SIZE (PLUS)') &&
-                  o.colour === spec.colour
-              );
-
-              const newOrder: BuyerOrder = {
-                // Same comment → same order id, so a webhook retried by Meta on another copy cannot duplicate it
-                id: orderId,
-                liveId: targetLive.id,
-                buyerName: cleanBuyerName(sender),
-                channel: 'live_chat',
-                sourceCommentId: commentId,
-                itemCode: spec.itemCode,
-                itemName: spec.itemName,
-                size: spec.size || 'FREE SIZE (PLUS)',
-                colour: spec.colour || 'ASSORTED',
-                quantity: spec.quantity || 1,
-                statedUnitPricePhp: spec.price || 550,
-                orderedAt: nowIso,
-                status: spec.itemCode === 'PENDING SPEC' ? 'pending' : 'confirmed',
-                invoiced: false,
-                lane: 'live',
-                version: 1,
-                hostVerificationNote: spec.reviewNotes || `Captured from live: "${message}"`,
-                reviewNotes: spec.reviewNotes || `Live comment: "${message}"`,
-                overrideHistory: [],
-                isDuplicateFlagged: existingSameBuyerSpec,
-                duplicateReason: existingSameBuyerSpec
-                  ? 'Repeat comment for same item/size detected during live stream'
-                  : undefined,
-              };
-              orders.push(newOrder);
-              targetLive.totalMined = (targetLive.totalMined || 0) + 1;
-            }
-            targetLive.totalComments = (targetLive.totalComments || 0) + 1;
-            performInventorySync(targetLive.id);
+            eventType = 'comment';
+            const result = captureLiveComment({
+              commentId: v.comment_id || v.id,
+              postId: v.post_id,
+              message: v.message || '',
+              senderName: v.from?.name,
+              senderId: v.from?.id,
+              createdTime: v.created_time ? new Date(Number(v.created_time) * 1000 || v.created_time).toISOString() : nowIso,
+              pageId: entry.id,
+            });
+            eventDetails = result.detail;
           }
         }
       }
@@ -2217,6 +2322,9 @@ app.post('/api/facebook/live-sync', async (req, res) => {
     graphSyncStats.onAirVideoId = cleanVid;
   }
 
+  if ((accessToken || fbPageId) && !canManageMetaToken(req)) {
+    return res.status(403).json({ error: 'Only an owner can change the Facebook token or Page ID.' });
+  }
   if (accessToken && String(accessToken).trim()) {
     setMetaCredentials(String(accessToken).trim(), fbPageId ? String(fbPageId).trim() : undefined);
   } else if (fbPageId && String(fbPageId).trim()) {
@@ -2240,119 +2348,103 @@ app.post('/api/facebook/live-sync', async (req, res) => {
   if (fbToken) {
     graphSyncStats.mode = 'live_graph_api';
     try {
-      // A new broadcast that is on air right now gets its own live session
+      const graph = async (pathAndQuery: string, label: string): Promise<any | null> => {
+        const sep = pathAndQuery.includes('?') ? '&' : '?';
+        try {
+          const r = await fetch(`https://graph.facebook.com/v22.0/${pathAndQuery}${sep}access_token=${encodeURIComponent(fbToken)}`, {
+            signal: AbortSignal.timeout(15000),
+          });
+          const j: any = await r.json().catch(() => ({}));
+          if (r.ok) return j;
+          graphError = `${label}: ${j?.error?.message || `HTTP ${r.status}`}`;
+        } catch (err: any) {
+          graphError = `${label}: ${err?.message || 'network error'}`;
+        }
+        return null;
+      };
+      // Facebook's title for a live; the first line of its description when it has no title
+      const fbTitle = (v: any) =>
+        String(v?.title || (typeof v?.description === 'string' ? v.description.split('\n')[0] : '') || '').trim().slice(0, 80);
+      const applyVideo = (v: any, id: string) => {
+        targetLive.fbVideoId = id;
+        targetLive.videoUrl = v?.permalink_url ? `https://www.facebook.com${v.permalink_url}` : `https://www.facebook.com/watch/?v=${id}`;
+        if (fbTitle(v)) targetLive.title = fbTitle(v);
+        // The broadcast's real start counts, even when the portal was started late
+        const started = v?.creation_time || v?.created_time;
+        if (started && new Date(started).getTime() < new Date(targetLive.startedAt || Date.now()).getTime()) {
+          targetLive.startedAt = new Date(started).toISOString();
+        }
+        graphSyncStats.onAirVideoId = id;
+      };
+
+      // A broadcast that is on air right now gets its own live session (only a LIVE broadcast, never an old one)
       if (!fbVideoId) {
-        const onAirRes = await fetch(
-          `https://graph.facebook.com/v22.0/${encodeURIComponent(pageId)}/live_videos?broadcast_status=["LIVE"]&fields=id,status,video{id}&limit=1&access_token=${encodeURIComponent(fbToken)}`,
-          { signal: AbortSignal.timeout(10000) }
-        ).catch(() => null);
-        if (onAirRes?.ok) {
-          const onAir: any = await onAirRes.json().catch(() => ({}));
-          const live = (onAir.data || []).find((v: any) => v.status === 'LIVE');
-          const onAirId = live ? String(live.video?.id || live.id) : '';
-          if (onAirId && onAirId !== targetLive.fbVideoId) {
-            targetLive = liveForBroadcast(onAirId);
-            graphSyncStats.onAirVideoId = onAirId;
-          }
+        const onAir = await graph(
+          `${encodeURIComponent(pageId)}/live_videos?broadcast_status=${encodeURIComponent('["LIVE"]')}&fields=id,status,title,creation_time,permalink_url,video{id}&limit=1`,
+          'On-air check'
+        );
+        const live = (onAir?.data || []).find((v: any) => v.status === 'LIVE');
+        const onAirId = live ? String(live.video?.id || live.id) : '';
+        if (onAirId) {
+          if (onAirId !== targetLive.fbVideoId) targetLive = liveForBroadcast(onAirId);
+          applyVideo(live, onAirId);
+          effectiveStatus = 'LIVE';
         }
       }
 
       let videoId = targetLive.fbVideoId;
-
-      if (!videoId || videoId === 'Not connected yet') {
-        const listUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
-          pageId
-        )}/live_videos?fields=id,title,description,status,creation_time,permalink_url,video{id}&limit=5&access_token=${encodeURIComponent(
-          fbToken
-        )}`;
-        const listRes = await fetch(listUrl);
-        if (listRes.ok) {
-          const listData: any = await listRes.json();
-          const latestVid = (listData.data || []).find((v: any) => v.status === 'LIVE') || listData.data?.[0];
-          const resolvedVid = latestVid?.video?.id || latestVid?.id;
-          if (resolvedVid) {
-            videoId = String(resolvedVid);
-            targetLive.fbVideoId = videoId;
-            graphSyncStats.onAirVideoId = videoId;
-            const titleText = latestVid.title || (typeof latestVid.description === 'string' ? latestVid.description.split('\n')[0].trim() : '');
-            if (titleText) targetLive.title = titleText;
-            if (latestVid.status) effectiveStatus = latestVid.status;
-            if (latestVid.permalink_url) targetLive.videoUrl = `https://www.facebook.com${latestVid.permalink_url}`;
-          }
-        }
-        // Fallback to /{pageId}/videos (does not require Meta Live Video API review)
-        if (!videoId || videoId === 'Not connected yet') {
-          const vidsUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
-            pageId
-          )}/videos?fields=id,live_status,title,description,created_time,permalink_url&limit=10&access_token=${encodeURIComponent(
-            fbToken
-          )}`;
-          const vidsRes = await fetch(vidsUrl);
-          if (vidsRes.ok) {
-            const vidsData: any = await vidsRes.json();
-            const liveVids = (vidsData.data || []).filter((v: any) => typeof v.live_status === 'string' && v.live_status.length > 0);
-            const chosen = liveVids.find((v: any) => v.live_status === 'LIVE') || liveVids[0] || vidsData.data?.[0];
-            if (chosen?.id) {
-              videoId = String(chosen.id);
-              targetLive.fbVideoId = videoId;
-              graphSyncStats.onAirVideoId = videoId;
-              const titleText = chosen.title || (typeof chosen.description === 'string' ? chosen.description.split('\n')[0].trim() : '');
-              if (titleText) targetLive.title = titleText;
-              if (chosen.live_status) effectiveStatus = chosen.live_status;
-              if (chosen.permalink_url) targetLive.videoUrl = `https://www.facebook.com${chosen.permalink_url}`;
-              graphError = null;
-            }
-          } else if (!listRes.ok) {
-            const errJson: any = await vidsRes.json().catch(() => ({}));
-            graphError = errJson?.error?.message || `Graph API HTTP ${vidsRes.status}`;
-          }
+      if ((!videoId || videoId === 'Not connected yet') && targetLive.status === 'live') {
+        // Fallback for pages without live_videos access: the page's videos marked LIVE
+        const vids = await graph(`${encodeURIComponent(pageId)}/videos?fields=id,live_status,title,created_time,permalink_url&limit=10`, 'Videos check');
+        const chosen = (vids?.data || []).find((v: any) => v.live_status === 'LIVE');
+        if (chosen?.id) {
+          videoId = String(chosen.id);
+          applyVideo(chosen, videoId);
         }
       }
 
       if (videoId && videoId !== 'Not connected yet') {
-        const graphUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
-          videoId
-        )}?fields=id,title,description,live_status&access_token=${encodeURIComponent(
-          fbToken
-        )}`;
-        const graphRes = await fetch(graphUrl);
-        if (graphRes.ok) {
-          const graphData: any = await graphRes.json();
-          if (graphData.live_status) effectiveStatus = graphData.live_status;
-          const titleText = graphData.title || (typeof graphData.description === 'string' ? graphData.description.split('\n')[0].trim() : '');
-          if (titleText) targetLive.title = titleText;
+        const v = await graph(`${encodeURIComponent(videoId)}?fields=id,title,description,live_status,created_time,permalink_url`, 'Live video');
+        if (v) {
+          if (v.live_status) effectiveStatus = v.live_status;
+          applyVideo(v, videoId);
         }
-        const streamCommentsUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
-          videoId
-        )}/comments?fields=id,message,from{id,name},created_time&filter=stream&order=reverse_chronological&limit=500&access_token=${encodeURIComponent(
-          fbToken
-        )}`;
-        let commentsRes = await fetch(streamCommentsUrl);
-        let commentsJson: any = commentsRes.ok ? await commentsRes.json().catch(() => ({})) : {};
-        if (!Array.isArray(commentsJson.data) || commentsJson.data.length === 0) {
-          const plainCommentsUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
-            videoId
-          )}/comments?fields=id,message,from{id,name},created_time&limit=500&access_token=${encodeURIComponent(
-            fbToken
-          )}`;
-          commentsRes = await fetch(plainCommentsUrl);
-          commentsJson = commentsRes.ok ? await commentsRes.json().catch(() => ({})) : {};
+
+        // All of the live's comments, newest first, 100 per page. Once a page holds only comments already
+        // handled, older pages were read on an earlier sync.
+        const comments: any[] = [];
+        let next: string | null = `${encodeURIComponent(videoId)}/comments?fields=id,message,from{id,name},created_time&filter=stream&order=reverse_chronological&limit=100`;
+        let readOk = false;
+        for (let pageNo = 0; next && pageNo < 40; pageNo++) {
+          const page = await graph(next, 'Live comments');
+          if (!page) break;
+          readOk = true;
+          const data: any[] = Array.isArray(page.data) ? page.data : [];
+          comments.push(...data);
+          if (!data.length || data.every((c) => c.id && seenCommentIds.has(c.id))) break;
+          const after = page.paging?.cursors?.after;
+          next = page.paging?.next && after ? `${encodeURIComponent(videoId)}/comments?fields=id,message,from{id,name},created_time&filter=stream&order=reverse_chronological&limit=100&after=${encodeURIComponent(after)}` : null;
         }
-        if (commentsRes.ok) {
-          const commentsList = Array.isArray(commentsJson.data) ? commentsJson.data.slice().reverse() : [];
+        if (readOk) {
+          const commentsList = comments.slice().reverse();
           totalCommentsFetched = commentsList.length;
           targetLive.totalComments = Math.max(targetLive.totalComments || 0, totalCommentsFetched);
 
-          for (const c of commentsList) {
-            if (c.id && !seenCommentIds.has(c.id)) {
-              seenCommentIds.add(c.id);
+          // While the live is on air, its order comments are saved here too, so a late or missing webhook
+          // never loses an order (same order id as the webhook would give). Ended lives are only counted.
+          if (targetLive.status === 'live' || effectiveStatus === 'LIVE') {
+            for (const c of commentsList) {
+              backfilledComments += captureLiveComment({
+                commentId: c.id,
+                message: c.message || '',
+                senderName: c.from?.name,
+                senderId: c.from?.id,
+                createdTime: c.created_time ? new Date(c.created_time).toISOString() : nowIso,
+                live: targetLive,
+              }).captured;
             }
           }
-          // Preserve authentic live orders - do not create anonymous orders from public video comments
           targetLive.totalMined = orders.filter((o) => o.liveId === targetLive.id).length;
-        } else {
-          const errJson: any = await commentsRes.json().catch(() => ({}));
-          graphError = errJson?.error?.message || `Graph API HTTP ${commentsRes.status}`;
         }
       }
 
@@ -2736,6 +2828,34 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
     metaApiStatus,
     metaApiDetail: delivery.detail,
   });
+});
+
+// 8d-2b. Send a photo to a buyer (invoice garment photos taken on an admin's phone)
+app.post('/api/meta/messenger/send-photo', async (req, res) => {
+  const { threadId, imageDataUrl, clientMessageId } = req.body || {};
+  const thread = messengerThreads.find((t) => t.id === threadId);
+  if (!thread) return res.status(404).json({ error: 'Messenger conversation not found' });
+  if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl is required' });
+
+  const delivery = await sendMessengerImage(thread.psid, String(imageDataUrl));
+  const safeClientId = typeof clientMessageId === 'string' && /^[\w-]{6,80}$/.test(clientMessageId) ? clientMessageId : '';
+  // The photo itself is not stored in the portal; the conversation shows that one was sent
+  const newMsg = {
+    id: safeClientId || `m_photo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    sender: 'page_agent' as const,
+    text: '📷 Photo',
+    timestamp: new Date().toISOString(),
+    deliveryStatus: delivery.status,
+    deliveryDetail: delivery.detail,
+    ...(delivery.messageId ? { mid: delivery.messageId } : {}),
+  };
+  if (delivery.messageId) seenMessageIds.add(delivery.messageId);
+  const existingIdx = thread.messages.findIndex((m) => m.id === newMsg.id);
+  if (existingIdx >= 0) thread.messages[existingIdx] = newMsg;
+  else thread.messages.push(newMsg);
+  sortMessengerThreads();
+  saveRuntimeState();
+  res.json({ success: delivery.status === 'sent', thread, message: newMsg, metaApiDetail: delivery.detail });
 });
 
 // 8d-3. Simulate Incoming Buyer Business Messenger DM (POST /api/meta/messenger/simulate-dm)

@@ -1,7 +1,7 @@
 // Staff sign-in for the portal.
 //
 // The owner signs in with PORTAL_OWNER_CODE (a Vercel environment variable). The owner then
-// creates phone sign-in links for the admins from "Admin Phone QR". Codes and session tokens
+// creates sign-in links for the co-owner and the admins from "Admin Phone QR". Codes and session tokens
 // are stored only as SHA-256 hashes. Sign-in is enforced only when PORTAL_OWNER_CODE and the
 // database are both configured, so a deploy without them keeps working as before.
 
@@ -19,10 +19,15 @@ export interface PortalUser {
 export const SESSION_HEADER = 'x-portal-session';
 const SESSION_DAYS = 60;
 
+/** The primary owner signs in with PORTAL_OWNER_CODE; every other seat gets a code from the owner. */
+export const PRIMARY_OWNER_ID = 'owner';
+
 export const DEFAULT_STAFF: Array<{ id: string; name: string; role: PortalRole }> = [
-  { id: 'owner', name: 'Pola (Shop Owner)', role: 'owner' },
-  { id: 'admin1', name: 'Admin 1 (Staff Lead)', role: 'admin' },
-  { id: 'admin2', name: 'Admin 2 (Inventory Lead)', role: 'admin' },
+  { id: PRIMARY_OWNER_ID, name: 'Pola (Shop Owner)', role: 'owner' },
+  { id: 'owner2', name: 'Co-owner', role: 'owner' },
+  { id: 'admin1', name: 'Admin 1', role: 'admin' },
+  { id: 'admin2', name: 'Admin 2', role: 'admin' },
+  { id: 'admin3', name: 'Admin 3', role: 'admin' },
 ];
 
 export function sha256(value: string): string {
@@ -112,13 +117,13 @@ export class PortalAuth {
   }
 
   /**
-   * Creates a fresh access code for an admin (owner only). The previous code stops working;
-   * phones already signed in stay signed in unless revokeSessions is true.
+   * Creates a fresh access code for the co-owner or an admin (owner only). The previous code stops
+   * working; phones already signed in stay signed in unless revokeSessions is true.
    */
   async issueCode(staffId: string, revokeSessions: boolean): Promise<{ code: string; staff: StaffRow }> {
     if (!this.backend) throw new Error('Database is not configured');
     const def = DEFAULT_STAFF.find((s) => s.id === staffId);
-    if (!def || def.role === 'owner') throw new Error('Unknown admin');
+    if (!def || def.id === PRIMARY_OWNER_ID) throw new Error('Unknown staff seat');
     const existing = (await this.backend.listStaff()).find((s) => s.id === staffId);
     const code = newAccessCode();
     const staff: StaffRow = {
@@ -133,11 +138,11 @@ export class PortalAuth {
     return { code, staff };
   }
 
-  /** Signs every phone of this admin out and disables their code (owner only). */
+  /** Signs every phone of this seat out and disables its code (owner only; never the primary owner). */
   async revoke(staffId: string): Promise<void> {
     if (!this.backend) return;
     const existing = (await this.backend.listStaff()).find((s) => s.id === staffId);
-    if (!existing || existing.role === 'owner') return;
+    if (!existing || existing.id === PRIMARY_OWNER_ID) return;
     await this.backend.upsertStaff({ ...existing, code_hash: null, revoked_at: new Date().toISOString() });
     await this.backend.deleteSessionsForStaff(staffId);
   }

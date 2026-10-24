@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   QrCode,
   Smartphone,
-  Laptop,
   Users,
   Copy,
   Check,
@@ -38,6 +37,25 @@ interface MobileAccessQRModalProps {
   authEnabled?: boolean;
 }
 
+type ProfileKey = 'owner2' | 'admin1' | 'admin2' | 'admin3' | 'owner';
+/** Seats that get a sign-in link from the owner (the primary owner uses PORTAL_OWNER_CODE) */
+type InviteKey = Exclude<ProfileKey, 'owner'>;
+
+const PROFILE_TABS: Array<{ key: ProfileKey; label: string; colour: string }> = [
+  { key: 'owner2', label: 'Co-owner', colour: 'amber' },
+  { key: 'admin1', label: 'Admin 1', colour: 'rose' },
+  { key: 'admin2', label: 'Admin 2', colour: 'purple' },
+  { key: 'admin3', label: 'Admin 3', colour: 'sky' },
+  { key: 'owner', label: 'My Owner Phone', colour: 'amber' },
+];
+
+const TAB_ACTIVE: Record<string, string> = {
+  amber: 'bg-amber-600 text-white shadow-lg shadow-amber-950/50',
+  rose: 'bg-rose-600 text-white shadow-lg shadow-rose-950/50',
+  purple: 'bg-purple-600 text-white shadow-lg shadow-purple-950/50',
+  sky: 'bg-sky-600 text-white shadow-lg shadow-sky-950/50',
+};
+
 export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
   isOpen,
   onClose,
@@ -46,7 +64,7 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
   onSwitchUser,
   authEnabled = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'admin1' | 'admin2' | 'owner' | 'sessions'>('admin1');
+  const [activeTab, setActiveTab] = useState<ProfileKey | 'sessions'>('owner2');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [urlMode, setUrlMode] = useState<'production' | 'current'>('production');
 
@@ -57,22 +75,40 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
     ? PROD_BASE_URL
     : currentOrigin;
 
-  const adminProfiles: Record<'admin1' | 'admin2' | 'owner', MobileSessionInfo> = {
+  const adminDescription =
+    'Admin access: review live claims, set prices, approve orders and reply to buyers. Cannot see or change the Facebook token or create sign-in links.';
+  const adminProfiles: Record<ProfileKey, MobileSessionInfo> = {
+    owner2: {
+      id: 'owner2',
+      userName: 'Co-owner',
+      role: 'owner',
+      label: 'Co-owner Access',
+      description: 'Same access as the shop owner, including the Facebook token and creating sign-in links for admins.',
+      defaultDevice: 'Co-owner Phone',
+    },
     admin1: {
       id: 'admin1',
-      userName: 'Admin 1 (Staff Lead)',
+      userName: 'Admin 1',
       role: 'admin',
-      label: 'Admin 1 Mobile Access',
-      description: 'Full admin access for staff lead on mobile phone. Can approve claims, edit garment specs, and manage buyer bags.',
-      defaultDevice: 'Phone 1 (Staff Lead)',
+      label: 'Admin 1 Access',
+      description: adminDescription,
+      defaultDevice: 'Admin 1 Phone',
     },
     admin2: {
       id: 'admin2',
-      userName: 'Admin 2 (Inventory Lead)',
+      userName: 'Admin 2',
       role: 'admin',
-      label: 'Admin 2 Mobile Access',
-      description: 'Full admin access for inventory & verification admin on mobile phone. Can review live claims, set prices, and approve invoices.',
-      defaultDevice: 'Phone 2 (Inventory Lead)',
+      label: 'Admin 2 Access',
+      description: adminDescription,
+      defaultDevice: 'Admin 2 Phone',
+    },
+    admin3: {
+      id: 'admin3',
+      userName: 'Admin 3',
+      role: 'admin',
+      label: 'Admin 3 Access',
+      description: adminDescription,
+      defaultDevice: 'Admin 3 Phone',
     },
     owner: {
       id: 'owner',
@@ -85,13 +121,13 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
   };
 
   // Access codes exist only in this browser tab until the owner shares them; the server keeps only a hash
-  const [inviteCodes, setInviteCodes] = useState<Partial<Record<'admin1' | 'admin2', string>>>({});
+  const [inviteCodes, setInviteCodes] = useState<Partial<Record<InviteKey, string>>>({});
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const isOwner = currentUserRole === 'owner';
 
-  const getAccessUrl = (profileKey: 'admin1' | 'admin2' | 'owner') => {
+  const getAccessUrl = (profileKey: ProfileKey) => {
     const prof = adminProfiles[profileKey];
     if (authEnabled) {
       if (profileKey === 'owner') return `${effectiveBaseUrl}/`;
@@ -101,7 +137,7 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
     return `${effectiveBaseUrl}/?auth=${prof.id}&user=${encodeURIComponent(prof.userName)}&role=${prof.role}`;
   };
 
-  const createInvite = async (profileKey: 'admin1' | 'admin2', revokeSessions: boolean) => {
+  const createInvite = async (profileKey: InviteKey, revokeSessions: boolean) => {
     setInviteBusy(true);
     setInviteError(null);
     try {
@@ -136,7 +172,7 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
     };
   }, [currentAccessUrl]);
 
-  const handleCopyLink = (profileKey: 'admin1' | 'admin2' | 'owner') => {
+  const handleCopyLink = (profileKey: ProfileKey) => {
     const link = getAccessUrl(profileKey);
     if (!link) return;
     navigator.clipboard.writeText(link);
@@ -168,7 +204,7 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-neutral-400 mt-0.5">
-                Grant instant portal access to your 2 admins on their mobile phones without passwords or losing your current desktop login.
+                Give the co-owner and your 3 admins their own sign-in link without logging yourself out.
               </p>
             </div>
           </div>
@@ -190,51 +226,26 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
               Zero-Logout Guarantee • Multi-Device Simultaneous Access
             </span>
             <p className="text-neutral-300 text-[11px] leading-relaxed">
-              Each admin phone uses an independent persistent access token. Sharing this QR code with <strong>Admin 1</strong> and <strong>Admin 2</strong> will <strong>never log you out</strong> of your session. All 3 devices operate at the same time with live real-time sync.
+              Each person gets their own private link. Sharing a link <strong>never logs you out</strong>, and everyone can use the portal at the same time.
             </p>
           </div>
         </div>
 
         {/* Tab Selection */}
         <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 pb-3 text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveTab('admin1')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${
-              activeTab === 'admin1'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-950/50'
-                : 'bg-neutral-800/80 text-neutral-400 hover:text-white'
-            }`}
-          >
-            <Smartphone className="w-4 h-4 text-rose-300" />
-            <span>Admin 1 Phone</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('admin2')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${
-              activeTab === 'admin2'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-950/50'
-                : 'bg-neutral-800/80 text-neutral-400 hover:text-white'
-            }`}
-          >
-            <Smartphone className="w-4 h-4 text-purple-300" />
-            <span>Admin 2 Phone</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('owner')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${
-              activeTab === 'owner'
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/50'
-                : 'bg-neutral-800/80 text-neutral-400 hover:text-white'
-            }`}
-          >
-            <Key className="w-4 h-4 text-amber-300" />
-            <span>Owner Phone</span>
-          </button>
+          {PROFILE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${
+                activeTab === tab.key ? TAB_ACTIVE[tab.colour] : 'bg-neutral-800/80 text-neutral-400 hover:text-white'
+              }`}
+            >
+              {tab.key === 'owner' || tab.key === 'owner2' ? <Key className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
+              <span>{tab.label}</span>
+            </button>
+          ))}
 
           <button
             type="button"
@@ -246,7 +257,7 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
             }`}
           >
             <Users className="w-4 h-4 text-neutral-300" />
-            <span>Active Logins (3)</span>
+            <span>Seats ({PROFILE_TABS.length})</span>
           </button>
         </div>
 
@@ -278,11 +289,11 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
                   <div className="w-48 sm:w-52 text-center text-[11px] text-neutral-300 space-y-3 py-6">
                     {isOwner ? (
                       <>
-                        <p>Create a private sign-in link for {adminProfiles[activeTab].userName}. Any older link for this admin stops working.</p>
+                        <p>Create a private sign-in link for {adminProfiles[activeTab].userName}. Any older link for this seat stops working.</p>
                         <button
                           type="button"
                           disabled={inviteBusy}
-                          onClick={() => createInvite(activeTab as 'admin1' | 'admin2', false)}
+                          onClick={() => createInvite(activeTab as InviteKey, false)}
                           className="px-3 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl font-bold"
                         >
                           {inviteBusy ? 'Creating…' : 'Create sign-in link'}
@@ -370,7 +381,7 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
                     <button
                       type="button"
                       disabled={inviteBusy}
-                      onClick={() => createInvite(activeTab as 'admin1' | 'admin2', true)}
+                      onClick={() => createInvite(activeTab as InviteKey, true)}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-neutral-700 rounded-xl text-xs font-semibold transition"
                       title="Creates a new link and signs this admin out of every phone"
                     >
@@ -399,7 +410,7 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
                 <div className="p-3 bg-neutral-950/80 rounded-xl border border-neutral-800 space-y-1.5">
                   <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
                     <Share2 className="w-3.5 h-3.5 text-amber-400" />
-                    <span>How Admins Can Install As An App On Their Phone:</span>
+                    <span>How to Install It As An App On a Phone:</span>
                   </span>
                   <ul className="text-[11px] text-neutral-400 space-y-1 list-disc list-inside">
                     <li>
@@ -427,102 +438,38 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
                   <Users className="w-4 h-4 text-rose-400" />
                   <span>Authorized Multi-Login Device Registry</span>
                 </span>
-                <span className="text-emerald-400 font-mono text-[11px]">3 Seats Configured</span>
+                <span className="text-emerald-400 font-mono text-[11px]">{PROFILE_TABS.length} seats</span>
               </div>
 
               <div className="divide-y divide-neutral-850">
-                {/* Seat 1: Owner */}
-                <div className="py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center font-bold">
-                      👑
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <strong className="text-white">Pola (Shop Owner)</strong>
-                        <span className="px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
-                          OWNER
-                        </span>
-                        {currentUserRole === 'owner' && (
-                          <span className="text-[10px] text-emerald-400 font-mono">● You are here</span>
-                        )}
+                {PROFILE_TABS.map((tab) => {
+                  const prof = adminProfiles[tab.key];
+                  return (
+                    <div key={tab.key} className="py-2.5 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <strong className="text-white">{tab.key === 'owner' ? prof.userName : tab.label}</strong>
+                          <span className="px-2 py-0.2 rounded-full bg-neutral-800 text-neutral-300 text-[10px] font-bold border border-neutral-700">
+                            {prof.role.toUpperCase()}
+                          </span>
+                          {currentUserName === prof.userName && (
+                            <span className="text-[10px] text-emerald-400 font-mono">● You are here</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-neutral-400 mt-0.5">
+                          {tab.key === 'owner' ? 'Signs in with the owner code' : 'Signs in with a link from the owner'}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-neutral-400 flex items-center gap-2 mt-0.5">
-                        <Laptop className="w-3 h-3 text-neutral-500" />
-                        <span>Desktop / Primary Browser</span>
-                        <span className="text-neutral-600">&bull;</span>
-                        <span className="text-emerald-400">Active Now</span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab(tab.key)}
+                        className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold transition"
+                      >
+                        {tab.key === 'owner' ? 'View' : 'View link'}
+                      </button>
                     </div>
-                  </div>
-                  <span className="text-[11px] text-neutral-400 font-mono">Permanent Seat</span>
-                </div>
-
-                {/* Seat 2: Admin 1 */}
-                <div className="py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center justify-center font-bold">
-                      1
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <strong className="text-white">Admin 1 (Staff Lead)</strong>
-                        <span className="px-2 py-0.2 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-bold border border-rose-500/30">
-                          ADMIN
-                        </span>
-                        {currentUserName.includes('Admin 1') && (
-                          <span className="text-[10px] text-emerald-400 font-mono">● Active Device</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-neutral-400 flex items-center gap-2 mt-0.5">
-                        <Smartphone className="w-3 h-3 text-neutral-500" />
-                        <span>Phone 1 (Mobile App)</span>
-                        <span className="text-neutral-600">&bull;</span>
-                        <span className="text-emerald-400">Authorized &bull; Non-Expiring</span>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('admin1')}
-                    className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold transition"
-                  >
-                    View QR
-                  </button>
-                </div>
-
-                {/* Seat 3: Admin 2 */}
-                <div className="py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center justify-center font-bold">
-                      2
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <strong className="text-white">Admin 2 (Inventory Lead)</strong>
-                        <span className="px-2 py-0.2 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold border border-purple-500/30">
-                          ADMIN
-                        </span>
-                        {currentUserName.includes('Admin 2') && (
-                          <span className="text-[10px] text-emerald-400 font-mono">● Active Device</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-neutral-400 flex items-center gap-2 mt-0.5">
-                        <Smartphone className="w-3 h-3 text-neutral-500" />
-                        <span>Phone 2 (Mobile App)</span>
-                        <span className="text-neutral-600">&bull;</span>
-                        <span className="text-emerald-400">Authorized &bull; Non-Expiring</span>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('admin2')}
-                    className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold transition"
-                  >
-                    View QR
-                  </button>
-                </div>
+                  );
+                })}
               </div>
             </div>
 

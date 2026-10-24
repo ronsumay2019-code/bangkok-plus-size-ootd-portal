@@ -82,6 +82,8 @@ interface LiveSessionCommandProps {
   ) => Promise<void>;
   onBulkImportOrders?: (rawLines: string) => Promise<void>;
   onReplyMessenger?: (threadId: string, text: string) => Promise<void>;
+  /** Only owners may set the Facebook token or Page ID */
+  canManageMetaToken?: boolean;
 }
 
 export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
@@ -103,6 +105,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   onGraphSync,
   onBulkImportOrders,
   onReplyMessenger,
+  canManageMetaToken = true,
 }) => {
   const isOnAir = live.status === 'live';
   const [secondsOnAir, setSecondsOnAir] = useState(0);
@@ -716,6 +719,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   placeholder="FB Video ID or URL (blank = auto-detect latest morning live)"
                   className="sm:col-span-4 bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px]"
                 />
+                {canManageMetaToken && (
                 <input
                   type="text"
                   name="fbPageIdInput"
@@ -725,6 +729,8 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   placeholder="Page ID (default: me)"
                   className="sm:col-span-2 bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px]"
                 />
+                )}
+                {canManageMetaToken && (
                 <input
                   type="password"
                   name="fbAccessTokenInput"
@@ -734,6 +740,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   placeholder="META_PAGE_ACCESS_TOKEN (or FB_PAGE_ACCESS_TOKEN)"
                   className="sm:col-span-3 bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px]"
                 />
+                )}
                 <button
                   type="button"
                   disabled={isSyncingGraph}
@@ -743,8 +750,8 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                       try {
                         await onGraphSync('LIVE_STOPPED', {
                           fbVideoId: fbVideoIdInput,
-                          fbPageId: fbPageIdInput,
-                          accessToken: fbAccessTokenInput,
+                          fbPageId: canManageMetaToken ? fbPageIdInput : undefined,
+                          accessToken: canManageMetaToken ? fbAccessTokenInput : undefined,
                         });
                       } finally {
                         setIsSyncingGraph(false);
