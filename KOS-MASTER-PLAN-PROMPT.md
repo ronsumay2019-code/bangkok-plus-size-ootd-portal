@@ -181,19 +181,20 @@ Seed `Lessons` with the mistakes already made:
 | Vercel: deployments, env var *names*, runtime errors | What is actually live |
 | Meta app: permissions granted, App Review status, webhook subscriptions | What Facebook allows today |
 
-## 5. The counting method (core logic; restore it and protect it)
+## 5. The counting method: the Live Selling Bible
 
-1. **Host Item Calling Controller.** The host or staff marks which rack item is being shown right now.
-2. **Inheritance.** A comment like "mine" or a code-only comment inherits the item called at that comment's time.
-3. **Multi-claim decomposition.** For example, "mine rustans black and maroon" becomes 2 allocation units.
-4. **Chatter filtering.** Questions, "na mine ko", cancellations and reactions are not orders. A bare item name without "mine" is flagged "to check".
-5. **Reconcile against the store purchase.** Demand pieces must equal pieces bought, with every difference explained: SHORT, NO ROW, surplus.
-6. **Owner approval before invoices.** One invoice per live per buyer. The buyer's 24h starts when the invoice is marked sent.
+The method is `kos/01-Project/Live-Selling-Bible.md` (HARD RULE, recorded by the owner on 24 Oct). It replaces earlier rack-based descriptions. In short:
+
+1. **Item Events come from the host.** Code, price, description, colours and sizes are taken from what the host says, never from the chat. While capturing an event, do nothing else.
+2. **Job 1.** Inside the window from event N to event N+1, a buyer's first comment containing MINE+code, MINE only, code only, or code+size/colour is their **1st capture**.
+3. **Job 2.** Review the whole chat and Messenger for each capture. Each later mention is a replacement, an additional order, a swap or chatter, granted or denied, and the final order count follows the outcomes table.
+4. Repeat until the live ends.
+
+There is no catalogue, rack or stock inventory. Store staff confirm availability.
 
 **Golden test (G5):**
-- Replaying the real NEW SHOP comments, with the item-calling timeline, through the engine must reproduce the reconciled result recorded in the handoff (152 pieces = 152 bought).
-- Expected values are read from the backup data and confirmed by the owner. The owner holds the store purchase count. The evaluator compares and does not guess.
-- LINEN SHOP becomes the second golden test once the owner confirms it.
+- The real comments and the real Item Events of one past live, plus the owner's Job 2 decisions, must reproduce the **owner-confirmed final order list**.
+- The result is computed, never typed in (Lesson L-008).
 
 ## 6. The team: roles, skills, outputs and model routing
 
