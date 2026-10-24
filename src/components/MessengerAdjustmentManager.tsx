@@ -423,9 +423,13 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
                   >
                     <div
                       className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs ${
-                        msg.sender === 'page_agent'
-                          ? 'bg-rose-600 text-white'
-                          : 'bg-neutral-950 border border-neutral-800 text-neutral-200'
+                        msg.sender !== 'page_agent'
+                          ? 'bg-neutral-950 border border-neutral-800 text-neutral-200'
+                          : msg.deliveryStatus === 'failed' || msg.deliveryStatus === 'not_sent'
+                          ? 'bg-neutral-800 text-neutral-100 border border-amber-500/60'
+                          : msg.deliveryStatus === 'sending'
+                          ? 'bg-rose-600/60 text-white'
+                          : 'bg-rose-600 text-white'
                       }`}
                     >
                       <p>{msg.text}</p>
@@ -433,7 +437,17 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
                     <span className="text-[10px] text-neutral-500 font-mono mt-1 px-1">
                       {msg.sender === 'page_agent' ? 'Page Admin' : activeThread.buyerName} ·{' '}
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {msg.sender === 'page_agent' && msg.deliveryStatus === 'sending' && ' · Sending…'}
+                      {msg.sender === 'page_agent' && msg.deliveryStatus === 'sent' && (
+                        <span className="text-emerald-400"> · ✓ Delivered</span>
+                      )}
                     </span>
+                    {msg.sender === 'page_agent' && (msg.deliveryStatus === 'failed' || msg.deliveryStatus === 'not_sent') && (
+                      <span className="text-[10px] text-amber-400 mt-0.5 px-1 max-w-[85%] text-right">
+                        {msg.deliveryStatus === 'failed' ? '⚠ Not delivered' : '⚠ Not sent to Messenger (saved here only)'}
+                        {msg.deliveryDetail ? ` — ${msg.deliveryDetail}` : ''} · use Open in Messenger
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

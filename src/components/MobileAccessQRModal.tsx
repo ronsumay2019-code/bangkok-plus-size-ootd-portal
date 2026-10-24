@@ -17,12 +17,12 @@ import {
   Sparkles,
   ArrowRight,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 
 export interface MobileSessionInfo {
   id: string;
   userName: string;
   role: 'owner' | 'admin' | 'staff';
-  token: string;
   label: string;
   description: string;
   defaultDevice: string;
@@ -33,7 +33,9 @@ interface MobileAccessQRModalProps {
   onClose: () => void;
   currentUserRole: 'owner' | 'admin' | 'staff';
   currentUserName: string;
-  onSwitchUser?: (userName: string, role: 'owner' | 'admin' | 'staff', token: string) => void;
+  onSwitchUser?: (userName: string, role: 'owner' | 'admin' | 'staff') => void;
+  /** Staff sign-in is on: links carry a one-time access code created by the owner */
+  authEnabled?: boolean;
 }
 
 export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
@@ -42,6 +44,7 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
   currentUserRole,
   currentUserName,
   onSwitchUser,
+  authEnabled = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'admin1' | 'admin2' | 'owner' | 'sessions'>('admin1');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -59,7 +62,6 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
       id: 'admin1',
       userName: 'Admin 1 (Staff Lead)',
       role: 'admin',
-      token: 'bpso_admin_one_2026',
       label: 'Admin 1 Mobile Access',
       description: 'Full admin access for staff lead on mobile phone. Can approve claims, edit garment specs, and manage buyer bags.',
       defaultDevice: 'Phone 1 (Staff Lead)',
@@ -68,7 +70,6 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
       id: 'admin2',
       userName: 'Admin 2 (Inventory Lead)',
       role: 'admin',
-      token: 'bpso_admin_two_2026',
       label: 'Admin 2 Mobile Access',
       description: 'Full admin access for inventory & verification admin on mobile phone. Can review live claims, set prices, and approve invoices.',
       defaultDevice: 'Phone 2 (Inventory Lead)',
@@ -77,25 +78,67 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
       id: 'owner',
       userName: 'Pola (Shop Owner)',
       role: 'owner',
-      token: 'bpso_owner_pola_2026',
       label: 'Shop Owner Mobile Access',
       description: 'Executive owner access with full override powers. Can be opened on owner phone alongside desktop session.',
       defaultDevice: 'Shop Owner Phone',
     },
   };
 
+  // Access codes exist only in this browser tab until the owner shares them; the server keeps only a hash
+  const [inviteCodes, setInviteCodes] = useState<Partial<Record<'admin1' | 'admin2', string>>>({});
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const isOwner = currentUserRole === 'owner';
+
   const getAccessUrl = (profileKey: 'admin1' | 'admin2' | 'owner') => {
     const prof = adminProfiles[profileKey];
-    return `${effectiveBaseUrl}/?auth=${prof.id}&token=${prof.token}&user=${encodeURIComponent(prof.userName)}&role=${prof.role}`;
+    if (authEnabled) {
+      if (profileKey === 'owner') return `${effectiveBaseUrl}/`;
+      const code = inviteCodes[profileKey];
+      return code ? `${effectiveBaseUrl}/?invite=${encodeURIComponent(code)}` : '';
+    }
+    return `${effectiveBaseUrl}/?auth=${prof.id}&user=${encodeURIComponent(prof.userName)}&role=${prof.role}`;
   };
 
-  const getQrCodeImgUrl = (text: string) => {
-    // Standard high-reliability QR code API (generates crisp 280x280 PNG)
-    return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=12&format=png&data=${encodeURIComponent(text)}`;
+  const createInvite = async (profileKey: 'admin1' | 'admin2', revokeSessions: boolean) => {
+    setInviteBusy(true);
+    setInviteError(null);
+    try {
+      const res = await fetch('/api/auth/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffId: profileKey, revokeSessions }),
+      });
+      const data: any = await res.json().catch(() => ({}));
+      if (!res.ok || !data.code) throw new Error(data.error || 'Could not create the sign-in link');
+      setInviteCodes((prev) => ({ ...prev, [profileKey]: data.code }));
+    } catch (err: any) {
+      setInviteError(err?.message || 'Could not create the sign-in link');
+    } finally {
+      setInviteBusy(false);
+    }
   };
+
+  // QR codes are drawn in the browser so access links are never sent to an outside QR service
+  const currentAccessUrl = activeTab !== 'sessions' ? getAccessUrl(activeTab) : '';
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentAccessUrl) {
+      setQrDataUrl('');
+      return;
+    }
+    QRCode.toDataURL(currentAccessUrl, { width: 280, margin: 2 })
+      .then((url) => !cancelled && setQrDataUrl(url))
+      .catch(() => !cancelled && setQrDataUrl(''));
+    return () => {
+      cancelled = true;
+    };
+  }, [currentAccessUrl]);
 
   const handleCopyLink = (profileKey: 'admin1' | 'admin2' | 'owner') => {
     const link = getAccessUrl(profileKey);
+    if (!link) return;
     navigator.clipboard.writeText(link);
     setCopiedKey(profileKey);
     setTimeout(() => setCopiedKey(null), 3000);
@@ -226,17 +269,43 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-center">
               {/* Left Column: QR Code Box */}
               <div className="flex flex-col items-center justify-center p-5 bg-neutral-950 rounded-2xl border-2 border-neutral-700/80 shadow-inner space-y-3">
-                <div className="p-3 bg-white rounded-2xl shadow-2xl border-4 border-neutral-200">
-                  <img
-                    src={getQrCodeImgUrl(getAccessUrl(activeTab))}
-                    alt={`${adminProfiles[activeTab].label} QR Code`}
-                    className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
-                    onError={(e) => {
-                      // Fallback QR code provider if offline/fallback needed
-                      (e.target as HTMLImageElement).src = `https://quickchart.io/qr?text=${encodeURIComponent(getAccessUrl(activeTab))}&size=260`;
-                    }}
-                  />
-                </div>
+                {authEnabled && activeTab === 'owner' ? (
+                  <div className="w-48 sm:w-52 text-center text-[11px] text-neutral-300 space-y-2 py-6">
+                    <Key className="w-6 h-6 text-amber-300 mx-auto" />
+                    <p>On your phone, open the portal and type your <strong>owner access code</strong> (the PORTAL_OWNER_CODE saved in Vercel).</p>
+                  </div>
+                ) : authEnabled && !currentAccessUrl ? (
+                  <div className="w-48 sm:w-52 text-center text-[11px] text-neutral-300 space-y-3 py-6">
+                    {isOwner ? (
+                      <>
+                        <p>Create a private sign-in link for {adminProfiles[activeTab].userName}. Any older link for this admin stops working.</p>
+                        <button
+                          type="button"
+                          disabled={inviteBusy}
+                          onClick={() => createInvite(activeTab as 'admin1' | 'admin2', false)}
+                          className="px-3 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl font-bold"
+                        >
+                          {inviteBusy ? 'Creating…' : 'Create sign-in link'}
+                        </button>
+                      </>
+                    ) : (
+                      <p>Only the shop owner can create phone sign-in links.</p>
+                    )}
+                    {inviteError && <p className="text-rose-400">{inviteError}</p>}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-white rounded-2xl shadow-2xl border-4 border-neutral-200">
+                    {qrDataUrl ? (
+                      <img
+                        src={qrDataUrl}
+                        alt={`${adminProfiles[activeTab].label} QR Code`}
+                        className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 sm:w-52 sm:h-52" />
+                    )}
+                  </div>
+                )}
                 <div className="text-center space-y-0.5">
                   <span className="text-xs font-bold text-white flex items-center justify-center gap-1.5">
                     <Smartphone className="w-3.5 h-3.5 text-rose-400" />
@@ -297,12 +366,25 @@ export const MobileAccessQRModal: React.FC<MobileAccessQRModalProps> = ({
                     <span>Test Open In New Tab</span>
                   </a>
 
-                  {onSwitchUser && (
+                  {authEnabled && isOwner && activeTab !== 'owner' && currentAccessUrl && (
+                    <button
+                      type="button"
+                      disabled={inviteBusy}
+                      onClick={() => createInvite(activeTab as 'admin1' | 'admin2', true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-neutral-700 rounded-xl text-xs font-semibold transition"
+                      title="Creates a new link and signs this admin out of every phone"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>New link + sign out old phones</span>
+                    </button>
+                  )}
+
+                  {onSwitchUser && !authEnabled && (
                     <button
                       type="button"
                       onClick={() => {
                         const prof = adminProfiles[activeTab];
-                        onSwitchUser(prof.userName, prof.role, prof.token);
+                        onSwitchUser(prof.userName, prof.role);
                         onClose();
                       }}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-neutral-700 rounded-xl text-xs font-semibold transition"

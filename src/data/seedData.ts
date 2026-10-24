@@ -6,7 +6,6 @@ import {
   PreOrder,
   MessengerThread,
 } from '../types/reconciliation';
-import liveOrdersSnapshot from './liveOrdersSnapshot.json';
 
 const todayDate = new Date().toISOString().slice(0, 10);
 const morningStartIso = new Date(new Date().setHours(9, 0, 0, 0)).toISOString();
@@ -231,7 +230,8 @@ export const SEED_INVENTORY_ITEMS: InventoryItem[] = [
   },
 ];
 
-export const SEED_BUYER_ORDERS: BuyerOrder[] = liveOrdersSnapshot as BuyerOrder[];
+// Live orders are stored in the portal database (see server/portalStore.ts), never in the code
+export const SEED_BUYER_ORDERS: BuyerOrder[] = [];
 
 export const SEED_AMENDMENTS: OrderAmendment[] = [];
 

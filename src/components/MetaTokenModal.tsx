@@ -25,10 +25,11 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const savedLocalToken = typeof window !== 'undefined' ? localStorage.getItem('meta_page_access_token') : null;
-      fetch('/api/meta/token', {
-        headers: savedLocalToken ? { 'x-meta-page-token': savedLocalToken } : {},
-      })
+      // Any token saved earlier only in this browser is no longer used: the server keeps the token now
+      try {
+        localStorage.removeItem('meta_page_access_token');
+      } catch {}
+      fetch('/api/meta/token')
         .then((r) => r.json())
         .then((data) => {
           if (data.success) {
@@ -65,12 +66,7 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem('meta_page_access_token', cleanToken);
-            if (cleanPageId) localStorage.setItem('meta_page_id', cleanPageId);
-          } catch {}
-        }
+
         setStatusMessage({
           type: 'success',
           text: 'Facebook Page Access Token successfully connected! Real-time Messenger dispatch and Graph API sync are now active.',

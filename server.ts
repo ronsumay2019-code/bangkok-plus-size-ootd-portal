@@ -39,6 +39,9 @@ import {
   OrderOverrideHistoryItem,
   MessengerThread,
 } from './src/types/reconciliation';
+import { AsyncLock, StateSync, SupabaseBackend, storeConfigFromEnv } from './server/portalStore';
+import { DEFAULT_STAFF, PortalAuth, PortalUser, SESSION_HEADER } from './server/auth';
+import { cleanBuyerName } from './src/utils/buyerName';
 
 dotenv.config();
 
@@ -74,7 +77,15 @@ const app = express();
 const server = http.createServer(app);
 const PORT = 3000;
 
-app.use(express.json({ limit: '50mb' }) as any);
+app.use(
+  express.json({
+    limit: '50mb',
+    // Keep the exact bytes Meta signed so the webhook signature can be checked
+    verify: (req: any, _res, buf) => {
+      if (req.url?.startsWith('/api/meta/webhook')) req.rawBody = buf;
+    },
+  }) as any
+);
 app.use(express.urlencoded({ extended: true, limit: '50mb' }) as any);
 
 // Setup Live API WebSocket handler for gemini-3.8-live real-time voice conversations (non-serverless only)
@@ -222,7 +233,7 @@ let activeSessions: UserSession[] = [
     sessionId: 'sess_owner_main',
     userName: 'Pola (Shop Owner)',
     userRole: 'owner',
-    token: 'bpso_owner_pola_2026',
+    token: '',
     deviceType: 'desktop',
     deviceName: 'Desktop (Shop Owner Primary)',
     connectedAt: new Date().toISOString(),
@@ -232,7 +243,7 @@ let activeSessions: UserSession[] = [
     sessionId: 'sess_admin_1',
     userName: 'Admin 1 (Staff Lead)',
     userRole: 'admin',
-    token: 'bpso_admin_one_2026',
+    token: '',
     deviceType: 'mobile',
     deviceName: 'Admin Phone 1',
     connectedAt: new Date().toISOString(),
@@ -242,7 +253,7 @@ let activeSessions: UserSession[] = [
     sessionId: 'sess_admin_2',
     userName: 'Admin 2 (Inventory Lead)',
     userRole: 'admin',
-    token: 'bpso_admin_two_2026',
+    token: '',
     deviceType: 'mobile',
     deviceName: 'Admin Phone 2',
     connectedAt: new Date().toISOString(),
@@ -252,6 +263,126 @@ let activeSessions: UserSession[] = [
 
 let storedFbAccessToken: string = process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN || '';
 let storedFbPageId: string = process.env.META_PAGE_ID || process.env.FB_PAGE_ID || 'me';
+
+// Durable storage (Supabase). When configured, every /api request loads this state first and
+// saves what changed before responding, so all Vercel copies see the same data.
+const storeConfig = storeConfigFromEnv();
+const portalBackend = storeConfig ? new SupabaseBackend(storeConfig.url, storeConfig.key) : null;
+const portalAuth = new PortalAuth(portalBackend, (process.env.PORTAL_OWNER_CODE || '').trim());
+const stateLock = new AsyncLock();
+let loadedThreadRows: any[] = [];
+let loadedMessageRows: any[] = [];
+
+/** Rebuilds each thread's message list from the separately stored message rows. */
+function assembleMessengerThreads() {
+  const byThread = new Map<string, any[]>();
+  for (const row of loadedMessageRows) {
+    const { messageId, threadId, ...msg } = row;
+    if (!byThread.has(threadId)) byThread.set(threadId, []);
+    byThread.get(threadId)!.push({ ...msg, id: messageId });
+  }
+  messengerThreads = loadedThreadRows.map((t) => ({
+    ...t,
+    messages: (byThread.get(t.id) || []).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+  }));
+}
+const SEEN_IDS_LIMIT = 5000;
+const setAccessor = (set: Set<string>) => ({
+  get: () => [...set].slice(-SEEN_IDS_LIMIT),
+  set: (ids: string[]) => {
+    set.clear();
+    for (const id of ids || []) set.add(id);
+  },
+});
+const stateSync = portalBackend
+  ? new StateSync(portalBackend, {
+      collections: {
+        lives: { get: () => lives, set: (v) => (lives = v as LiveSession[]) },
+        inventory: { get: () => inventory, set: (v) => (inventory = v as InventoryItem[]) },
+        orders: { get: () => orders, set: (v) => (orders = v as BuyerOrder[]) },
+        amendments: { get: () => amendments, set: (v) => (amendments = v as OrderAmendment[]) },
+        pre_orders: { get: () => preOrders, set: (v) => (preOrders = v as PreOrder[]) },
+        // Threads and their messages are separate rows, so a buyer DM arriving while staff reply is never overwritten
+        messenger_threads: {
+          get: () => messengerThreads.map(({ messages, ...thread }) => thread as any),
+          set: (v) => (loadedThreadRows = v as any[]),
+        },
+        messenger_messages: {
+          get: () =>
+            messengerThreads.flatMap((t) =>
+              (t.messages || []).map((m) => ({ ...m, id: `${t.id}::${m.id}`, messageId: m.id, threadId: t.id }))
+            ),
+          set: (v) => (loadedMessageRows = v as any[]),
+        },
+      },
+      values: {
+        phpPerThbRate: { get: () => phpPerThbRate, set: (v) => (phpPerThbRate = Number(v) || 1.62) },
+        latestSummary: { get: () => latestSummary, set: (v) => (latestSummary = v) },
+        graphSyncStats: { get: () => graphSyncStats, set: (v) => (graphSyncStats = { ...graphSyncStats, ...v }) },
+        webhookEventsLog: { get: () => webhookEventsLog, set: (v) => (webhookEventsLog = Array.isArray(v) ? v : []) },
+        seenCommentIds: setAccessor(seenCommentIds),
+        seenMessageIds: setAccessor(seenMessageIds),
+        metaCredentials: {
+          get: () => ({ token: storedFbAccessToken, pageId: storedFbPageId }),
+          set: (v) => {
+            storedFbAccessToken = v?.token || process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN || '';
+            storedFbPageId = v?.pageId || process.env.META_PAGE_ID || process.env.FB_PAGE_ID || 'me';
+          },
+        },
+      },
+    })
+  : null;
+
+// Manila calendar date (YYYY-MM-DD); lives are dated by the Philippine buyers' day
+function manilaDate(d = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
+function createLiveSession(fromLive?: LiveSession, fbVideoId?: string): LiveSession {
+  const now = new Date();
+  const date = manilaDate(now);
+  const hhmm = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false })
+    .format(now)
+    .replace(':', '');
+  let id = `live_${date.replace(/-/g, '_')}_${hhmm}`;
+  while (lives.some((l) => l.id === id)) id += 'b';
+  const live: LiveSession = {
+    id,
+    title: `NEW SHOP · ${date}`,
+    status: 'live',
+    startedAt: now.toISOString(),
+    endedAt: null,
+    fbVideoId: fbVideoId || undefined,
+    videoUrl: fbVideoId ? `https://www.facebook.com/watch/?v=${fbVideoId}` : undefined,
+    storeName: fromLive?.storeName || 'Pratunam Market Wholesale Floor',
+    storeDate: date,
+    lineup: [],
+    totalComments: 0,
+    totalMined: 0,
+    reconciledAt: null,
+    reconciliationStatus: 'unreconciled',
+  } as LiveSession;
+  lives.unshift(live);
+  activeLive = live;
+  latestSummary = null;
+  return live;
+}
+
+/**
+ * Called when Facebook reports a broadcast is LIVE. Attaches it to the current live if that live
+ * has no video yet, otherwise starts a new live session so each broadcast keeps its own claims.
+ */
+function liveForBroadcast(videoId: string): LiveSession {
+  const current = lives[0];
+  if (current && current.fbVideoId === videoId) return current;
+  const currentVideo = current?.fbVideoId && current.fbVideoId !== 'Not connected yet' ? current.fbVideoId : '';
+  if (current && !currentVideo && (current.status === 'live' || current.storeDate === manilaDate())) {
+    current.fbVideoId = videoId;
+    current.videoUrl = `https://www.facebook.com/watch/?v=${videoId}`;
+    return current;
+  }
+  return createLiveSession(current, videoId);
+}
 
 function getMetaPageAccessToken(): string {
   const candidate = (
@@ -306,6 +437,68 @@ function setMetaCredentials(token?: string, pageId?: string) {
   saveRuntimeState();
 }
 
+/** Looks up a Messenger buyer's name from their Page-scoped ID (needs the Page token). */
+async function lookupMessengerName(psid: string): Promise<string | null> {
+  const fbToken = getMetaPageAccessToken();
+  if (!fbToken || !/^\d{10,25}$/.test(psid)) return null;
+  try {
+    const r = await fetch(
+      `https://graph.facebook.com/v22.0/${encodeURIComponent(psid)}?fields=name,first_name,last_name&access_token=${encodeURIComponent(fbToken)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!r.ok) return null;
+    const d: any = await r.json();
+    const name = d.name || [d.first_name, d.last_name].filter(Boolean).join(' ');
+    return name ? cleanBuyerName(name) : null;
+  } catch {
+    return null;
+  }
+}
+
+type DeliveryStatus = 'sent' | 'failed' | 'not_sent';
+
+/**
+ * Sends a Messenger text through the Graph API and reports what happened. Never throws.
+ * 'not_sent' means it was saved in the portal only (no token, or the buyer has no real Page-scoped ID).
+ */
+async function sendMessengerText(psid: string, text: string, timeoutMs = 20000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
+  const fbToken = getMetaPageAccessToken();
+  const cleanPsid = String(psid || '').trim();
+  if (!fbToken) {
+    return { status: 'not_sent', detail: 'No Meta Page Access Token configured. Add META_PAGE_ACCESS_TOKEN in Vercel or connect via the header.' };
+  }
+  if (!/^\d{10,25}$/.test(cleanPsid)) {
+    return {
+      status: 'not_sent',
+      detail: `This buyer has no real Messenger ID yet (${cleanPsid || 'none'}). They must message the Page first — use 'Open in Messenger' instead.`,
+    };
+  }
+  try {
+    const metaRes = await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_type: 'RESPONSE', recipient: { id: cleanPsid }, message: { text: text.trim() } }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const metaData: any = await metaRes.json().catch(() => ({}));
+    if (metaRes.ok && metaData.message_id) {
+      return { status: 'sent', detail: `Delivered to Facebook Messenger (Message ID: ${metaData.message_id})`, messageId: metaData.message_id };
+    }
+    console.warn('[Messenger Send API Error]:', metaData);
+    return { status: 'failed', detail: metaData?.error?.message || `Meta API Error (${metaRes.status})` };
+  } catch (e: any) {
+    console.warn('[Messenger Send API Network Error]:', e);
+    return { status: 'failed', detail: e?.message || 'Network error reaching graph.facebook.com' };
+  }
+}
+
+/** Meta's 24-hour window starts at the buyer's last message, not at the Page's replies. */
+function windowFromLastBuyerMessage(messages: Array<{ sender: string; timestamp: string }>, fallbackIso?: string): string {
+  const lastBuyer = [...messages].reverse().find((m) => m.sender === 'buyer');
+  const base = lastBuyer?.timestamp || fallbackIso;
+  return base ? new Date(new Date(base).getTime() + 24 * 3600 * 1000).toISOString() : new Date(0).toISOString();
+}
+
 function sortMessengerThreads() {
   messengerThreads.sort((a, b) => {
     const aLast = a.messages && a.messages.length > 0 ? a.messages[a.messages.length - 1] : null;
@@ -317,8 +510,10 @@ function sortMessengerThreads() {
 }
 
 function saveRuntimeState() {
+  sortMessengerThreads();
+  // With the database configured, changes are saved by the /api middleware before each response
+  if (stateSync) return;
   try {
-    sortMessengerThreads();
     fs.writeFileSync(
       STATE_FILE_PATH,
       JSON.stringify(
@@ -345,6 +540,7 @@ function saveRuntimeState() {
 }
 
 function loadRuntimeState() {
+  if (stateSync) return;
   try {
     if (fs.existsSync(STATE_FILE_PATH)) {
       const parsed = JSON.parse(fs.readFileSync(STATE_FILE_PATH, 'utf8'));
@@ -413,8 +609,8 @@ if (orders.length === 0) {
 }
 saveRuntimeState();
 
-// Run initial reconciliation on boot for active session
-const activeLive = lives[0];
+// Run initial reconciliation on boot for active session (refreshed after every database load)
+let activeLive = lives[0];
 
 function performInventorySync(targetLiveId?: string): InventorySyncResult {
   inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
@@ -505,20 +701,6 @@ function parseLiveSellingClaim(rawComment: string): { isClaim: boolean; code: st
     price: spec.price,
     reviewNotes: spec.reviewNotes,
   };
-}
-
-function cleanBuyerName(name: any): string {
-  if (!name) return 'Customer';
-  return String(name)
-    .replace(/\u00C3\u00B1/g, 'ñ')
-    .replace(/Ã±/g, 'ñ')
-    .replace(/Ã/g, '')
-    .replace(/Escobi.*?as/gi, 'Escobiñas')
-    .replace(/Era.*?a/gi, 'Eraña')
-    .replace(/Tua.*?o/gi, 'Tuaño')
-    .replace(/Hofile.*?a/gi, 'Hofileña')
-    .replace(/[\uFFFD]/g, '')
-    .trim();
 }
 
 function parseClaimSpecFromRaw(rawInput: any, fallbackCode = 'LIVE') {
@@ -810,6 +992,91 @@ function parseClaimSpecsFromRaw(rawInput: any, fallbackCode = 'LIVE'): Array<{
   return [{ ...single, quantity: 1 }];
 }
 
+/* ==================== SIGN-IN + DATABASE MIDDLEWARE ==================== */
+
+const PUBLIC_API_PATHS = new Set(['/meta/webhook', '/auth/login', '/auth/status']);
+
+function portalUserOf(req: express.Request): PortalUser | null {
+  return (req as any).portalUser || null;
+}
+
+/** Rejects the request unless the signed-in user has one of the roles (no-op while sign-in is off). */
+function requireRole(req: express.Request, res: express.Response, roles: Array<PortalUser['role']>): boolean {
+  if (!portalAuth.enabled) return true;
+  const user = portalUserOf(req);
+  if (user && roles.includes(user.role)) return true;
+  res.status(403).json({ error: `Only the ${roles.join(' or ')} can do this.` });
+  return false;
+}
+
+app.use('/api', async (req, res, next) => {
+  try {
+    if (portalAuth.enabled) {
+      const user = await portalAuth.userForToken(req.header(SESSION_HEADER) || undefined);
+      if (!user && !PUBLIC_API_PATHS.has(req.path)) {
+        return res.status(401).json({ error: 'Please sign in to the portal.', authRequired: true });
+      }
+      (req as any).portalUser = user;
+    }
+  } catch (err: any) {
+    return res.status(503).json({ error: 'Sign-in check failed: database unavailable. Please try again.', detail: err?.message });
+  }
+
+  if (!stateSync) return next();
+
+  // One request at a time per server copy: load → handle → save, then the next request
+  const release = await stateLock.acquire();
+  let released = false;
+  const done = () => {
+    if (!released) {
+      released = true;
+      clearTimeout(safety);
+      release();
+    }
+  };
+  const safety = setTimeout(done, 55_000);
+  res.on('finish', done);
+  res.on('close', done);
+
+  try {
+    await stateSync.load();
+    assembleMessengerThreads();
+    // The database returns rows in save order: the newest live must come first (it is the active one)
+    lives.sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime());
+    sortMessengerThreads();
+    activeLive = lives[0];
+    if (!activeLive) {
+      // Fresh database: start with an empty live for today
+      createLiveSession();
+    }
+  } catch (err: any) {
+    stateSync.loaded = false;
+    done();
+    console.error('[State] Load failed:', err);
+    return res.status(503).json({ error: 'Database unavailable — nothing was changed. Please try again.', detail: err?.message });
+  }
+
+  const sendJson = res.json.bind(res);
+  let saving = false;
+  res.json = ((body: any) => {
+    if (saving) return sendJson(body);
+    saving = true;
+    stateSync
+      .save()
+      .then(() => sendJson(body))
+      .catch((err: any) => {
+        console.error('[State] Save failed:', err);
+        if (!res.headersSent) {
+          res.status(500);
+          sendJson({ error: 'Could not save to the database. Please try again.', detail: err?.message });
+        }
+      });
+    return res;
+  }) as any;
+
+  next();
+});
+
 /* ==================== API ENDPOINTS ==================== */
 
 // 1. Get full state
@@ -826,14 +1093,10 @@ app.get('/api/state', (_req, res) => {
         ...o,
         buyerName: cleanBuyerName(o.buyerName),
       }));
-    if (orders.length === 0) {
-      loadRuntimeState();
-    }
-    if (orders.length === 0) {
-      orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
-    }
-    if (inventory.length === 0) {
-      inventory = JSON.parse(JSON.stringify(SEED_INVENTORY_ITEMS));
+    if (!stateSync) {
+      if (orders.length === 0) loadRuntimeState();
+      if (orders.length === 0) orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
+      if (inventory.length === 0) inventory = JSON.parse(JSON.stringify(SEED_INVENTORY_ITEMS));
     }
     inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
     if (!latestSummary && activeLive) {
@@ -853,22 +1116,23 @@ app.get('/api/state', (_req, res) => {
       graphSyncStats,
       latestSummary,
       phpPerThbRate,
-      activeSessions,
+      activeSessions: publicSessions(),
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Purge anonymous FB Live comments and restore verified authentic live orders
-app.post('/api/orders/purge-anonymous', (_req, res) => {
+app.post('/api/orders/purge-anonymous', (req, res) => {
+  if (!requireRole(req, res, ['owner', 'admin'])) return;
   orders = orders.filter(
     (o: any) =>
       !o.id?.startsWith('ord_graph_') &&
       o.buyerName !== 'FB Live Buyer' &&
       !o.buyerName?.startsWith('FB Buyer ')
   );
-  if (orders.length === 0) {
+  if (orders.length === 0 && !stateSync) {
     orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
   }
   saveRuntimeState();
@@ -880,39 +1144,86 @@ app.post('/api/orders/purge-anonymous', (_req, res) => {
   res.json({ success: true, count: orders.length });
 });
 
-// 1b-2. Multi-login and mobile auth endpoints
-app.get('/api/auth/sessions', (_req, res) => {
+// 1b-2. Staff sign-in, phone access links and connected devices
+function publicSessions(): UserSession[] {
+  // Never send access tokens to the browser
+  return activeSessions.map((s) => ({ ...s, token: '' }));
+}
+
+const PREDEFINED_USERS = DEFAULT_STAFF.map((s) => ({ id: s.id, name: s.name, role: s.role }));
+
+app.get('/api/auth/status', async (req, res) => {
   res.json({
     success: true,
-    sessions: activeSessions,
-    predefinedUsers: [
-      { id: 'owner', name: 'Pola (Shop Owner)', role: 'owner', token: 'bpso_owner_pola_2026' },
-      { id: 'admin1', name: 'Admin 1 (Staff Lead)', role: 'admin', token: 'bpso_admin_one_2026' },
-      { id: 'admin2', name: 'Admin 2 (Inventory Lead)', role: 'admin', token: 'bpso_admin_two_2026' },
-    ],
+    authEnabled: portalAuth.enabled,
+    databaseEnabled: !!stateSync,
+    user: portalUserOf(req),
   });
 });
 
-app.post('/api/auth/register', (req, res) => {
-  const { sessionId, token, userName, role, deviceType, deviceName } = req.body;
-  const nowIso = new Date().toISOString();
-
-  let targetRole: 'owner' | 'admin' | 'staff' = 'admin';
-  let targetName = userName || 'Admin User';
-
-  if (token === 'bpso_owner_pola_2026' || role === 'owner') {
-    targetRole = 'owner';
-    targetName = userName || 'Pola (Shop Owner)';
-  } else if (token === 'bpso_admin_one_2026' || userName?.includes('Admin 1')) {
-    targetRole = 'admin';
-    targetName = 'Admin 1 (Staff Lead)';
-  } else if (token === 'bpso_admin_two_2026' || userName?.includes('Admin 2')) {
-    targetRole = 'admin';
-    targetName = 'Admin 2 (Inventory Lead)';
+app.post('/api/auth/login', async (req, res) => {
+  if (!portalAuth.enabled) {
+    return res.json({ success: true, authEnabled: false, user: null });
   }
+  const { code, deviceType, deviceName } = req.body || {};
+  const result = await portalAuth.login(String(code || ''), { deviceType, deviceName });
+  if (!result) {
+    return res.status(401).json({ error: 'That access code is not valid. Ask the owner for a new phone link.' });
+  }
+  res.json({ success: true, authEnabled: true, token: result.token, user: result.user });
+});
+
+app.get('/api/auth/sessions', async (_req, res) => {
+  if (portalAuth.enabled) {
+    const sessions = (await portalAuth.listSessions()).map((s) => ({
+      sessionId: s.token_hash.slice(0, 12),
+      userName: s.name,
+      userRole: s.role,
+      token: '',
+      deviceType: (s.device_type as UserSession['deviceType']) || 'desktop',
+      deviceName: s.device_name || undefined,
+      connectedAt: s.created_at || '',
+      lastActiveAt: s.last_seen_at || '',
+    }));
+    return res.json({ success: true, authEnabled: true, sessions, predefinedUsers: PREDEFINED_USERS });
+  }
+  res.json({ success: true, authEnabled: false, sessions: publicSessions(), predefinedUsers: PREDEFINED_USERS });
+});
+
+// Owner creates a phone sign-in code for Admin 1 / Admin 2 (the old code stops working)
+app.post('/api/auth/invite', async (req, res) => {
+  if (!portalAuth.enabled) {
+    return res.status(400).json({ error: 'Sign-in is not set up yet. Add PORTAL_OWNER_CODE in Vercel first.' });
+  }
+  if (!requireRole(req, res, ['owner'])) return;
+  const { staffId, revokeSessions } = req.body || {};
+  try {
+    const { code, staff } = await portalAuth.issueCode(String(staffId || ''), !!revokeSessions);
+    res.json({ success: true, code, staffId: staff.id, name: staff.name, role: staff.role });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Could not create access code' });
+  }
+});
+
+// Owner signs out every phone of an admin and disables their code
+app.post('/api/auth/revoke', async (req, res) => {
+  if (!requireRole(req, res, ['owner'])) return;
+  await portalAuth.revoke(String(req.body?.staffId || ''));
+  res.json({ success: true });
+});
+
+// Legacy device registration (used only while sign-in is not set up)
+app.post('/api/auth/register', (req, res) => {
+  if (portalAuth.enabled) {
+    return res.json({ success: true, session: null, sessions: [], user: portalUserOf(req) });
+  }
+  const { sessionId, userName, role, deviceType, deviceName } = req.body;
+  const nowIso = new Date().toISOString();
+  const targetRole: 'owner' | 'admin' | 'staff' = role === 'owner' || role === 'staff' ? role : 'admin';
+  const targetName = userName || 'Admin User';
 
   const sid = sessionId || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-  const existing = activeSessions.find((s) => s.sessionId === sid || s.token === token);
+  const existing = activeSessions.find((s) => s.sessionId === sid);
 
   if (existing) {
     existing.lastActiveAt = nowIso;
@@ -921,14 +1232,14 @@ app.post('/api/auth/register', (req, res) => {
     if (deviceType) existing.deviceType = deviceType;
     if (deviceName) existing.deviceName = deviceName;
     saveRuntimeState();
-    return res.json({ success: true, session: existing, sessions: activeSessions });
+    return res.json({ success: true, session: { ...existing, token: '' }, sessions: publicSessions() });
   }
 
   const newSession: UserSession = {
     sessionId: sid,
     userName: targetName,
     userRole: targetRole,
-    token: token || 'bpso_admin_guest',
+    token: '',
     deviceType: deviceType || 'mobile',
     deviceName: deviceName || 'Mobile Phone',
     connectedAt: nowIso,
@@ -936,7 +1247,7 @@ app.post('/api/auth/register', (req, res) => {
   };
   activeSessions.push(newSession);
   saveRuntimeState();
-  res.json({ success: true, session: newSession, sessions: activeSessions });
+  res.json({ success: true, session: newSession, sessions: publicSessions() });
 });
 
 app.post('/api/auth/heartbeat', (req, res) => {
@@ -945,31 +1256,28 @@ app.post('/api/auth/heartbeat', (req, res) => {
   if (session) {
     session.lastActiveAt = new Date().toISOString();
   }
-  res.json({ success: true, sessions: activeSessions });
+  res.json({ success: true, sessions: publicSessions() });
 });
 
 // Meta Facebook Page Access Token Management (supports META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN)
 app.get('/api/meta/token', (req, res) => {
-  const headerToken = (req.headers['x-meta-page-token'] as string) || '';
-  if (headerToken && !process.env.META_PAGE_ACCESS_TOKEN) {
-    process.env.META_PAGE_ACCESS_TOKEN = headerToken.trim();
-    process.env.FB_PAGE_ACCESS_TOKEN = headerToken.trim();
-  }
   const activeToken = getMetaPageAccessToken();
-  const detectedEnvKeys = Object.keys(process.env).filter((k) => 
-    /meta|fb|token|page|access/i.test(k) && !/npm|pnpm|node|path|gemini/i.test(k)
-  );
   res.json({
     success: true,
     hasToken: !!activeToken,
     maskedToken: activeToken ? `${activeToken.slice(0, 8)}...${activeToken.slice(-6)}` : null,
     pageId: getMetaPageId(),
     mode: activeToken ? 'live_graph_api' : 'manual_messenger',
-    detectedEnvKeys,
+    tokenSource: process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN
+      ? 'vercel_environment'
+      : storedFbAccessToken
+      ? 'portal_database'
+      : 'none',
   });
 });
 
 app.post('/api/meta/token', (req, res) => {
+  if (!requireRole(req, res, ['owner', 'admin'])) return;
   const { token, pageId } = req.body;
   if (token && typeof token === 'string') {
     setMetaCredentials(token, pageId);
@@ -988,7 +1296,10 @@ app.post('/api/meta/token', (req, res) => {
 });
 
 // 1b. Reset runtime state back to clean seed data
-app.post('/api/state/reset', (_req, res) => {
+app.post('/api/state/reset', (req, res) => {
+  if (stateSync) {
+    return res.status(410).json({ error: 'Reset is disabled: live data is stored permanently in the database.' });
+  }
   lives = JSON.parse(JSON.stringify(SEED_LIVE_SESSIONS));
   inventory = JSON.parse(JSON.stringify(SEED_INVENTORY_ITEMS));
   orders = JSON.parse(JSON.stringify(SEED_BUYER_ORDERS));
@@ -1031,10 +1342,10 @@ app.post('/api/reconciliation/trigger-auto', async (req, res) => {
   // Purge any mock inventory items requested to be deleted
   inventory = inventory.filter((item) => !item.id.startsWith('inv_'));
 
-  // If orders are empty, attempt bridge sync from Facebook Live
-  if (orders.length === 0) {
+  // If orders are empty, optionally pull claims from an external bridge (only when BRIDGE_SYNC_URL is set)
+  if (orders.length === 0 && process.env.BRIDGE_SYNC_URL) {
     try {
-      const bridgeUrl = process.env.BRIDGE_SYNC_URL || 'https://bangkokplussizeootd.vercel.app/api/facebook/live-sync?bridge=1';
+      const bridgeUrl = process.env.BRIDGE_SYNC_URL;
       const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
       if (bridgeRes.ok) {
         const bData: any = await bridgeRes.json();
@@ -1511,7 +1822,13 @@ app.post('/api/inventory/sync', (req, res) => {
 // 7. Toggle Live session (Start / End Live -> Automate Reconciliation)
 app.post('/api/live/toggle', (req, res) => {
   const { liveId, action } = req.body;
-  const live = lives.find((l) => l.id === (liveId || activeLive.id)) || lives[0];
+  let live = lives.find((l) => l.id === (liveId || activeLive.id)) || lives[0];
+
+  // Starting again after an earlier day's live has ended opens a new live session,
+  // so each live keeps its own claims. Same-day "Resume" continues the same live.
+  if (action === 'start' && live.status === 'ended' && live.storeDate !== manilaDate()) {
+    live = createLiveSession(live);
+  }
 
   if (action === 'end') {
     live.status = 'ended';
@@ -1542,11 +1859,11 @@ app.post('/api/live/toggle', (req, res) => {
     graphSyncStats.broadcastStatus = 'LIVE';
   }
 
-  res.json({ success: true, live, summary: latestSummary });
+  res.json({ success: true, live, lives, summary: latestSummary });
 });
 
 // 8. Generate Official Final Invoices (Strictly Gated to Reconciled Items Only!)
-app.post('/api/invoices/generate', (req, res) => {
+app.post('/api/invoices/generate', async (req, res) => {
   const { buyerNames, messageText } = req.body;
   if (!latestSummary) {
     return res.status(400).json({ error: 'No reconciled summary available. Please reconcile first.' });
@@ -1558,6 +1875,8 @@ app.post('/api/invoices/generate', (req, res) => {
     totalAmountPhp: number;
     itemsCount: number;
     generatedAt: string;
+    deliveryStatus?: DeliveryStatus;
+    deliveryDetail?: string;
   }> = [];
 
   const eligibleBags = latestSummary.buyerBags.filter((b) => b.totalPiecesGot > 0);
@@ -1565,8 +1884,22 @@ app.post('/api/invoices/generate', (req, res) => {
     ? eligibleBags.filter((b) => buyerNames.includes(b.buyerName))
     : eligibleBags;
 
-  targetBags.forEach((bag, idx) => {
-    const invNum = bag.invoiceId || `INV-LIVE-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(idx + 1).padStart(3, '0')}`;
+  // Invoice numbers continue from the highest number already used today, so they never repeat
+  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const prefix = `INV-LIVE-${datePart}-`;
+  let nextSeq =
+    orders.reduce((max, o) => {
+      const n = o.invoiceNumber?.startsWith(prefix) ? parseInt(o.invoiceNumber.slice(prefix.length), 10) : 0;
+      return Number.isFinite(n) && n > max ? n : max;
+    }, 0) + 1;
+
+  const pendingSends: Array<{ thread: MessengerThread; text: string; idx: number; invoice: (typeof generatedInvoices)[number] }> = [];
+  for (let idx = 0; idx < targetBags.length; idx++) {
+    const bag = targetBags[idx];
+    const alreadyNumbered = bag.lines
+      .map((line) => orders.find((o) => o.id === line.orderId)?.invoiceNumber)
+      .find(Boolean);
+    const invNum = alreadyNumbered || bag.invoiceId || `${prefix}${String(nextSeq++).padStart(3, '0')}`;
     bag.invoiceStatus = 'invoiced';
     bag.invoiceId = invNum;
 
@@ -1582,14 +1915,6 @@ app.post('/api/invoices/generate', (req, res) => {
       }
     });
 
-    generatedInvoices.push({
-      invoiceNumber: invNum,
-      buyerName: bag.buyerName,
-      totalAmountPhp: bag.subtotalPhp,
-      itemsCount: bag.totalPiecesGot,
-      generatedAt: new Date().toISOString(),
-    });
-
     // Record invoice message into buyer Messenger thread in portal
     let existingThread = messengerThreads.find(
       (t) => t.buyerName.toLowerCase() === bag.buyerName.toLowerCase()
@@ -1599,38 +1924,47 @@ app.post('/api/invoices/generate', (req, res) => {
     if (!existingThread) {
       existingThread = {
         id: `th_inv_${Date.now()}_${idx}`,
-        psid: `psid_${Date.now()}`,
+        psid: '',
         buyerName: bag.buyerName,
         buyerHandle: `fb.com/${bag.buyerName.replace(/\s+/g, '.')}`,
-        windowExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        windowExpiresAt: new Date(0).toISOString(),
         unreadCount: 0,
         messages: [],
       };
       messengerThreads.unshift(existingThread);
     }
 
-    existingThread.messages.push({
-      id: `m_inv_${Date.now()}_${idx}`,
-      sender: 'page_agent',
-      text: invoiceMsgBody,
-      timestamp: new Date().toISOString(),
-    });
-    existingThread.unreadCount = 0;
+    const invoice = {
+      invoiceNumber: invNum,
+      buyerName: bag.buyerName,
+      totalAmountPhp: bag.subtotalPhp,
+      itemsCount: bag.totalPiecesGot,
+      generatedAt: new Date().toISOString(),
+    } as (typeof generatedInvoices)[number];
+    generatedInvoices.push(invoice);
+    pendingSends.push({ thread: existingThread, text: invoiceMsgBody, idx, invoice });
+  }
 
-    // Outbound dispatch attempt if token is configured (supports META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN)
-    const fbToken = getMetaPageAccessToken();
-    if (fbToken && existingThread.psid) {
-      fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messaging_type: 'RESPONSE',
-          recipient: { id: existingThread.psid },
-          message: { text: invoiceMsgBody },
-        }),
-      }).catch((err) => console.warn('[Invoice Dispatch] Outbound error:', err));
-    }
-  });
+  // Wait for Meta's answers before responding (work after the response may never run on Vercel),
+  // sending 5 at a time so a large batch stays well inside the function time limit
+  for (let i = 0; i < pendingSends.length; i += 5) {
+    await Promise.all(
+      pendingSends.slice(i, i + 5).map(async ({ thread, text, idx, invoice }) => {
+        const delivery = await sendMessengerText(thread.psid, text, 8000);
+        thread.messages.push({
+          id: `m_inv_${Date.now()}_${idx}`,
+          sender: 'page_agent',
+          text,
+          timestamp: new Date().toISOString(),
+          deliveryStatus: delivery.status,
+          deliveryDetail: delivery.detail,
+        });
+        thread.unreadCount = 0;
+        invoice.deliveryStatus = delivery.status;
+        invoice.deliveryDetail = delivery.detail;
+      })
+    );
+  }
 
   saveRuntimeState();
 
@@ -1661,16 +1995,21 @@ app.get('/api/meta/webhook', (req, res) => {
 });
 
 // 8c. Meta Webhook Event Ingestion (POST /api/meta/webhook) — Live Broadcasts, Comments & Business Messenger
-app.post('/api/meta/webhook', (req, res) => {
-  const isPortalSimulator = req.headers['x-portal-simulator'] === 'true';
+app.post('/api/meta/webhook', async (req, res) => {
   const appSecret = process.env.META_APP_SECRET;
   const signatureHeader = req.headers['x-hub-signature-256'] as string | undefined;
+  // The portal's own simulator may skip the signature only when a signed-in staff member sends it
+  const isPortalSimulator = req.headers['x-portal-simulator'] === 'true' && (!portalAuth.enabled || !!portalUserOf(req));
 
-  // Verify Meta HMAC-SHA256 signature when META_APP_SECRET is configured (unless called from internal portal simulator)
-  if (appSecret && !isPortalSimulator && signatureHeader) {
-    const expectedSig =
-      'sha256=' + crypto.createHmac('sha256', appSecret).update(JSON.stringify(req.body)).digest('hex');
-    if (signatureHeader !== expectedSig) {
+  // Verify Meta's HMAC-SHA256 signature over the exact bytes received when META_APP_SECRET is configured
+  if (appSecret && !isPortalSimulator) {
+    const raw: Buffer = (req as any).rawBody || Buffer.from(JSON.stringify(req.body || {}));
+    const expectedSig = 'sha256=' + crypto.createHmac('sha256', appSecret).update(raw).digest('hex');
+    const ok =
+      !!signatureHeader &&
+      signatureHeader.length === expectedSig.length &&
+      crypto.timingSafeEqual(Buffer.from(signatureHeader), Buffer.from(expectedSig));
+    if (!ok) {
       return res.status(401).json({ error: 'Invalid X-Hub-Signature-256 webhook signature' });
     }
   }
@@ -1687,54 +2026,54 @@ app.post('/api/meta/webhook', (req, res) => {
       // 1) Handle Meta Business Messenger Events (entry.messaging)
       if (entry.messaging && Array.isArray(entry.messaging)) {
         for (const msgEvent of entry.messaging) {
-          const senderPsid = msgEvent.sender?.id || `psid_${Date.now()}`;
-          const senderName = msgEvent.sender?.name || 'Messenger Buyer';
+          const isEcho = !!msgEvent.message?.is_echo; // sent by the Page (e.g. from Business Suite)
+          const buyerPsid = String((isEcho ? msgEvent.recipient?.id : msgEvent.sender?.id) || '');
           const mid = msgEvent.message?.mid || `mid_${Date.now()}`;
           const text = msgEvent.message?.text || '';
+          const sentAt = msgEvent.timestamp ? new Date(Number(msgEvent.timestamp)).toISOString() : nowIso;
 
-          if (!text || seenMessageIds.has(mid)) continue;
+          if (!text || !buyerPsid || seenMessageIds.has(mid)) continue;
           seenMessageIds.add(mid);
 
           eventType = 'pages_messaging';
-          const intent = detectMessengerIntent(text, senderName);
-          eventDetails = `Business Messenger DM from ${senderName}: "${text}"${intent ? ` [Auto-Triage: ${intent.type.toUpperCase()}]` : ''}`;
-
-          let thread = messengerThreads.find(
-            (t) => t.psid === senderPsid || t.buyerName.toLowerCase() === senderName.toLowerCase()
-          );
-          const linkedOrder = orders.find((o) => o.buyerName.toLowerCase() === senderName.toLowerCase());
-
+          // Meta sends only IDs, never names: match threads by Messenger ID
+          let thread = messengerThreads.find((t) => t.psid === buyerPsid);
           if (!thread) {
+            const senderName = msgEvent.sender?.name || (await lookupMessengerName(buyerPsid)) || 'Messenger Buyer';
+            const linkedOrder = orders.find((o) => o.buyerName.toLowerCase() === senderName.toLowerCase());
             thread = {
-              id: `msg_th_${Date.now()}`,
-              psid: senderPsid,
+              id: `msg_th_${buyerPsid}`,
+              psid: buyerPsid,
               buyerName: senderName,
-              buyerHandle: `fb.com/${senderName.toLowerCase().replace(/\s+/g, '.')}`,
-              windowExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-              unreadCount: 1,
+              buyerHandle: `fb.com/${buyerPsid}`,
+              windowExpiresAt: new Date(0).toISOString(),
+              unreadCount: 0,
               linkedOrderId: linkedOrder?.id,
-              detectedIntent: intent,
               messages: [],
             };
             messengerThreads.unshift(thread);
-          } else {
-            thread.unreadCount = (thread.unreadCount || 0) + 1;
-            thread.windowExpiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-            if (intent) thread.detectedIntent = intent;
-            const curIdx = messengerThreads.indexOf(thread);
-            if (curIdx > 0) {
-              messengerThreads.splice(curIdx, 1);
-              messengerThreads.unshift(thread);
-            }
           }
 
+          if (thread.messages.some((m) => m.mid === mid || m.id === mid)) continue;
           thread.messages.push({
             id: mid,
             mid,
-            sender: 'buyer',
+            sender: isEcho ? 'page_agent' : 'buyer',
             text,
-            timestamp: nowIso,
+            timestamp: sentAt,
+            ...(isEcho ? { deliveryStatus: 'sent' as const } : {}),
           });
+
+          if (!isEcho) {
+            const intent = detectMessengerIntent(text, thread.buyerName);
+            if (intent) thread.detectedIntent = intent;
+            thread.unreadCount = (thread.unreadCount || 0) + 1;
+            eventDetails = `Business Messenger DM from ${thread.buyerName}: "${text}"${intent ? ` [Auto-Triage: ${intent.type.toUpperCase()}]` : ''}`;
+          } else {
+            eventDetails = `Page reply to ${thread.buyerName} (sent outside the portal): "${text}"`;
+          }
+          thread.windowExpiresAt = windowFromLastBuyerMessage(thread.messages, thread.windowExpiresAt);
+          sortMessengerThreads();
         }
       }
 
@@ -1747,7 +2086,10 @@ app.post('/api/meta/webhook', (req, res) => {
             eventType = 'live_videos';
             eventDetails = `Live video ${videoId} status changed to ${status}`;
 
-            const targetLive = lives.find((l) => l.fbVideoId === videoId || l.status === 'live') || lives[0];
+            const targetLive =
+              status === 'LIVE' && videoId
+                ? liveForBroadcast(String(videoId))
+                : lives.find((l) => l.fbVideoId === videoId || l.status === 'live') || lives[0];
 
             if (status === 'LIVE') {
               targetLive.status = 'live';
@@ -1795,8 +2137,10 @@ app.post('/api/meta/webhook', (req, res) => {
 
             const targetLive = lives.find((l) => l.status === 'live') || lives[0];
             const specs = parseClaimSpecsFromRaw(message);
-            for (const spec of specs) {
+            for (const [specIdx, spec] of specs.entries()) {
               if (spec.isChatter || spec.isAmendmentNote) continue;
+              const orderId = `ord_wh_${String(commentId).replace(/[^\w-]/g, '_')}_${specIdx + 1}`;
+              if (orders.some((o) => o.id === orderId)) continue;
               const existingSameBuyerSpec = orders.some(
                 (o) =>
                   o.liveId === targetLive.id &&
@@ -1807,7 +2151,8 @@ app.post('/api/meta/webhook', (req, res) => {
               );
 
               const newOrder: BuyerOrder = {
-                id: `ord_wh_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                // Same comment → same order id, so a webhook retried by Meta on another copy cannot duplicate it
+                id: orderId,
                 liveId: targetLive.id,
                 buyerName: cleanBuyerName(sender),
                 channel: 'live_chat',
@@ -1863,7 +2208,7 @@ app.post('/api/meta/webhook', (req, res) => {
 // 8d. Periodic Facebook Graph API v22.0 Sync (POST /api/facebook/live-sync)
 app.post('/api/facebook/live-sync', async (req, res) => {
   const { liveId, forceStatus, fbVideoId, fbPageId, accessToken } = req.body || {};
-  const targetLive = lives.find((l) => l.id === (liveId || activeLive.id)) || lives[0];
+  let targetLive = lives.find((l) => l.id === (liveId || activeLive.id)) || lives[0];
   const nowIso = new Date().toISOString();
 
   if (fbVideoId && String(fbVideoId).trim()) {
@@ -1895,6 +2240,23 @@ app.post('/api/facebook/live-sync', async (req, res) => {
   if (fbToken) {
     graphSyncStats.mode = 'live_graph_api';
     try {
+      // A new broadcast that is on air right now gets its own live session
+      if (!fbVideoId) {
+        const onAirRes = await fetch(
+          `https://graph.facebook.com/v22.0/${encodeURIComponent(pageId)}/live_videos?broadcast_status=["LIVE"]&fields=id,status,video{id}&limit=1&access_token=${encodeURIComponent(fbToken)}`,
+          { signal: AbortSignal.timeout(10000) }
+        ).catch(() => null);
+        if (onAirRes?.ok) {
+          const onAir: any = await onAirRes.json().catch(() => ({}));
+          const live = (onAir.data || []).find((v: any) => v.status === 'LIVE');
+          const onAirId = live ? String(live.video?.id || live.id) : '';
+          if (onAirId && onAirId !== targetLive.fbVideoId) {
+            targetLive = liveForBroadcast(onAirId);
+            graphSyncStats.onAirVideoId = onAirId;
+          }
+        }
+      }
+
       let videoId = targetLive.fbVideoId;
 
       if (!videoId || videoId === 'Not connected yet') {
@@ -2024,30 +2386,42 @@ app.post('/api/facebook/live-sync', async (req, res) => {
             timestamp: m.created_time || nowIso,
           }));
 
-          const existingIdx = messengerThreads.findIndex((t) => t.id === conv.id || t.psid === psid);
-          const threadObj: MessengerThread = {
-            id: conv.id,
-            psid,
-            buyerName,
-            buyerHandle: `fb.com/${psid}`,
-            windowExpiresAt: new Date(new Date(conv.updated_time || nowIso).getTime() + 24 * 3600 * 1000).toISOString(),
-            unreadCount: 1,
-            linkedOrderId: linkedOrder?.id,
-            detectedIntent: intent,
-            messages: mappedMessages,
-          };
-          if (existingIdx >= 0) messengerThreads[existingIdx] = threadObj;
-          else messengerThreads.push(threadObj);
+          const existing = messengerThreads.find((t) => t.psid === psid || t.id === conv.id);
+          if (existing) {
+            // Merge: keep older messages and delivery statuses the portal already has
+            const known = new Set(existing.messages.map((m) => m.mid || m.id));
+            const fresh = mappedMessages.filter((m: any) => !known.has(m.mid) && !known.has(m.id));
+            existing.messages.push(...fresh);
+            existing.messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            existing.unreadCount = (existing.unreadCount || 0) + fresh.filter((m: any) => m.sender === 'buyer').length;
+            if (buyerName && buyerName !== 'Messenger Buyer') existing.buyerName = buyerName;
+            existing.psid = psid;
+            if (intent) existing.detectedIntent = intent;
+            if (!existing.linkedOrderId && linkedOrder) existing.linkedOrderId = linkedOrder.id;
+            existing.windowExpiresAt = windowFromLastBuyerMessage(existing.messages, existing.windowExpiresAt);
+          } else {
+            messengerThreads.push({
+              id: conv.id,
+              psid,
+              buyerName,
+              buyerHandle: `fb.com/${psid}`,
+              windowExpiresAt: windowFromLastBuyerMessage(mappedMessages),
+              unreadCount: 0,
+              linkedOrderId: linkedOrder?.id,
+              detectedIntent: intent,
+              messages: mappedMessages,
+            });
+          }
           syncedThreadsCount++;
         }
       }
     } catch (err: any) {
       graphError = err?.message || 'Network error contacting graph.facebook.com';
     }
-  } else {
-    // Automatic bridge fallback to main Bangkok Plus Size OOTD backend (which holds the connected Facebook Page token in Supabase)
+  } else if (process.env.BRIDGE_SYNC_URL) {
+    // Optional external bridge (only when BRIDGE_SYNC_URL is set; the portal no longer depends on the old main system)
     try {
-      const bridgeUrl = process.env.BRIDGE_SYNC_URL || 'https://bangkokplussizeootd.vercel.app/api/facebook/live-sync?bridge=1';
+      const bridgeUrl = process.env.BRIDGE_SYNC_URL;
       const bridgeRes = await fetch(bridgeUrl, { headers: { Accept: 'application/json' } });
       if (bridgeRes.ok) {
         const bData: any = await bridgeRes.json();
@@ -2093,7 +2467,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
                   orderedAt: reqRow.created_at || nowIso,
                   status: spec.itemCode === 'PENDING SPEC' ? 'pending' : (reqRow.status === 'confirmed' ? 'confirmed' : 'pending'),
                   invoiced: false,
-                  lane: reqRow.lane === 'preorder' ? 'preorder' : 'live',
+                  lane: reqRow.lane === 'preorder' || reqRow.lane === 'pre_order' ? 'pre_order' : 'live',
                   version: 1,
                   hostVerificationNote: spec.reviewNotes,
                   reviewNotes: spec.reviewNotes,
@@ -2309,103 +2683,58 @@ app.get('/api/meta/messenger/threads', (_req, res) => {
 
 // 8d-2. Send Reply or Reconciled Invoice via Business Messenger (POST /api/meta/messenger/reply)
 app.post('/api/meta/messenger/reply', async (req, res) => {
-  const { threadId, text, psid: reqPsid, buyerName: reqBuyerName, token: reqToken } = req.body;
-  if (!text || (!threadId && !reqPsid)) {
+  const { threadId, text, psid: reqPsid, buyerName: reqBuyerName, clientMessageId } = req.body || {};
+  if (!text || !String(text).trim() || (!threadId && !reqPsid)) {
     return res.status(400).json({ error: 'threadId or psid, and text are required' });
   }
 
-  // 1. Recover or resolve thread (stateless resilience for Vercel ephemeral cold starts)
   let thread = messengerThreads.find(
     (t) => (threadId && t.id === threadId) || (reqPsid && t.psid === reqPsid)
   );
-
   if (!thread) {
-    const fallbackPsid = reqPsid || threadId;
+    // Only possible if the conversation was never saved (e.g. the database was configured mid-way)
     thread = {
       id: threadId || `th_${Date.now()}`,
-      psid: fallbackPsid,
+      psid: String(reqPsid || ''),
       buyerName: reqBuyerName || 'Messenger Buyer',
-      buyerHandle: `fb.com/${(reqBuyerName || 'buyer').toLowerCase().replace(/\s+/g, '.')}`,
-      windowExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      buyerHandle: `fb.com/${reqPsid || 'buyer'}`,
+      windowExpiresAt: new Date(0).toISOString(),
       unreadCount: 0,
       messages: [],
     };
     messengerThreads.unshift(thread);
   }
 
-  // 2. Token resolution: check request body, custom header, or env
-  const incomingToken = (
-    reqToken ||
-    (req.headers['x-meta-page-token'] as string) ||
-    ''
-  ).trim();
+  // The token comes only from the server (Vercel setting or the owner's saved token), never from the browser
+  const delivery = await sendMessengerText(thread.psid, String(text));
 
-  if (incomingToken && !process.env.META_PAGE_ACCESS_TOKEN) {
-    process.env.META_PAGE_ACCESS_TOKEN = incomingToken;
-    process.env.FB_PAGE_ACCESS_TOKEN = incomingToken;
-  }
-  const fbToken = (incomingToken || getMetaPageAccessToken()).trim();
-
-  let metaApiStatus: 'sent_to_facebook' | 'local_only' | 'error' = 'local_only';
-  let metaApiDetail = '';
-
-  const cleanPsid = String(thread.psid || reqPsid || '').trim();
-  const isRealNumericPsid = /^\d{10,25}$/.test(cleanPsid);
-
-  if (fbToken && isRealNumericPsid) {
-    try {
-      const metaRes = await fetch(
-        `https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messaging_type: 'RESPONSE',
-            recipient: { id: cleanPsid },
-            message: { text: text.trim() },
-          }),
-        }
-      );
-      const metaData: any = await metaRes.json();
-      if (metaRes.ok && metaData.message_id) {
-        metaApiStatus = 'sent_to_facebook';
-        metaApiDetail = `Delivered to Facebook Messenger (Message ID: ${metaData.message_id})`;
-      } else {
-        metaApiStatus = 'error';
-        metaApiDetail = metaData?.error?.message || `Meta API Error (${metaRes.status})`;
-        console.warn('[Messenger Send API Error]:', metaData);
-      }
-    } catch (e: any) {
-      metaApiStatus = 'error';
-      metaApiDetail = e?.message || 'Network error reaching graph.facebook.com';
-      console.warn('[Messenger Send API Network Error]:', e);
-    }
-  } else if (!fbToken) {
-    metaApiStatus = 'local_only';
-    metaApiDetail = 'No Meta Page Access Token configured. Connect via Header or set META_PAGE_ACCESS_TOKEN in Vercel.';
-  } else if (!isRealNumericPsid) {
-    metaApiStatus = 'local_only';
-    metaApiDetail = `Buyer ${thread.buyerName} does not have a real Meta PSID yet (PSID: ${cleanPsid || 'none'}). On Facebook, a buyer must message the Page before the API can send them messages. Use 1-tap 'Open in Messenger' instead.`;
-  }
-
+  // Reuse the browser's id so its instant "sending…" bubble is replaced, not duplicated
+  const safeClientId = typeof clientMessageId === 'string' && /^[\w-]{6,80}$/.test(clientMessageId) ? clientMessageId : '';
   const newMsg = {
-    id: `m_reply_${Date.now()}`,
+    id: safeClientId || `m_reply_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     sender: 'page_agent' as const,
-    text: text.trim(),
+    text: String(text).trim(),
     timestamp: new Date().toISOString(),
+    deliveryStatus: delivery.status,
+    deliveryDetail: delivery.detail,
+    ...(delivery.messageId ? { mid: delivery.messageId } : {}),
   };
+  if (delivery.messageId) seenMessageIds.add(delivery.messageId); // the echo webhook for this message is then skipped
 
-  thread.messages.push(newMsg);
+  const existingIdx = thread.messages.findIndex((m) => m.id === newMsg.id);
+  if (existingIdx >= 0) thread.messages[existingIdx] = newMsg;
+  else thread.messages.push(newMsg);
   thread.unreadCount = 0;
   sortMessengerThreads();
   saveRuntimeState();
 
+  const metaApiStatus = delivery.status === 'sent' ? 'sent_to_facebook' : delivery.status === 'failed' ? 'error' : 'local_only';
   res.json({
-    success: metaApiStatus !== 'error',
+    success: delivery.status !== 'failed',
     thread,
     message: newMsg,
     metaApiStatus,
-    metaApiDetail,
+    metaApiDetail: delivery.detail,
   });
 });
 
@@ -2466,7 +2795,10 @@ app.post('/api/meta/messenger/simulate-dm', (req, res) => {
 
 // 8e. Owner / Admin Approval Gate for Reconciliation (POST /api/owner/review-approval)
 app.post('/api/owner/review-approval', (req, res) => {
-  const { liveId, role, reviewedBy, action, notes } = req.body;
+  const { liveId, action, notes } = req.body;
+  const signedIn = portalUserOf(req);
+  const role = portalAuth.enabled ? signedIn?.role : req.body.role;
+  const reviewedBy = portalAuth.enabled ? signedIn?.name : req.body.reviewedBy;
 
   // Enforce Owner or Admin role verification
   if (role !== 'owner' && role !== 'admin') {
@@ -2497,7 +2829,10 @@ app.post('/api/owner/review-approval', (req, res) => {
 
 // 8f. Full Override Power for Owner or Admin (POST /api/owner/order-override)
 app.post('/api/owner/order-override', (req, res) => {
-  const { orderId, isPreOrder, role, author, reason, overrides } = req.body;
+  const { orderId, isPreOrder, reason, overrides } = req.body;
+  const signedIn = portalUserOf(req);
+  const role = portalAuth.enabled ? signedIn?.role : req.body.role;
+  const author = portalAuth.enabled ? signedIn?.name : req.body.author;
 
   // Enforce Owner or Admin role check
   if (role !== 'owner' && role !== 'admin') {
