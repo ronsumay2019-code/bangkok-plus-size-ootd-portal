@@ -38,6 +38,24 @@ Milestones, Manila time. Every milestone ends with a checkpoint in `00-START-HER
 
 If the critical path can't make it, Claude says so at the first missed milestone. Scope is cut from the non-critical work, never from the gates.
 
+### Ships fresh, with 0 data (owner decision, 24 Oct)
+
+Production goes live **empty**:
+- No orders, lives, pre-orders, rack rows, invoices, payments or test records.
+- What stays: staff seats and sign-in, plus the platform settings and env vars the portal needs to run.
+- The NEW SHOP orders are **not** restored into production.
+
+All testing and the golden tests run on the **preview against a copy** (a Supabase branch or a restored backup). Real past data is test material there, and it never reaches production.
+
+The launch wipe is part of G7 and runs in this order:
+1. Fresh backup of production, logged in the KOS.
+2. Owner confirms at the go moment.
+3. Wipe.
+4. A query proves 0 rows in every business collection.
+5. Smoke test on the empty portal: sign-in, start a live, one test comment captured, then that test record removed and 0 re-confirmed.
+
+The release note shows the final row counts as evidence.
+
 ## 2. Non-negotiable rules (apply to every agent)
 
 1. **Real data only.** Every number needs a source: a query, a Facebook comment ID or time, the host's words on the replay, or an owner record.
@@ -206,8 +224,7 @@ A failed gate sends the ticket back one gate with the reason logged. There is no
    - **W2 Counting method:**
      - restore the Host Item Calling Controller, inheritance, decomposition and chatter filter;
      - make the board reconcile against the store purchase;
-     - golden tests;
-     - the decision on restoring NEW SHOP from backup (owner).
+     - golden tests, run on the preview copy only (production ships with 0 data).
    - **W3 Invoices and Messenger:**
      - one invoice per live per buyer;
      - owner approval;
