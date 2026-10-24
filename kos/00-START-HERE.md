@@ -17,12 +17,13 @@ Updated: 24 Oct 2026, Claude.
    - **Owner:** answer the questions in [[Live-Selling-Business]] §3.
 4. **Files to read, in this order:**
    1. [[Live-Selling-Business]] (HARD RULE)
-   2. [[Lessons]]
-   3. [[Current-State]]
-   4. [[Known-Issues]]
-   5. [[Master-Plan]]
-   6. `KOS-MASTER-PLAN-PROMPT.md`
-   7. your ticket in `05-Work/Tickets/`
+   2. [[Open-Loop]] (nothing left unanswered)
+   3. [[Lessons]]
+   4. [[Current-State]]
+   5. [[Known-Issues]]
+   6. [[Master-Plan]]
+   7. `KOS-MASTER-PLAN-PROMPT.md`
+   8. your ticket in `05-Work/Tickets/`
 5. **Do not touch:**
    - secrets (names only, in [[Env-Var-Names]]);
    - the `portal_backup` schema;

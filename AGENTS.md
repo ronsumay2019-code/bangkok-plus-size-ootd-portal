@@ -13,3 +13,7 @@
 5. **No secrets** in files, commits or chat.
    - No deleting production data, no pushing to `main`, no sending to buyers.
    - Each of those needs the owner.
+6. **Nothing is left unanswered (HARD RULE).**
+   - No question, request or task is left unanswered or untouched, in chat or on any platform in this build, before moving to the next topic.
+   - Track every item in `kos/04-State/Open-Loop.md`.
+   - A topic closes only when its rows are Answered, Done or Parked by the owner.

@@ -113,6 +113,12 @@ The release note shows the final row counts as evidence.
    - hard-stops at 15 minutes.
    Work that is too big gets split into tickets.
 
+9. **Nothing is left unanswered.**
+   - No question, request or task is left unanswered or untouched before moving to the next topic. That covers chat, GitHub PRs, issues and review comments, Vercel, Supabase, Meta and agent sessions.
+   - Every item is a row in `kos/04-State/Open-Loop.md`.
+   - Only the owner can park an item.
+   - The lead checks the ledger at every gate and at the start of every reply.
+
 ## 3. KOS: the Obsidian vault
 
 The vault lives **in the repo** at `kos/`. The owner edits it in Obsidian, synced through git with the Obsidian Git plugin, and every agent reads it from the repo, so there is one source of truth. Backend facts from Supabase, Vercel and Meta enter the KOS only as dated evidence snapshots: a query plus its result. They are never typed from memory.
