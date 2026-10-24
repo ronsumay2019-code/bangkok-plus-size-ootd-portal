@@ -1,7 +1,9 @@
 // Which live comments are orders. Follows the main system's rules (lib/order-intent.ts, owner 2026-10-18):
 // "mine" in its spellings ("mine T1", "myne", "m1ne"), "pamine", mine glued to a code ("MineT4"), and short
 // code-only replies ("T1", "Confirm T2", "9"). Questions, cancellations, "na mine ko" (what she already ordered),
-// reactions and empty comments are not orders. It never decides an item, a price or a winner.
+// reactions and empty comments are not orders. Comments that name an item, colour or size without "mine"
+// ("Linen pants blk", "White set sa suot mo") are kept "to check" against the replay rather than dropped.
+// It never decides an item, a price or a winner.
 
 const MINE = 'm+[iy1í]+[nñ]+e*';
 const PAMINE = new RegExp(`(?:^|[^a-z])pa[\\s-]?${MINE}(?![a-z])`, 'i');
@@ -37,9 +39,18 @@ function isCodeOnly(t: string): boolean {
   return words.every((w) => (/^[a-z]{1,3}\d[a-z0-9]{0,3}$/.test(w) && !SIZE.test(w) && !/^x\d+$/.test(w)) || numbered(w));
 }
 
+/** Garment words, colours and sizes buyers use when they order without "mine" */
+const ITEM_WORDS =
+  /\b(?:dress|set|sets|pants|pant|linen|blouse|top|tops|skirt|skort|shorts|terno|coord|co-ord|jumpsuit|romper|cardigan|polo|tee|shirt|wrap|flowy|maxi|midi|tie ?dye|white|black|blk|blck|brown|beige|cream|navy|blue|green|emerald|olive|pink|red|maroon|gray|grey|yellow|mustard|violet|lilac|lavender|orange|nude|stone|[2-6]?x{1,4}l|xl)\b/i;
+/** Questions, requests to see an item, and chat that only mention an item */
+const ASKING =
+  /^(?:hm+|how much|magkano|mgkano|mkano|pwede|pde|meron|merun|may|anong|ano|saan|kasya|patingin|pakita|paflex|pa flex|flex|please flex|pls flex|available|avail|size)\b/i;
+
 export interface OrderComment {
   /** For the reviewer when it isn't a plain "mine CODE" */
   note: string;
+  /** Names an item without "mine": confirm on the replay before treating it as an order */
+  toCheck?: boolean;
 }
 
 /** The order in a live comment, or null when the comment is not an order. */
@@ -52,5 +63,7 @@ export function orderComment(raw: string): OrderComment | null {
   if (PAMINE.test(current)) return { note: 'Written as "pamine".' };
   if (ONE_WORD.test(current)) return { note: 'Mine and the item written as one word.' };
   if (isCodeOnly(t)) return { note: 'Code-only reply, no "mine": check it on the replay.' };
+  if (!t.includes('?') && !ASKING.test(t) && ITEM_WORDS.test(t))
+    return { note: 'To check: names an item without "mine". Confirm on the replay.', toCheck: true };
   return null;
 }

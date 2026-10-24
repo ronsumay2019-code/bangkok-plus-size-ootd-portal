@@ -7,18 +7,20 @@ import {
   MessengerThread,
 } from '../types/reconciliation';
 
-const todayDate = new Date().toISOString().slice(0, 10);
+// Manila calendar day (the shop's timezone), not UTC
+const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const morningStartIso = new Date(new Date().setHours(9, 0, 0, 0)).toISOString();
 
 export const SEED_LIVE_SESSIONS: LiveSession[] = [
   {
     id: `live_${todayDate.replace(/-/g, '_')}_morning`,
-    title: `NEW SHOP · ${todayDate}`,
+    // Placeholder until the portal loads; real lives take their title from Facebook
+    title: `Live · ${todayDate}`,
     status: 'ended',
     startedAt: morningStartIso,
     endedAt: new Date().toISOString(),
-    fbVideoId: '1126219396590785',
-    videoUrl: 'https://www.facebook.com/watch/?v=1126219396590785',
+    fbVideoId: undefined,
+    videoUrl: undefined,
     storeName: 'Pratunam Market Wholesale Floor',
     storeDate: todayDate,
     lineup: ['RUSTANS', 'LU PANTS', 'LINEN PANTS', 'FLOWY', 'DRESS', 'SEXY BLACK', 'ELEGANT SET', 'GIG 5'],

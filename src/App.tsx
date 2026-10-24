@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { LiveSessionCommand } from './components/LiveSessionCommand';
 import { AutoReconciliationSummary } from './components/AutoReconciliationSummary';
@@ -14,6 +14,8 @@ import { OwnerOverrideModal } from './components/OwnerOverrideModal';
 import { MobileAccessQRModal } from './components/MobileAccessQRModal';
 import { MetaTokenModal } from './components/MetaTokenModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { DateFilterBar } from './components/DateFilterBar';
+import { manilaDay } from './utils/dates';
 import type { PortalAuthContext } from './components/LoginGate';
 import { 
   LiveSession, 
@@ -192,6 +194,39 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
   });
 
   const activeLive = lives[0] || SEED_LIVE_SESSIONS[0];
+
+  // View by date (Manila day) on Order Review, Reconciliation and Invoices. A live's orders keep the live's
+  // date, so replay comments read the next morning stay with their live.
+  const [viewDate, setViewDate] = useState<string>('');
+  const liveDay = (l: LiveSession) => manilaDay(l.startedAt) || l.storeDate || '';
+  const orderDay = (o: BuyerOrder) => {
+    const l = lives.find((x) => x.id === o.liveId);
+    return l ? liveDay(l) : manilaDay(o.orderedAt);
+  };
+  const dateOptions = useMemo(
+    () => [...new Set([...lives.map(liveDay), ...orders.map(orderDay)].filter(Boolean))].sort().reverse(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lives, orders]
+  );
+  const livesOnViewDate = viewDate ? lives.filter((l) => liveDay(l) === viewDate) : [];
+  const ordersForView = viewDate ? orders.filter((o) => orderDay(o) === viewDate) : orders;
+  /** The live reconciled and invoiced on the Reconciliation view: the chosen date's live, else the latest live */
+  const reconLive: LiveSession | null = viewDate ? livesOnViewDate[0] || null : activeLive;
+  const summaryForView = useMemo(() => {
+    if (!reconLive) return null;
+    if (summary && summary.liveId === reconLive.id) return summary;
+    if (!viewDate) return summary;
+    return runAutomaticLiveReconciliation(
+      reconLive,
+      orders.filter((o) => o.liveId === reconLive.id),
+      amendments,
+      inventory.filter((i) => i.liveId === reconLive.id),
+      phpRate,
+      null,
+      'rolling_pass'
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reconLive?.id, summary, orders, amendments, inventory, phpRate, viewDate]);
 
   // Helper toast notification
   const showToast = (msg: string) => {
@@ -570,12 +605,12 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
   };
 
   // 7. Generate Invoices & Dispatch to Customer Messenger
-  const handleGenerateInvoices = async (buyerNames?: string[], messageText?: string) => {
+  const handleGenerateInvoices = async (buyerNames?: string[], messageText?: string, liveId?: string) => {
     try {
       const res = await fetch('/api/invoices/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ buyerNames, messageText }),
+        body: JSON.stringify({ buyerNames, messageText, liveId }),
       });
       if (res.ok) {
         const data: any = await res.json();
@@ -1122,9 +1157,19 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
         )}
 
         {activeTab === 'reconciliation' && (
+          <DateFilterBar
+            value={viewDate}
+            dates={dateOptions}
+            onChange={setViewDate}
+            allLabel={`Latest live${activeLive ? ` (${activeLive.title})` : ''}`}
+            liveTitles={livesOnViewDate.map((l) => l.title)}
+            caption={viewDate && !reconLive ? 'No live on this date' : undefined}
+          />
+        )}
+        {activeTab === 'reconciliation' && (
           <AutoReconciliationSummary
-            summary={summary}
-            onGenerateInvoices={handleGenerateInvoices}
+            summary={summaryForView}
+            onGenerateInvoices={(names, msg) => handleGenerateInvoices(names, msg, reconLive?.id)}
             onTriggerReconciliation={handleTriggerReconciliation}
             onUpdateOrder={handleUpdateOrder}
             onUpdateBag={handleUpdateBag}
@@ -1135,10 +1180,20 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
         )}
 
         {activeTab === 'order_review' && (
+          <DateFilterBar
+            value={viewDate}
+            dates={dateOptions}
+            onChange={setViewDate}
+            allLabel="All dates"
+            liveTitles={livesOnViewDate.map((l) => l.title)}
+            caption={`${ordersForView.length} order${ordersForView.length === 1 ? '' : 's'}`}
+          />
+        )}
+        {activeTab === 'order_review' && (
           <OrderReviewApprovalWorkspace
-            orders={orders}
-            summary={summary}
-            activeLive={activeLive}
+            orders={ordersForView}
+            summary={viewDate ? summaryForView : summary}
+            activeLive={reconLive || activeLive}
             userRole={userRole}
             amendments={amendments}
             messengerThreads={messengerThreads}
@@ -1146,7 +1201,7 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
             onApproveBatchOrders={handleBatchApproveOrders}
             onRejectOrder={handleRejectOrder}
             onUpdateOrder={handleUpdateOrder}
-            onGenerateInvoices={handleGenerateInvoices}
+            onGenerateInvoices={(names) => handleGenerateInvoices(names, undefined, viewDate ? reconLive?.id : undefined)}
             onTriggerReconciliation={handleTriggerReconciliation}
             onOwnerApproval={handleOwnerApproval}
             onOpenOverride={(order, isPreOrder) => setOverrideModal({ isOpen: true, order, isPreOrder })}
