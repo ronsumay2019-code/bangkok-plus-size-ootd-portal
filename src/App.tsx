@@ -14,6 +14,7 @@ import { OwnerOverrideModal } from './components/OwnerOverrideModal';
 import { MobileAccessQRModal } from './components/MobileAccessQRModal';
 import { MetaTokenModal } from './components/MetaTokenModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import type { PortalAuthContext } from './components/LoginGate';
 import { 
   LiveSession, 
   BuyerOrder, 
@@ -27,7 +28,6 @@ import {
 import { 
   SEED_LIVE_SESSIONS, 
   SEED_INVENTORY_ITEMS, 
-  SEED_BUYER_ORDERS, 
   SEED_AMENDMENTS,
   SEED_PRE_ORDERS,
   SEED_MESSENGER_THREADS,
@@ -57,7 +57,7 @@ function mergeThreads(incoming: MessengerThread[], existing: MessengerThread[]):
         ...match,
         ...inc,
         messages: mergedMsgs,
-        unreadCount: Math.max(match.unreadCount || 0, inc.unreadCount || 0),
+        unreadCount: inc.unreadCount ?? match.unreadCount ?? 0,
         windowExpiresAt: inc.windowExpiresAt || match.windowExpiresAt,
       };
       map.set(match.id, mergedThread);
@@ -75,14 +75,14 @@ function mergeThreads(incoming: MessengerThread[], existing: MessengerThread[]):
   return unique;
 }
 
-export default function App() {
+export default function App({ authEnabled = false, portalUser = null, signOut }: Partial<PortalAuthContext> = {}) {
   const [activeTab, setActiveTab] = useState<string>('live_command');
   const [showAnalysisModal, setShowAnalysisModal] = useState<boolean>(false);
   const [isMobileAccessModalOpen, setIsMobileAccessModalOpen] = useState<boolean>(false);
   const [isMetaTokenModalOpen, setIsMetaTokenModalOpen] = useState<boolean>(false);
   const [lives, setLives] = useState<LiveSession[]>(SEED_LIVE_SESSIONS);
   const [inventory, setInventory] = useState<InventoryItem[]>(SEED_INVENTORY_ITEMS);
-  const [orders, setOrders] = useState<BuyerOrder[]>(SEED_BUYER_ORDERS);
+  const [orders, setOrders] = useState<BuyerOrder[]>([]);
   const [amendments, setAmendments] = useState<OrderAmendment[]>(SEED_AMENDMENTS);
   const [preOrders, setPreOrders] = useState<PreOrder[]>(SEED_PRE_ORDERS);
   const [messengerThreads, setMessengerThreads] = useState<MessengerThread[]>(SEED_MESSENGER_THREADS);
@@ -94,8 +94,17 @@ export default function App() {
   const [userRole, setUserRole] = useState<'owner' | 'admin' | 'staff'>('owner');
   const [currentUserName, setCurrentUserName] = useState<string>('Pola (Shop Owner)');
 
-  // Multi-Login & Mobile Authentication on Mount
+  // With sign-in switched on, the signed-in staff member decides the role and name
   useEffect(() => {
+    if (authEnabled && portalUser) {
+      setUserRole(portalUser.role);
+      setCurrentUserName(portalUser.name);
+    }
+  }, [authEnabled, portalUser]);
+
+  // Multi-Login & Mobile Authentication on Mount (only while sign-in is not set up)
+  useEffect(() => {
+    if (authEnabled) return;
     try {
       if (typeof window === 'undefined') return;
       const urlParams = new URLSearchParams(window.location.search);
@@ -114,7 +123,7 @@ export default function App() {
             : 'Admin 1 (Staff Lead)'
         );
 
-        if (authParam === 'owner' || tokenParam === 'bpso_owner_pola_2026') {
+        if (authParam === 'owner') {
           detectedRole = 'owner';
           detectedName = 'Pola (Shop Owner)';
         }
@@ -125,7 +134,6 @@ export default function App() {
         const sessionPayload = {
           userName: detectedName,
           userRole: detectedRole,
-          token: tokenParam || `bpso_${authParam || 'admin'}_2026`,
           deviceType: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
           deviceName: /iPhone/i.test(navigator.userAgent)
             ? 'iPhone'
@@ -272,8 +280,12 @@ export default function App() {
       });
       if (res.ok) {
         const data: any = await res.json();
-        setLives((prev) => prev.map((l) => (l.id === data.live.id ? data.live : l)));
-        if (data.summary) setSummary(data.summary);
+        if (Array.isArray(data.lives) && data.lives.length) setLives(data.lives);
+        else setLives((prev) => prev.map((l) => (l.id === data.live.id ? data.live : l)));
+        if (data.live && data.live.id !== activeLive.id) {
+          setSummary(data.summary || null);
+          showToast(`New live session started: ${data.live.title}`);
+        } else if (data.summary) setSummary(data.summary);
       }
     } catch (e) {
       // Local fallback
@@ -914,65 +926,58 @@ export default function App() {
   };
 
   const handleReplyMessenger = async (threadId: string, text: string) => {
+    const targetThread = messengerThreads.find((t) => t.id === threadId);
+    // The server saves the reply under this same id, so the "sending…" bubble is replaced, never duplicated
+    const clientMessageId = `m_reply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const optimisticMsg = {
+      id: clientMessageId,
+      sender: 'page_agent' as const,
+      text: text.trim(),
+      timestamp: new Date().toISOString(),
+      deliveryStatus: 'sending' as const,
+    };
+    setMessengerThreads((prev) =>
+      prev.map((t) => (t.id === threadId ? { ...t, messages: [...(t.messages || []), optimisticMsg], unreadCount: 0 } : t))
+    );
+    const markFailed = (detail: string) =>
+      setMessengerThreads((prev) =>
+        prev.map((t) =>
+          t.id === threadId
+            ? { ...t, messages: t.messages.map((m) => (m.id === clientMessageId ? { ...m, deliveryStatus: 'failed' as const, deliveryDetail: detail } : m)) }
+            : t
+        )
+      );
+
     try {
-      const targetThread = messengerThreads.find((t) => t.id === threadId);
-      const cleanPsid = targetThread?.psid;
-      const cleanBuyer = targetThread?.buyerName;
-      const savedToken = typeof window !== 'undefined' ? localStorage.getItem('meta_page_access_token') : null;
-
-      // Optimistically add reply immediately so the message stays on screen permanently
-      const optimisticMsg = {
-        id: `m_reply_${Date.now()}`,
-        mid: `m_reply_${Date.now()}`,
-        sender: 'page_agent' as const,
-        text: text.trim(),
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessengerThreads((prev) => {
-        return prev.map((t) => {
-          if (t.id === threadId || (cleanPsid && t.psid === cleanPsid)) {
-            return {
-              ...t,
-              messages: [...(t.messages || []), optimisticMsg],
-              unreadCount: 0,
-            };
-          }
-          return t;
-        });
-      });
-
       const res = await fetch('/api/meta/messenger/reply', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(savedToken ? { 'x-meta-page-token': savedToken } : {})
-        },
-        body: JSON.stringify({ 
-          threadId, 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          threadId,
           text,
-          psid: cleanPsid,
-          buyerName: cleanBuyer,
-          token: savedToken,
+          psid: targetThread?.psid,
+          buyerName: targetThread?.buyerName,
+          clientMessageId,
         }),
       });
-      const data: any = await res.json();
+      const data: any = await res.json().catch(() => ({}));
       if (res.ok && data.thread) {
         setMessengerThreads((prev) => mergeThreads([data.thread], prev));
         if (data.metaApiStatus === 'sent_to_facebook') {
           showToast(`✅ Delivered to Facebook Messenger: ${data.thread.buyerName}`);
         } else if (data.metaApiStatus === 'error') {
-          showToast(`⚠️ Meta API: ${data.metaApiDetail}`);
-        } else if (data.metaApiDetail) {
-          showToast(`ℹ️ ${data.metaApiDetail}`);
+          showToast(`⚠️ Not delivered — Meta says: ${data.metaApiDetail}`);
         } else {
-          showToast(`Sent Business Messenger reply to ${data.thread.buyerName}`);
+          showToast(`ℹ️ Saved in the portal only — ${data.metaApiDetail}`);
         }
       } else {
-        showToast(data.metaApiDetail || data.error || 'Could not send Messenger reply');
+        const detail = data.error || data.metaApiDetail || `Could not send (HTTP ${res.status})`;
+        markFailed(detail);
+        showToast(`⚠️ ${detail}`);
       }
     } catch (e: any) {
-      showToast(e.message || 'Messenger reply error.');
+      markFailed(e?.message || 'Network error');
+      showToast('⚠️ Could not reach the portal server — the reply was not sent.');
     }
   };
 
@@ -1065,7 +1070,10 @@ export default function App() {
         onOpenMetaTokenModal={() => setIsMetaTokenModalOpen(true)}
         preOrdersCount={preOrders.length}
         userRole={userRole}
+        roleLocked={authEnabled}
+        onSignOut={authEnabled ? signOut : undefined}
         setUserRole={(newRole) => {
+          if (authEnabled) return;
           setUserRole(newRole);
           const defaultNames: Record<string, string> = {
             owner: 'Pola (Shop Owner)',
@@ -1077,7 +1085,7 @@ export default function App() {
           if (typeof window !== 'undefined') {
             localStorage.setItem(
               'bpso_user_session',
-              JSON.stringify({ userName: newName, userRole: newRole, token: `bpso_${newRole}_2026` })
+              JSON.stringify({ userName: newName, userRole: newRole })
             );
           }
         }}
@@ -1250,7 +1258,9 @@ export default function App() {
         onClose={() => setIsMobileAccessModalOpen(false)}
         currentUserRole={userRole}
         currentUserName={currentUserName}
-        onSwitchUser={(newName, newRole, token) => {
+        authEnabled={authEnabled}
+        onSwitchUser={(newName, newRole) => {
+          if (authEnabled) return;
           setCurrentUserName(newName);
           setUserRole(newRole);
           if (typeof window !== 'undefined') {
@@ -1259,7 +1269,6 @@ export default function App() {
               JSON.stringify({
                 userName: newName,
                 userRole: newRole,
-                token,
               })
             );
           }

@@ -768,7 +768,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 <div className="pt-2 border-t border-neutral-800 space-y-2">
                   <label className="text-[11px] text-neutral-300 block font-medium">
                     Paste Raw Facebook Live Comments from This Morning&apos;s Broadcast (1 comment per line, e.g.{' '}
-                    <code className="text-amber-300">Jhoy Escobiñas: Mine LU pants black</code>):
+                    <code className="text-amber-300">Buyer Name: Mine LU pants black</code>):
                   </label>
                   <textarea
                     rows={4}
@@ -776,7 +776,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                     aria-label="Raw Morning Live Comments"
                     value={rawBatchComments}
                     onChange={(e) => setRawBatchComments(e.target.value)}
-                    placeholder={"Jhoy Escobiñas: Mine LU pants black\nEmz Cruz: Mine Rustans Pink & Charcoal\nArcega Gina: AC RUSTANS\nShiela Marasigan: Rustans violet"}
+                    placeholder={"Buyer A: Mine LU pants black\nBuyer B: Mine Rustans Pink & Charcoal\nBuyer C: AC RUSTANS\nBuyer D: Rustans violet"}
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2.5 text-xs text-white font-mono"
                   />
                   <div className="flex justify-end">
@@ -973,7 +973,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   <label className="text-[10px] text-neutral-400 block mb-0.5">Miner Live Comment *</label>
                   <input
                     type="text"
-                    placeholder="e.g. Mine Rustans Pink & Charcoal or Jhoy: Mine LU pants black"
+                    placeholder="e.g. Mine Rustans Pink & Charcoal or Buyer Name: Mine LU pants black"
                     value={naturalCommentInput}
                     onChange={(e) => setNaturalCommentInput(e.target.value)}
                     className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-2 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500 text-xs"
@@ -1009,12 +1009,12 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   <span className="text-[10px] text-neutral-500 block mb-1">Quick Stream Samples from Morning Live:</span>
                   <div className="flex flex-wrap gap-1">
                     {[
-                      { b: 'Jhoy Escobiñas', c: 'Mine LU pants black' },
-                      { b: 'Emz Cruz', c: 'Mine Rustans Pink & Charcoal' },
-                      { b: 'Arcega Gina', c: 'AC RUSTANS' },
-                      { b: 'Shiela Marasigan', c: 'Rustans violet' },
-                      { b: 'Marlon Escobiñas', c: 'Mine linen pants avocado and yellow' },
-                      { b: 'Weng De Leon Eraña', c: 'Mine 2 tops' },
+                      { b: 'Sample Buyer A', c: 'Mine LU pants black' },
+                      { b: 'Sample Buyer B', c: 'Mine Rustans Pink & Charcoal' },
+                      { b: 'Sample Buyer C', c: 'AC RUSTANS' },
+                      { b: 'Sample Buyer D', c: 'Rustans violet' },
+                      { b: 'Sample Buyer E', c: 'Mine linen pants avocado and yellow' },
+                      { b: 'Sample Buyer F', c: 'Mine 2 tops' },
                     ].map((s) => (
                       <button
                         key={s.c}

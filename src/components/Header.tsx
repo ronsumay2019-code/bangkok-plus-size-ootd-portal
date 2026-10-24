@@ -29,6 +29,9 @@ interface HeaderProps {
   preOrdersCount?: number;
   userRole: 'owner' | 'admin' | 'staff';
   setUserRole: (role: 'owner' | 'admin' | 'staff') => void;
+  /** True when staff sign in: the role comes from the account and cannot be switched here */
+  roleLocked?: boolean;
+  onSignOut?: () => void;
   currentUserName?: string;
   graphSyncStats?: {
     lastSyncAt: string;
@@ -50,6 +53,8 @@ export const Header: React.FC<HeaderProps> = ({
   preOrdersCount = 0,
   userRole,
   setUserRole,
+  roleLocked = false,
+  onSignOut,
   currentUserName,
   graphSyncStats,
 }) => {
@@ -144,8 +149,10 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-neutral-400 text-[11px]">Role:</span>
             <select
               value={userRole}
+              disabled={roleLocked}
+              title={roleLocked ? 'Your role comes from your sign-in' : undefined}
               onChange={(e) => setUserRole(e.target.value as any)}
-              className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer"
+              className={`bg-transparent text-white font-bold text-xs focus:outline-none ${roleLocked ? 'cursor-default appearance-none' : 'cursor-pointer'}`}
             >
               <option value="owner" className="bg-neutral-900 text-white">Owner (Full Override)</option>
               <option value="admin" className="bg-neutral-900 text-white">Admin (Full Override)</option>
@@ -155,6 +162,15 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden xl:inline text-[10px] text-neutral-400 font-mono border-l border-neutral-700 pl-1.5 truncate max-w-[130px]" title={currentUserName}>
                 {currentUserName}
               </span>
+            )}
+            {onSignOut && (
+              <button
+                type="button"
+                onClick={onSignOut}
+                className="ml-1 pl-1.5 border-l border-neutral-700 text-[10px] text-neutral-400 hover:text-rose-300"
+              >
+                Sign out
+              </button>
             )}
           </div>
 

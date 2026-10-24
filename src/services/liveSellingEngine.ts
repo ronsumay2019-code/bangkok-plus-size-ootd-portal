@@ -15,6 +15,7 @@
  */
 
 import { BuyerOrder } from '../types/reconciliation';
+import { cleanBuyerName } from '../utils/buyerName';
 
 export interface HostItemSegment {
   itemCode: string;
@@ -141,19 +142,7 @@ export const KNOWN_COLOUR_DICTIONARY = [
   'ORANGE', 'SAGE', 'AVOCADO', 'MAUVE'
 ];
 
-export function cleanBuyerName(name: any): string {
-  if (!name) return 'Customer';
-  return String(name)
-    .replace(/\u00C3\u00B1/g, 'ñ')
-    .replace(/Ã±/g, 'ñ')
-    .replace(/Ã/g, '')
-    .replace(/Escobi.*?as/gi, 'Escobiñas')
-    .replace(/Era.*?a/gi, 'Eraña')
-    .replace(/Tua.*?o/gi, 'Tuaño')
-    .replace(/Hofile.*?a/gi, 'Hofileña')
-    .replace(/[\uFFFD]/g, '')
-    .trim();
-}
+export { cleanBuyerName };
 
 /**
  * Intelligent parser following host segment loop + miner in-between queue

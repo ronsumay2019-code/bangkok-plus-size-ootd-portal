@@ -1,0 +1,257 @@
+// End-to-end: two separate server processes (like two Vercel copies) share one database.
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn, ChildProcess } from 'child_process';
+import crypto from 'crypto';
+import path from 'path';
+import { startFakePostgrest, FakeDb } from './support/fakePostgrest';
+
+const OWNER_CODE = 'OWNER-TEST-CODE';
+const APP_SECRET = 'test-app-secret';
+const LIVE_ID = 'live_2026_10_22_morning';
+
+let db: FakeDb;
+const copies: ChildProcess[] = [];
+
+function seedRows() {
+  const live = { id: LIVE_ID, title: 'NEW SHOP · 2026-10-22', status: 'ended', storeDate: '2026-10-22', startedAt: '2026-10-22T01:00:00.000Z', endedAt: '2026-10-22T02:48:00.000Z', storeName: 'Pratunam', lineup: [], totalComments: 0, totalMined: 2, reconciledAt: null, reconciliationStatus: 'awaiting_owner_review' };
+  const order = (id: string, price: number, code = 'RUSTANS') => ({ id, liveId: LIVE_ID, buyerName: 'Vera Santos', channel: 'live_chat', itemCode: code, itemName: code, size: 'FREE SIZE (PLUS)', colour: 'PINK', quantity: 1, statedUnitPricePhp: price, orderedAt: '2026-10-22T07:00:00.000Z', status: 'pending', invoiced: false, lane: 'live', version: 1, overrideHistory: [] });
+  return {
+    portal_records: [
+      { collection: 'lives', id: LIVE_ID, data: live },
+      { collection: 'orders', id: 'ord_live_1', data: order('ord_live_1', 550) },
+      { collection: 'orders', id: 'ord_live_2', data: order('ord_live_2', 450, 'LU PANTS') },
+    ],
+    portal_kv: [{ key: 'phpPerThbRate', value: 1.62 }],
+  };
+}
+
+async function startCopy(port: number, extraEnv: Record<string, string> = {}): Promise<string> {
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v !== undefined && !/^(META_|FB_|FACEBOOK_|PAGE_|SUPABASE_|PORTAL_|BRIDGE_)/.test(k)) env[k] = v;
+  }
+  Object.assign(env, {
+    VERCEL: '1',
+    NODE_ENV: 'production',
+    TEST_PORT: String(port),
+    SUPABASE_URL: db.url,
+    SUPABASE_SERVICE_ROLE_KEY: 'test-service-key',
+    PORTAL_OWNER_CODE: OWNER_CODE,
+    ...extraEnv,
+  });
+  for (const [k, v] of Object.entries(env)) if (v === '') delete env[k];
+  const child = spawn(process.execPath, ['--import', 'tsx', path.join(__dirname, 'support/serverCopy.ts')], {
+    env,
+    cwd: path.join(__dirname, '..'),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  copies.push(child);
+  let logs = '';
+  child.stdout!.on('data', (d) => (logs += d));
+  child.stderr!.on('data', (d) => (logs += d));
+  const base = `http://127.0.0.1:${port}`;
+  for (let i = 0; i < 100; i++) {
+    try {
+      const r = await fetch(`${base}/api/auth/status`);
+      if (r.ok) return base;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error(`server copy on ${port} did not start:\n${logs}`);
+}
+
+async function call(base: string, p: string, opts: { method?: string; token?: string; body?: any; headers?: Record<string, string> } = {}) {
+  const res = await fetch(`${base}${p}`, {
+    method: opts.method || (opts.body ? 'POST' : 'GET'),
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts.token ? { 'x-portal-session': opts.token } : {}),
+      ...(opts.headers || {}),
+    },
+    body: opts.body !== undefined ? (typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body)) : undefined,
+  });
+  const data: any = await res.json().catch(() => ({}));
+  return { status: res.status, data };
+}
+
+let A: string;
+let B: string;
+let ownerToken: string;
+
+before(async () => {
+  db = await startFakePostgrest(seedRows());
+  [A, B] = await Promise.all([startCopy(4311), startCopy(4312)]);
+});
+
+after(async () => {
+  for (const c of copies) c.kill('SIGKILL');
+  await db.close().catch(() => {});
+});
+
+test('the portal refuses data until someone signs in', async () => {
+  const r = await call(A, '/api/state');
+  assert.equal(r.status, 401);
+  assert.equal(r.data.authRequired, true);
+  const bad = await call(A, '/api/auth/login', { body: { code: 'WRONG' } });
+  assert.equal(bad.status, 401);
+});
+
+test('owner signs in on one copy and the session works on the other copy', async () => {
+  const r = await call(A, '/api/auth/login', { body: { code: OWNER_CODE, deviceType: 'desktop' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.user.role, 'owner');
+  ownerToken = r.data.token;
+  const state = await call(B, '/api/state', { token: ownerToken });
+  assert.equal(state.status, 200);
+  assert.equal(state.data.lives[0].id, LIVE_ID, 'the stored live keeps its id (no new id from today’s date)');
+  assert.equal(state.data.orders.filter((o: any) => o.liveId === LIVE_ID).length, 2);
+  assert.ok(state.data.activeSessions.every((s: any) => !s.token), 'no passcodes or tokens sent to the browser');
+});
+
+test('a Messenger DM received by copy A can be answered from copy B, exactly once', async () => {
+  const psid = '7012345678901234';
+  const wh = await call(A, '/api/meta/webhook', {
+    body: { object: 'page', entry: [{ messaging: [{ sender: { id: psid }, recipient: { id: '109603071381200' }, timestamp: Date.now(), message: { mid: 'm_test_1', text: 'Hi po, palit ko 3XL' } }] }] },
+  });
+  assert.equal(wh.status, 200);
+  // the same delivery twice (Meta retries) must not duplicate the message
+  await call(B, '/api/meta/webhook', {
+    body: { object: 'page', entry: [{ messaging: [{ sender: { id: psid }, recipient: { id: '109603071381200' }, timestamp: Date.now(), message: { mid: 'm_test_1', text: 'Hi po, palit ko 3XL' } }] }] },
+  });
+
+  const stateB = await call(B, '/api/state', { token: ownerToken });
+  const thread = stateB.data.messengerThreads.find((t: any) => t.psid === psid);
+  assert.ok(thread, 'copy B sees the conversation copy A received');
+  assert.equal(thread.messages.length, 1);
+  assert.ok(new Date(thread.windowExpiresAt).getTime() > Date.now(), '24h window counted from the buyer message');
+
+  const clientMessageId = 'm_reply_test_abc123';
+  const reply = await call(B, '/api/meta/messenger/reply', {
+    token: ownerToken,
+    body: { threadId: thread.id, text: 'Sige po, 3XL na', clientMessageId },
+  });
+  assert.equal(reply.status, 200);
+  assert.equal(reply.data.message.id, clientMessageId, 'server keeps the browser id so the bubble is not duplicated');
+  assert.equal(reply.data.message.deliveryStatus, 'not_sent', 'no Page token configured in this test');
+  assert.match(reply.data.metaApiDetail, /No Meta Page Access Token/);
+
+  const stateA = await call(A, '/api/state', { token: ownerToken });
+  const threadA = stateA.data.messengerThreads.find((t: any) => t.psid === psid);
+  assert.equal(threadA.messages.filter((m: any) => m.sender === 'page_agent').length, 1, 'reply stored once, visible on copy A');
+});
+
+test('replies and new buyer DMs arriving at the same moment on different copies are all kept', async () => {
+  const psid = '7012345678901234';
+  const s0 = await call(A, '/api/state', { token: ownerToken });
+  const thread = s0.data.messengerThreads.find((t: any) => t.psid === psid);
+  const before = thread.messages.length;
+  const jobs: Promise<any>[] = [];
+  for (let i = 0; i < 6; i++) {
+    jobs.push(call(B, '/api/meta/messenger/reply', { token: ownerToken, body: { threadId: thread.id, text: `reply ${i}`, clientMessageId: `m_reply_race_${i}x` } }));
+    jobs.push(call(A, '/api/meta/webhook', { body: { object: 'page', entry: [{ messaging: [{ sender: { id: psid }, recipient: { id: '1' }, timestamp: Date.now(), message: { mid: `m_race_${i}`, text: `buyer ${i}` } }] }] } }));
+  }
+  const results = await Promise.all(jobs);
+  assert.ok(results.every((r) => r.status === 200));
+  const s1 = await call(B, '/api/state', { token: ownerToken });
+  const t1 = s1.data.messengerThreads.find((t: any) => t.psid === psid);
+  assert.equal(t1.messages.length, before + 12, 'no message lost or duplicated');
+});
+
+test('the same live comment delivered to two copies at once creates one order', async () => {
+  const comment = { object: 'page', entry: [{ changes: [{ field: 'feed', value: { item: 'comment', comment_id: 'cmt_dup_1', message: 'Mine rustans pink', from: { id: '1', name: 'Joy Tuazon' } } }] }] };
+  await Promise.all([call(A, '/api/meta/webhook', { body: comment }), call(B, '/api/meta/webhook', { body: comment })]);
+  const s = await call(A, '/api/state', { token: ownerToken });
+  const made = s.data.orders.filter((o: any) => o.sourceCommentId === 'cmt_dup_1');
+  assert.equal(made.length, 1);
+  assert.equal(made[0].buyerName, 'Joy Tuazon', 'name kept as written');
+});
+
+test('approving an order on one copy is saved for every copy', async () => {
+  const r = await call(A, '/api/orders/approve', { token: ownerToken, body: { orderId: 'ord_live_1' } });
+  assert.equal(r.status, 200);
+  const s = await call(B, '/api/state', { token: ownerToken });
+  assert.equal(s.data.orders.find((o: any) => o.id === 'ord_live_1').status, 'confirmed');
+});
+
+test('orders added on two copies at the same time are all kept', async () => {
+  const adds = Array.from({ length: 8 }, (_, i) =>
+    call(i % 2 ? A : B, '/api/orders/add', { token: ownerToken, body: { liveId: LIVE_ID, buyerName: `Buyer ${i}`, itemCode: 'RUSTANS', statedPrice: 550 } })
+  );
+  const results = await Promise.all(adds);
+  assert.ok(results.every((r) => r.status === 200));
+  const s = await call(A, '/api/state', { token: ownerToken });
+  const added = s.data.orders.filter((o: any) => /^Buyer \d$/.test(o.buyerName));
+  assert.equal(added.length, 8);
+});
+
+test('owner creates an admin phone link; admins cannot create links or change the token', async () => {
+  const inv = await call(B, '/api/auth/invite', { token: ownerToken, body: { staffId: 'admin1' } });
+  assert.equal(inv.status, 200);
+  const login = await call(A, '/api/auth/login', { body: { code: inv.data.code, deviceType: 'mobile' } });
+  assert.equal(login.status, 200);
+  assert.equal(login.data.user.role, 'admin');
+  const adminToken = login.data.token;
+
+  assert.equal((await call(A, '/api/auth/invite', { token: adminToken, body: { staffId: 'admin2' } })).status, 403);
+  assert.equal((await call(A, '/api/meta/token', { token: adminToken, body: { token: 'x' } })).status, 200, 'admins may still connect the Page token');
+  const override = await call(B, '/api/owner/order-override', { token: adminToken, body: { orderId: 'ord_live_2', role: 'staff', reason: 'size fix', overrides: { size: '3XL' } } });
+  assert.equal(override.status, 200, 'the role comes from the sign-in, not from the request body');
+});
+
+test('reset is disabled once data lives in the database', async () => {
+  const r = await call(A, '/api/state/reset', { token: ownerToken, body: {} });
+  assert.equal(r.status, 410);
+});
+
+test('starting a live after an earlier day’s live ended opens a new live session', async () => {
+  const r = await call(A, '/api/live/toggle', { token: ownerToken, body: { liveId: LIVE_ID, action: 'start' } });
+  assert.equal(r.status, 200);
+  assert.notEqual(r.data.live.id, LIVE_ID);
+  assert.equal(r.data.lives[0].id, r.data.live.id);
+  const s = await call(B, '/api/state', { token: ownerToken });
+  assert.equal(s.data.lives[0].id, r.data.live.id, 'the new live is the active one on every copy');
+  assert.equal(s.data.lives.length, 2, 'the earlier live and its orders are kept');
+  assert.equal(s.data.orders.filter((o: any) => o.liveId === LIVE_ID).length, 11);
+});
+
+test('webhook signature is checked over the exact bytes Meta sent', async () => {
+  const C = await startCopy(4313, { META_APP_SECRET: APP_SECRET });
+  const raw = JSON.stringify({ object: 'page', entry: [{ messaging: [{ sender: { id: '7099999999999999' }, recipient: { id: '1' }, message: { mid: 'm_sig_1', text: 'Escobiñas: mine po 💜' } }] }] }).replace(/ñ/g, '\\u00f1');
+  const sig = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(raw).digest('hex');
+  const good = await call(C, '/api/meta/webhook', { body: raw, headers: { 'x-hub-signature-256': sig } });
+  assert.equal(good.status, 200, 'valid signature accepted even with escaped characters');
+  const bad = await call(C, '/api/meta/webhook', { body: raw, headers: { 'x-hub-signature-256': 'sha256=deadbeef' } });
+  assert.equal(bad.status, 401);
+  const missing = await call(C, '/api/meta/webhook', { body: raw });
+  assert.equal(missing.status, 401, 'unsigned events are refused when the app secret is set');
+});
+
+test('without PORTAL_OWNER_CODE the portal stays open (sign-in not set up yet) but still saves to the database', async () => {
+  const D = await startCopy(4314, { PORTAL_OWNER_CODE: '' });
+  const s = await call(D, '/api/state');
+  assert.equal(s.status, 200);
+  assert.ok(s.data.orders.length >= 10);
+  const st = await call(D, '/api/auth/status');
+  assert.equal(st.data.authEnabled, false);
+  assert.equal(st.data.databaseEnabled, true);
+});
+
+test('without the database settings the portal still starts (old in-memory behaviour)', async () => {
+  const E = await startCopy(4315, { SUPABASE_URL: '', SUPABASE_SERVICE_ROLE_KEY: '' });
+  const s = await call(E, '/api/state');
+  assert.equal(s.status, 200);
+  const st = await call(E, '/api/auth/status');
+  assert.equal(st.data.databaseEnabled, false);
+  assert.equal(st.data.authEnabled, false);
+});
+
+test('if the database is down the portal says so and changes nothing', async () => {
+  const before = JSON.stringify(db.tables.portal_records);
+  const url = db.url;
+  await db.close();
+  const r = await call(A, '/api/orders/add', { token: ownerToken, body: { buyerName: 'X', itemCode: 'Y' } });
+  assert.equal(r.status, 503);
+  assert.equal(JSON.stringify(db.tables.portal_records), before);
+  assert.ok(url);
+});

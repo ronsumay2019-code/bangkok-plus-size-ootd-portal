@@ -376,6 +376,9 @@ export interface MessengerMessage {
   text: string;
   timestamp: string;
   mid?: string;
+  /** Outgoing messages only: whether Meta delivered it ('sending' is shown in the browser until the server answers) */
+  deliveryStatus?: 'sending' | 'sent' | 'failed' | 'not_sent';
+  deliveryDetail?: string;
 }
 
 export interface MessengerThread {
