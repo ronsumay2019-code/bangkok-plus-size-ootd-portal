@@ -10,3 +10,5 @@ The automatic part (merges and deploys) is added by the Timeline Action once tic
 | 24 Oct | Owner: production ships with 0 data; Monday 4 PM deadline | Master-plan prompt |
 | 24 Oct | Owner: Live Selling Business (HARD RULE) recorded | [[Live-Selling-Business]] |
 | 24 Oct | G0 truth audit; Master Plan drafted | [[Current-State]], [[Master-Plan]] |
+| Sun 25 Oct, about 04:30 | Owner connected Obsidian; *Git: Pull* reported "Everything is up-to-date" | Owner screenshot |
+| Sun 25 Oct, 04:44 | First milestone (Sat 11 PM) missed; schedule re-planned | [[Master-Plan]] §4, OL-17 |

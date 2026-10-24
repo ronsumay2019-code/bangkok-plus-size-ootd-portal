@@ -66,16 +66,21 @@ GO requires:
 
 **Never cut:** any gate, W2, W5, golden tests, the 0-data launch.
 
-## 4. Schedule (Manila time)
+## 4. Schedule (re-planned Sun 25 Oct, 04:44 Manila, after the first milestone was missed)
 
-| By | Done |
-|---|---|
-| Sat 11 PM | This plan reviewed by Grok; the owner has the Live Selling Business questions |
-| Sun 12 PM | T-001, T-002, T-003, T-004, T-020 |
-| Sun 10 PM | T-005, T-010 to T-015 through G4 |
-| Mon 10 AM | Code freeze; T-016; full acceptance run on the preview (G5) |
-| Mon 2 PM | Final run; go/no-go report |
-| **Mon 4 PM** | **Owner GO, then T-030** |
+The owner's PC clock showed 3:34 PM on 24 Oct when it was 04:34 Sunday in Manila, so the owner's local time appears to be **13 hours behind Manila** (UTC-5). Both columns are shown. The deadline is fixed in Manila time.
+
+| Manila | Owner's clock (UTC-5) | Done |
+|---|---|---|
+| ~~Sat 11 PM~~ | ~~Sat 10 AM~~ | **Missed.** G0 and the plan draft were done. The Grok review and the Q1–Q9 answers were not. |
+| Sun 12 PM | Sat 11 PM | Q1–Q9 answered; Grok's plan review saved; RLS migration approved; branch protection allowed; T-003, T-004, T-020 |
+| Sun 6 PM | Sun 5 AM | T-002 golden fixture (one past live: Item Events and the confirmed order list) |
+| Sun 10 PM | Sun 9 AM | T-005, T-010 to T-015 through G4 |
+| Mon 10 AM | Sun 9 PM | Code freeze; T-016; full acceptance run on the preview (G5) |
+| Mon 2 PM | Mon 1 AM | Final run; go/no-go report |
+| **Mon 4 PM** | **Mon 3 AM** | **Owner GO, then T-030** |
+
+**Risk, stated plainly.** W2 can't start until Q1–Q9 are answered, and Antigravity, Codex and Grok can only work when the owner hands them the repo. If Q1–Q9 aren't answered by Sun 12 PM Manila, W2 isn't likely to pass G5 by Mon 10 AM, and the honest outcome would be NO-GO or a cut scope, reported at once.
 
 ## 5. What only the owner can do
 

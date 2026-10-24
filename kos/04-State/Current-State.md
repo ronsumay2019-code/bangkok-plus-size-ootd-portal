@@ -1,6 +1,6 @@
 # Current State: truth audit
 
-As of 24 Oct 2026, 22:xx Manila. Every line is either **Verified**, with its evidence, or **Not verified**. Claims don't count.
+As of Sun 25 Oct 2026, about 04:20 Manila (24 Oct, about 20:20 UTC). Corrected: an earlier draft said "22:xx". Every line is either **Verified**, with its evidence, or **Not verified**. Claims don't count.
 
 ## Production database (Supabase `bpso-live-portal`, ref `muqgabsvghhytwawipex`)
 

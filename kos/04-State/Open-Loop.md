@@ -24,7 +24,7 @@ Platform sweep, 24 Oct (Claude):
 | OL-04 | Official release PDF for the owner | Owner, 24 Oct | **Withdrawn** | It overstated readiness (L-004). It will be replaced by the gate G7 release note. It was never sent. |
 | OL-05 | What makes this portal hard; ranking among builds | Owner, 24 Oct | **Answered** | In chat, 24 Oct; summarised in [[Story]] chapter 1 |
 | OL-06 | Where Codex fits; team of Claude, Antigravity, Grok | Owner, 24 Oct | **Answered** | [[Master-Plan]] and `00-START-HERE` model routing |
-| OL-07 | Obsidian connection (browser, MCP, links, file?) | Owner, 24 Oct | **Answered**; setup **Waiting on owner** | Git plus the Obsidian Git plugin. Steps given in chat. Next: the owner confirms the vault opens and auto-pulls. |
+| OL-07 | Obsidian connection (browser, MCP, links, file?) | Owner, 24 Oct | **Done** (auto-pull interval **waiting on owner**) | The vault `kos` opened; Git plugin installed; *Git: Pull* returned "Everything is up-to-date" (owner, 24 Oct). Still to do: Settings → search "interval" → Auto pull interval 5. |
 | OL-08 | Live Selling Business questions Q1–Q9 | Claude, 24 Oct | **Waiting on owner** | [[Live-Selling-Business]] §3 |
 | OL-09 | Golden fixture: Item Events plus the confirmed final order list for one past live | Claude, 24 Oct | **Waiting on owner/staff** | Needed by Sun 12 PM. Claude prepares the sheet. |
 | OL-10 | Approve the RLS lockdown migration (KI-004, KI-005) | Claude, 24 Oct | **Waiting on owner** | Approval of the migration in Supabase |
@@ -34,3 +34,4 @@ Platform sweep, 24 Oct (Claude):
 | OL-14 | Grok independent review of the Master Plan (G3) | Claude, 24 Oct | **Waiting on owner** | Claude can't reach Grok, Antigravity or Codex from this session. The owner gives Grok the repo or the plan file, and Grok's report is saved to `06-Loop/Reviews/`. |
 | OL-15 | Logins for the platforms | Owner, 24 Oct | **Answered** | Noted. They go into each platform's own settings, never chat or the vault. |
 | OL-16 | Main repo docs conflict with the Live Selling Business (KI-010) | Claude, 24 Oct | **Waiting on owner** (Q8) | — |
+| OL-17 | **First milestone missed:** "Sat 24 Oct, 11 PM Manila: plan reviewed by Grok, owner has the questions" | Claude, Sun 25 Oct 04:44 Manila | **Waiting on owner** | Done by then: G0 and the Master Plan draft. Not done: the Grok review (OL-14) and the Q1–Q9 answers (OL-08). Re-plan in [[Master-Plan]] §4. |
