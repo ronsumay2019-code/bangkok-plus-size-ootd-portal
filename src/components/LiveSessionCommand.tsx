@@ -84,6 +84,8 @@ interface LiveSessionCommandProps {
   onReplyMessenger?: (threadId: string, text: string) => Promise<void>;
   /** Only owners may set the Facebook token or Page ID */
   canManageMetaToken?: boolean;
+  /** Owner: clear all orders and lives and start again from one Facebook live */
+  onStartFresh?: (fbVideo: string, confirm: string) => Promise<string | null>;
 }
 
 export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
@@ -106,7 +108,13 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   onBulkImportOrders,
   onReplyMessenger,
   canManageMetaToken = true,
+  onStartFresh,
 }) => {
+  const [showStartFresh, setShowStartFresh] = useState(false);
+  const [freshVideo, setFreshVideo] = useState('');
+  const [freshConfirm, setFreshConfirm] = useState('');
+  const [freshBusy, setFreshBusy] = useState(false);
+  const [freshError, setFreshError] = useState<string | null>(null);
   const isOnAir = live.status === 'live';
   const [secondsOnAir, setSecondsOnAir] = useState(0);
   const [newBuyerName, setNewBuyerName] = useState('');
@@ -768,6 +776,75 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
               {graphSyncStats?.lastStatusCheck && (
                 <div className="text-[11px] text-neutral-400 font-mono bg-neutral-900/70 px-2.5 py-1.5 rounded border border-neutral-800">
                   {graphSyncStats.lastStatusCheck}
+                </div>
+              )}
+
+              {onStartFresh && canManageMetaToken && (
+                <div className="pt-2 border-t border-neutral-800 space-y-2 text-[11px]">
+                  {!showStartFresh ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowStartFresh(true)}
+                      className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-300 font-bold border border-neutral-700"
+                    >
+                      Start fresh from a live…
+                    </button>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-600/50 space-y-2">
+                      <p className="text-amber-100">
+                        <strong>Owner only.</strong> Deletes every order, live, pre-order and rack row in the portal, then starts again
+                        from the live below; its comments are pulled fresh. Messenger chats and staff sign-ins are kept.
+                      </p>
+                      <input
+                        type="text"
+                        name="freshVideo"
+                        aria-label="Facebook live link or video ID"
+                        value={freshVideo}
+                        onChange={(e) => setFreshVideo(e.target.value)}
+                        placeholder="Facebook live link or video ID"
+                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                      />
+                      <input
+                        type="text"
+                        name="freshConfirm"
+                        aria-label="Type START FRESH to confirm"
+                        value={freshConfirm}
+                        onChange={(e) => setFreshConfirm(e.target.value)}
+                        placeholder="Type START FRESH to confirm"
+                        autoCapitalize="characters"
+                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                      />
+                      {freshError && <p className="text-rose-300">{freshError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={freshBusy || freshConfirm.trim().toUpperCase() !== 'START FRESH' || !freshVideo.trim()}
+                          onClick={async () => {
+                            setFreshBusy(true);
+                            setFreshError(null);
+                            const err = await onStartFresh(freshVideo.trim(), freshConfirm.trim().toUpperCase());
+                            setFreshBusy(false);
+                            if (err) setFreshError(err);
+                            else {
+                              setShowStartFresh(false);
+                              setFreshVideo('');
+                              setFreshConfirm('');
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-bold"
+                        >
+                          {freshBusy ? 'Starting fresh…' : 'Delete and start fresh'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowStartFresh(false)}
+                          className="px-3 py-1.5 rounded-lg bg-neutral-800 text-neutral-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -1034,6 +1034,31 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
     }
   };
 
+  /** Owner: clears every order and live, starts again from one Facebook live and pulls its comments now */
+  const handleStartFresh = async (fbVideo: string, confirm: string): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/admin/start-fresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fbVideo, confirm }),
+      });
+      const data: any = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) return data.error || 'Could not start fresh';
+      setLives(data.lives || []);
+      setOrders([]);
+      setInventory([]);
+      setAmendments([]);
+      setPreOrders([]);
+      setSummary(null);
+      setViewDate('');
+      showToast('Started fresh. Pulling the live\'s comments from Facebook…');
+      await handleGraphSync();
+      return null;
+    } catch (err: any) {
+      return err?.message || 'Could not start fresh';
+    }
+  };
+
   const handleGraphSync = async (
     forceStatus?: string,
     options?: { fbVideoId?: string; fbPageId?: string; accessToken?: string }
@@ -1153,6 +1178,7 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
             onBulkImportOrders={handleBulkImportOrders}
             onReplyMessenger={handleReplyMessenger}
             canManageMetaToken={!authEnabled || userRole === 'owner'}
+            onStartFresh={handleStartFresh}
           />
         )}
 

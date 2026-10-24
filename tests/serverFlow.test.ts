@@ -303,6 +303,28 @@ test('sending an invoice photo records it in the conversation with Messenger\'s 
 });
 
 
+test('owner can start fresh from one Facebook live; admins cannot; Messenger chats are kept', async () => {
+  const before = await call(A, '/api/state', { token: ownerToken });
+  const threadsBefore = before.data.messengerThreads.length;
+  const inv = await call(B, '/api/auth/invite', { token: ownerToken, body: { staffId: 'admin2' } });
+  const admin = await call(A, '/api/auth/login', { body: { code: inv.data.code } });
+  const denied = await call(A, '/api/admin/start-fresh', { token: admin.data.token, body: { confirm: 'START FRESH', fbVideo: '3310662652470857' } });
+  assert.equal(denied.status, 403);
+  assert.equal((await call(A, '/api/admin/start-fresh', { token: ownerToken, body: { fbVideo: '3310662652470857' } })).status, 400, 'needs the typed confirmation');
+
+  const r = await call(B, '/api/admin/start-fresh', {
+    token: ownerToken,
+    body: { confirm: 'START FRESH', fbVideo: 'https://www.facebook.com/bangkokplussizeootd/videos/3310662652470857/' },
+  });
+  assert.equal(r.status, 200);
+  const s = await call(A, '/api/state', { token: ownerToken });
+  assert.equal(s.data.orders.length, 0);
+  assert.equal(s.data.lives.length, 1);
+  assert.equal(s.data.lives[0].fbVideoId, '3310662652470857', 'the video id is read from the link');
+  assert.equal(s.data.lives[0].status, 'live');
+  assert.equal(s.data.messengerThreads.length, threadsBefore, 'Messenger chats are kept');
+});
+
 test('if the database is down the portal says so and changes nothing', async () => {
   const before = JSON.stringify(db.tables.portal_records);
   const url = db.url;
