@@ -39,7 +39,7 @@ import {
   OrderOverrideHistoryItem,
   MessengerThread,
 } from './src/types/reconciliation';
-import { AsyncLock, StateSync, SupabaseBackend, storeConfigFromEnv } from './server/portalStore';
+import { AsyncLock, ProofStore, StateSync, SupabaseBackend, storeConfigFromEnv } from './server/portalStore';
 import { DEFAULT_STAFF, PortalAuth, PortalUser, SESSION_HEADER } from './server/auth';
 import { orderComment } from './server/orderIntent';
 import { cleanBuyerName } from './src/utils/buyerName';
@@ -269,6 +269,7 @@ let storedFbPageId: string = process.env.META_PAGE_ID || process.env.FB_PAGE_ID 
 // saves what changed before responding, so all Vercel copies see the same data.
 const storeConfig = storeConfigFromEnv();
 const portalBackend = storeConfig ? new SupabaseBackend(storeConfig.url, storeConfig.key) : null;
+const proofStore = storeConfig ? new ProofStore(storeConfig.url, storeConfig.key) : null;
 const portalAuth = new PortalAuth(portalBackend, (process.env.PORTAL_OWNER_CODE || '').trim());
 const stateLock = new AsyncLock();
 let loadedThreadRows: any[] = [];
@@ -1473,10 +1474,11 @@ app.post('/api/orders/add', (req, res) => {
     channel: channel || 'live_chat',
     itemCode: itemCode.trim().toUpperCase(),
     itemName: itemCode.trim().toUpperCase(),
-    size: (size || '3XL').trim().toUpperCase(),
-    colour: (colour || 'MAROON').trim().toUpperCase(),
+    size: (size || 'FREE SIZE (PLUS)').trim().toUpperCase(),
+    colour: (colour || 'ASSORTED').trim().toUpperCase(),
     quantity: Number(quantity) || 1,
-    statedUnitPricePhp: statedPrice !== undefined && statedPrice !== '' ? Number(statedPrice) : 0,
+    // No price from the host yet: it stays empty until review (never a made-up amount)
+    statedUnitPricePhp: statedPrice !== undefined && statedPrice !== null && statedPrice !== '' && Number(statedPrice) > 0 ? Number(statedPrice) : null,
     orderedAt: new Date().toISOString(),
     status: 'pending',
     invoiced: false,
@@ -1868,8 +1870,12 @@ app.post('/api/live/toggle', (req, res) => {
 
   // Starting again after an earlier day's live has ended opens a new live session,
   // so each live keeps its own claims. Same-day "Resume" continues the same live.
-  if (action === 'start' && live.status === 'ended' && live.storeDate !== manilaDate()) {
-    live = createLiveSession(live);
+  const linkVideo = videoIdFromLink(req.body?.fbVideo);
+  if (action === 'start' && (req.body?.newLive || (live.status === 'ended' && live.storeDate !== manilaDate()))) {
+    live = createLiveSession(live, linkVideo || undefined);
+  } else if (action === 'start' && linkVideo) {
+    live.fbVideoId = linkVideo;
+    live.videoUrl = `https://www.facebook.com/watch/?v=${linkVideo}`;
   }
 
   if (action === 'end') {
@@ -1936,6 +1942,64 @@ app.post('/api/admin/start-fresh', (req, res) => {
   res.json({ success: true, live, lives, orders, inventory, amendments, preOrders, summary: null });
 });
 
+// The owner pasted the invoice into Business Messenger: the buyer's 24 hours to pay start now
+app.post('/api/invoices/mark-sent', (req, res) => {
+  if (!requireRole(req, res, ['owner', 'admin'])) return;
+  const invoiceNumber = String(req.body?.invoiceNumber || '');
+  const list = orders.filter((o) => o.invoiceNumber && o.invoiceNumber === invoiceNumber);
+  if (!list.length) return res.status(404).json({ error: 'Invoice not found' });
+  const now = new Date().toISOString();
+  list.forEach((o) => !o.invoiceSentAt && (o.invoiceSentAt = now));
+  saveRuntimeState();
+  res.json({ success: true, orders });
+});
+
+// A payment counts only with its screenshot/photo (stored privately); the invoice's orders move to Paid
+app.post('/api/payments/record', async (req, res) => {
+  if (!requireRole(req, res, ['owner', 'admin'])) return;
+  const { invoiceNumber, photoDataUrl, reference, amountPhp } = req.body || {};
+  const list = orders.filter((o) => o.invoiceNumber && o.invoiceNumber === String(invoiceNumber || ''));
+  if (!list.length) return res.status(404).json({ error: 'Invoice not found' });
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(photoDataUrl || ''));
+  if (!match) return res.status(400).json({ error: 'Add the payment screenshot or photo. No proof means not paid.' });
+  if (!proofStore) return res.status(400).json({ error: 'Payment photos need the portal database to be set up.' });
+  const bytes = Buffer.from(match[2], 'base64');
+  if (bytes.length > 6 * 1024 * 1024) return res.status(400).json({ error: 'The photo is too large (over 6 MB).' });
+  const safeInvoice = String(invoiceNumber).replace(/[^\w-]/g, '_');
+  const photoPath = `${safeInvoice}/${Date.now()}.${match[1].split('/')[1]}`;
+  try {
+    await proofStore.upload(photoPath, bytes, match[1]);
+  } catch (err: any) {
+    return res.status(502).json({ error: err?.message || 'Could not save the photo' });
+  }
+  const now = new Date().toISOString();
+  const amount = Number(amountPhp);
+  list.forEach((o) => {
+    o.paymentStatus = 'paid';
+    o.paidAt = now;
+    o.paymentProof = {
+      photoPath,
+      reference: reference ? String(reference).slice(0, 120) : undefined,
+      amountPhp: Number.isFinite(amount) && amount > 0 ? amount : undefined,
+      recordedBy: portalUserOf(req)?.name || 'Staff',
+      recordedAt: now,
+    };
+  });
+  saveRuntimeState();
+  res.json({ success: true, orders });
+});
+
+// A short-lived link to a payment proof photo
+app.get('/api/payments/proof', async (req, res) => {
+  const order = orders.find((o) => o.invoiceNumber === String(req.query.invoiceNumber || '') && o.paymentProof?.photoPath);
+  if (!order || !proofStore) return res.status(404).json({ error: 'No payment photo for this invoice' });
+  try {
+    res.json({ success: true, url: await proofStore.signedUrl(order.paymentProof!.photoPath!) });
+  } catch (err: any) {
+    res.status(502).json({ error: err?.message || 'Could not open the photo' });
+  }
+});
+
 // 8. Generate Official Final Invoices (Strictly Gated to Reconciled Items Only!)
 app.post('/api/invoices/generate', async (req, res) => {
   const { buyerNames, messageText, liveId } = req.body;
@@ -1999,6 +2063,8 @@ app.post('/api/invoices/generate', async (req, res) => {
           ord.invoiced = true;
           ord.invoiceNumber = invNum;
           ord.status = 'invoiced';
+          ord.invoicedAt = ord.invoicedAt || new Date().toISOString();
+          ord.paymentStatus = ord.paymentStatus || 'unpaid';
         }
       }
     });
@@ -2050,6 +2116,11 @@ app.post('/api/invoices/generate', async (req, res) => {
         thread.unreadCount = 0;
         invoice.deliveryStatus = delivery.status;
         invoice.deliveryDetail = delivery.detail;
+        // The buyer's 24 hours to pay start when the invoice reaches them
+        if (delivery.status === 'sent') {
+          const sentAt = new Date().toISOString();
+          orders.forEach((o) => o.invoiceNumber === invoice.invoiceNumber && !o.invoiceSentAt && (o.invoiceSentAt = sentAt));
+        }
       })
     );
   }

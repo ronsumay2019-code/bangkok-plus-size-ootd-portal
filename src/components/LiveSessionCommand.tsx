@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { ReadyForNextLive } from './ReadyForNextLive';
+import { ManualOrderForm } from './ManualOrderForm';
 import { 
   Square, 
   RotateCcw, 
@@ -68,7 +70,8 @@ interface LiveSessionCommandProps {
     colour: string;
     quantity: number;
     channel: 'live_chat' | 'messenger';
-    statedPrice: number;
+    /** null when the host's price is not known yet (waits for review) */
+    statedPrice: number | null;
   }) => void;
   onUpdateOrder?: (orderId: string, updates: Partial<BuyerOrder>) => Promise<void> | void;
   onBatchSetPrice?: (itemCode: string, pricePhp: number) => Promise<void> | void;
@@ -86,6 +89,13 @@ interface LiveSessionCommandProps {
   canManageMetaToken?: boolean;
   /** Owner: clear all orders and lives and start again from one Facebook live */
   onStartFresh?: (fbVideo: string, confirm: string) => Promise<string | null>;
+  /** Opens a new live session (optionally linked to its Facebook live) */
+  onStartNewLive?: (fbVideo: string) => Promise<void> | void;
+  /** Shortcuts after a live */
+  onOpenReview?: () => void;
+  onOpenPayments?: () => void;
+  /** The portal is still loading its data */
+  loading?: boolean;
 }
 
 export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
@@ -109,12 +119,12 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   onReplyMessenger,
   canManageMetaToken = true,
   onStartFresh,
+  onStartNewLive,
+  onOpenReview,
+  onOpenPayments,
+  loading = false,
 }) => {
-  const [showStartFresh, setShowStartFresh] = useState(false);
-  const [freshVideo, setFreshVideo] = useState('');
-  const [freshConfirm, setFreshConfirm] = useState('');
-  const [freshBusy, setFreshBusy] = useState(false);
-  const [freshError, setFreshError] = useState<string | null>(null);
+
   const isOnAir = live.status === 'live';
   const [secondsOnAir, setSecondsOnAir] = useState(0);
   const [newBuyerName, setNewBuyerName] = useState('');
@@ -125,8 +135,8 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   const [newQuantity, setNewQuantity] = useState('1');
   const [newChannel, setNewChannel] = useState<'live_chat' | 'messenger'>('live_chat');
   const [selectedOrderForSwap, setSelectedOrderForSwap] = useState<string>('');
-  const [swapNewSize, setSwapNewSize] = useState('4XL');
-  const [swapNewColour, setSwapNewColour] = useState('MAROON');
+  const [swapNewSize, setSwapNewSize] = useState('');
+  const [swapNewColour, setSwapNewColour] = useState('');
   const [autoReconciling, setAutoReconciling] = useState(false);
   const [reconcileStep, setReconcileStep] = useState(0);
   const [isSyncingGraph, setIsSyncingGraph] = useState(false);
@@ -370,12 +380,16 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
 
   const handleApplySwap = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrderForSwap) return;
+    if (!selectedOrderForSwap || (!swapNewSize && !swapNewColour.trim())) return;
+    // A blank field keeps what the buyer already has
+    const current = orders.find((o) => o.id === selectedOrderForSwap);
     onQuickAmendment(selectedOrderForSwap, {
-      size: swapNewSize,
-      colour: swapNewColour,
+      size: swapNewSize || current?.size || '',
+      colour: swapNewColour.trim() || current?.colour || '',
     });
     setSelectedOrderForSwap('');
+    setSwapNewSize('');
+    setSwapNewColour('');
   };
 
   // Filter current live orders
@@ -399,6 +413,12 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
   const coverageList = summary?.coverage || [];
   const shortages = coverageList.filter((c) => c.status === 'short');
   const covered = coverageList.filter((c) => c.status === 'covered');
+
+  if (loading) {
+    return (
+      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-12 text-center text-sm text-neutral-400">Loading the live…</div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -433,6 +453,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
       )}
 
       {/* Main Broadcast & Control Card */}
+      {isOnAir ? (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Video Broadcast View & Oversell Alert Banner (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
@@ -446,7 +467,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   {isOnAir ? '● ON AIR' : 'BROADCAST ENDED'}
                 </span>
                 <span className="font-mono text-sm text-neutral-200">
-                  {isOnAir ? formatTimer(secondsOnAir) : 'Duration: 1h 48m'}
+                  {isOnAir ? formatTimer(secondsOnAir) : live.endedAt && live.startedAt ? `Duration: ${formatTimer(Math.max(0, Math.round((new Date(live.endedAt).getTime() - new Date(live.startedAt).getTime()) / 1000)))}` : ''}
                 </span>
               </div>
 
@@ -463,22 +484,14 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
               </div>
             </div>
 
-            {/* Video Preview Player */}
-            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
-              <video
-                src="/media/bpso-live-preview.mp4"
-                poster="/media/bpso-live-poster.jpg"
-                controls
-                muted
-                autoPlay={isOnAir}
-                loop
-                className="w-full h-full object-cover"
-              />
-              {isOnAir && (
-                <div className="absolute top-3 left-3 bg-neutral-950/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-neutral-800 text-xs flex items-center gap-2 text-white shadow-lg">
-                  <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                  <span>Host Calling: <strong className="text-amber-400 font-mono">{currentHostSegment.itemCode}</strong> · <span className="text-emerald-400 font-bold">₱{currentHostSegment.pricePhp}</span></span>
-                </div>
+            {/* The live itself is watched on Facebook */}
+            <div className="p-6 bg-black/60 flex flex-col items-center justify-center gap-2 text-xs text-neutral-300 min-h-[120px]">
+              {live.videoUrl ? (
+                <a href={live.videoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold">
+                  <ExternalLink className="w-4 h-4" /> Watch this live on Facebook
+                </a>
+              ) : (
+                <span>No Facebook live linked yet. Paste the live link below and tap Sync.</span>
               )}
             </div>
 
@@ -486,7 +499,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
             <div className="p-4 bg-neutral-900 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-white">{live.title}</h3>
-                <p className="text-xs text-neutral-400">{live.storeName} · Live Selling Host: Myra</p>
+                <p className="text-xs text-neutral-400">{live.storeName}</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -519,104 +532,6 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
               </div>
             </div>
 
-            {/* Host Live Item Calling Stream Controller (Specification 10) */}
-            <div className="p-4 bg-neutral-950 border-t border-neutral-800 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-neutral-800/80">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-                  <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Radio className="w-3.5 h-3.5 text-rose-500" />
-                    Host Item Calling Controller · Item #{activeSegmentIndex + 1} of {HOST_BROADCAST_SEGMENTS.length}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-bold border border-rose-500/30">
-                    ON STREAM: {currentHostSegment.itemCode}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={activeSegmentIndex === 0}
-                    onClick={() => handleSelectSegment(activeSegmentIndex - 1)}
-                    className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition cursor-pointer"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    <span>Prev Item</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={activeSegmentIndex === HOST_BROADCAST_SEGMENTS.length - 1}
-                    onClick={() => handleSelectSegment(activeSegmentIndex + 1)}
-                    className="px-3.5 py-1 bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 disabled:opacity-30 text-neutral-950 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-lg transition cursor-pointer"
-                  >
-                    <span>Next Item Called</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Active Host Item Announced Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs bg-neutral-900/90 p-3 rounded-xl border border-neutral-800">
-                <div className="sm:col-span-5 space-y-1">
-                  <div className="text-[10px] text-neutral-400 uppercase tracking-wide font-semibold">Active Garment Called by Host</div>
-                  <div className="text-sm font-bold text-white flex items-center gap-2">
-                    <span className="text-amber-400 font-mono">{currentHostSegment.itemCode}</span>
-                    <span className="text-neutral-300 text-xs truncate">— {currentHostSegment.itemName}</span>
-                  </div>
-                  <div className="text-xs font-mono text-emerald-400 font-bold">
-                    Selling Price: ₱{currentHostSegment.pricePhp.toLocaleString()}
-                  </div>
-                </div>
-
-                <div className="sm:col-span-3 space-y-1">
-                  <div className="text-[10px] text-neutral-400 uppercase tracking-wide font-semibold">Sizes Called on Stream</div>
-                  <div className="flex flex-wrap gap-1">
-                    {currentHostSegment.availableSizes.map((sz) => (
-                      <span key={sz} className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-200 font-mono text-[10px] border border-neutral-700">
-                        {sz}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="sm:col-span-4 space-y-1">
-                  <div className="text-[10px] text-neutral-400 uppercase tracking-wide font-semibold">Colors Available / Shown (Click to Mine)</div>
-                  <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
-                    {currentHostSegment.availableColors.map((col) => (
-                      <button
-                        key={col}
-                        type="button"
-                        onClick={() => handleQuickMineColor(col)}
-                        title={`Click to quickly prepare mine order for ${col}`}
-                        className="px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 font-semibold text-[10px] border border-amber-500/30 transition cursor-pointer"
-                      >
-                        + {col}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Stream Timeline Ribbon */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px]">
-                <span className="text-neutral-500 shrink-0 uppercase tracking-wider font-semibold text-[9px]">Timeline:</span>
-                {HOST_BROADCAST_SEGMENTS.map((seg, idx) => (
-                  <button
-                    key={seg.itemCode}
-                    type="button"
-                    onClick={() => handleSelectSegment(idx)}
-                    className={`shrink-0 px-2.5 py-1 rounded-lg font-mono text-[10px] transition cursor-pointer ${
-                      activeSegmentIndex === idx
-                        ? 'bg-amber-500 text-neutral-950 font-bold ring-1 ring-amber-400 shadow'
-                        : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 border border-neutral-800'
-                    }`}
-                  >
-                    {idx + 1}. {seg.itemCode} (₱{seg.pricePhp})
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Meta Webhook & Graph API Sync Engine Card */}
@@ -779,75 +694,6 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                 </div>
               )}
 
-              {onStartFresh && canManageMetaToken && (
-                <div className="pt-2 border-t border-neutral-800 space-y-2 text-[11px]">
-                  {!showStartFresh ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowStartFresh(true)}
-                      className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-300 font-bold border border-neutral-700"
-                    >
-                      Start fresh from a live…
-                    </button>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-600/50 space-y-2">
-                      <p className="text-amber-100">
-                        <strong>Owner only.</strong> Deletes every order, live, pre-order and rack row in the portal, then starts again
-                        from the live below; its comments are pulled fresh. Messenger chats and staff sign-ins are kept.
-                      </p>
-                      <input
-                        type="text"
-                        name="freshVideo"
-                        aria-label="Facebook live link or video ID"
-                        value={freshVideo}
-                        onChange={(e) => setFreshVideo(e.target.value)}
-                        placeholder="Facebook live link or video ID"
-                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
-                      />
-                      <input
-                        type="text"
-                        name="freshConfirm"
-                        aria-label="Type START FRESH to confirm"
-                        value={freshConfirm}
-                        onChange={(e) => setFreshConfirm(e.target.value)}
-                        placeholder="Type START FRESH to confirm"
-                        autoCapitalize="characters"
-                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
-                      />
-                      {freshError && <p className="text-rose-300">{freshError}</p>}
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          disabled={freshBusy || freshConfirm.trim().toUpperCase() !== 'START FRESH' || !freshVideo.trim()}
-                          onClick={async () => {
-                            setFreshBusy(true);
-                            setFreshError(null);
-                            const err = await onStartFresh(freshVideo.trim(), freshConfirm.trim().toUpperCase());
-                            setFreshBusy(false);
-                            if (err) setFreshError(err);
-                            else {
-                              setShowStartFresh(false);
-                              setFreshVideo('');
-                              setFreshConfirm('');
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-bold"
-                        >
-                          {freshBusy ? 'Starting fresh…' : 'Delete and start fresh'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowStartFresh(false)}
-                          className="px-3 py-1.5 rounded-lg bg-neutral-800 text-neutral-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {showBatchImport && (
                 <div className="pt-2 border-t border-neutral-800 space-y-2">
                   <label className="text-[11px] text-neutral-300 block font-medium">
@@ -964,6 +810,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
                   onChange={(e) => setSwapNewSize(e.target.value)}
                   className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-2 text-neutral-200"
                 >
+                  <option value="">New size…</option>
                   <option value="XL">New Size: XL</option>
                   <option value="2XL">New Size: 2XL</option>
                   <option value="3XL">New Size: 3XL</option>
@@ -986,7 +833,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
               <div className="sm:col-span-2">
                 <button
                   type="submit"
-                  disabled={!selectedOrderForSwap}
+                  disabled={!selectedOrderForSwap || (!swapNewSize && !swapNewColour.trim())}
                   className="w-full h-full bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg font-semibold py-2 transition"
                 >
                   Swap Spec
@@ -998,270 +845,8 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
 
         {/* Right Column: Live Comment Feed & Real-time Demand Ledger (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          {/* Quick Mine Simulator (Requirement 1: Editable, Empty Defaults, Adapts to Any Live Item Code) */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-amber-400" />
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Live Mine Capture Simulator
-                </h4>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Host-Synced & Queue-Aware
-                </span>
-              </div>
-            </div>
-
-            {/* Active Host Context Pill */}
-            <div className="p-2.5 rounded-xl bg-neutral-950 border border-amber-500/30 mb-3 space-y-1">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-neutral-400">Host Segment: <strong className="text-amber-400 font-mono">{currentHostSegment.itemCode}</strong></span>
-                <span className="text-emerald-400 font-mono font-bold">Host Price: ₱{currentHostSegment.pricePhp.toLocaleString()}</span>
-              </div>
-              <div className="text-[10px] text-neutral-400 truncate">
-                Vague comments (e.g. <em>"Mine black"</em>, <em>"Mine pink & charcoal"</em>) automatically inherit this active garment & price!
-              </div>
-            </div>
-
-            {/* Dual Input Mode Selector */}
-            <div className="flex rounded-lg bg-neutral-950 p-1 border border-neutral-800 mb-3 text-xs">
-              <button
-                type="button"
-                onClick={() => setSimulatorMode('natural')}
-                className={`flex-1 py-1 rounded-md font-semibold transition ${
-                  simulatorMode === 'natural'
-                    ? 'bg-amber-500 text-neutral-950 font-bold shadow'
-                    : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                Intelligent Comment Parser
-              </button>
-              <button
-                type="button"
-                onClick={() => setSimulatorMode('manual')}
-                className={`flex-1 py-1 rounded-md font-semibold transition ${
-                  simulatorMode === 'manual'
-                    ? 'bg-amber-500 text-neutral-950 font-bold shadow'
-                    : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                Manual Field Form
-              </button>
-            </div>
-
-            {simulatorMode === 'natural' ? (
-              <form onSubmit={handleNaturalCommentSubmit} className="space-y-2.5 text-xs">
-                <div>
-                  <label className="text-[10px] text-neutral-400 block mb-0.5">Miner Live Comment *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Mine Rustans Pink & Charcoal or Buyer Name: Mine LU pants black"
-                    value={naturalCommentInput}
-                    onChange={(e) => setNaturalCommentInput(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-2 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500 text-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-neutral-400 block mb-0.5">Buyer Name (Optional if in comment)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Emz Cruz"
-                      value={naturalBuyerInput}
-                      onChange={(e) => setNaturalBuyerInput(e.target.value)}
-                      className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500 text-xs"
-                    />
-                  </div>
-
-                  <div className="flex items-end">
-                    <button
-                      type="submit"
-                      disabled={!naturalCommentInput.trim()}
-                      className="w-full bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 disabled:opacity-50 text-white font-bold rounded-lg py-2 flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Capture Mine Piece(s)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick Stream Sample Comment Chips */}
-                <div className="pt-1">
-                  <span className="text-[10px] text-neutral-500 block mb-1">Quick Stream Samples from Morning Live:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {[
-                      { b: 'Sample Buyer A', c: 'Mine LU pants black' },
-                      { b: 'Sample Buyer B', c: 'Mine Rustans Pink & Charcoal' },
-                      { b: 'Sample Buyer C', c: 'AC RUSTANS' },
-                      { b: 'Sample Buyer D', c: 'Rustans violet' },
-                      { b: 'Sample Buyer E', c: 'Mine linen pants avocado and yellow' },
-                      { b: 'Sample Buyer F', c: 'Mine 2 tops' },
-                    ].map((s) => (
-                      <button
-                        key={s.c}
-                        type="button"
-                        onClick={() => {
-                          setNaturalBuyerInput(s.b);
-                          setNaturalCommentInput(s.c);
-                        }}
-                        className="px-2 py-0.5 rounded bg-neutral-950 hover:bg-neutral-850 text-neutral-300 font-mono text-[10px] border border-neutral-800 transition cursor-pointer"
-                      >
-                        {s.c}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </form>
-            ) : (
-              /* Datalists for quick click suggestions while allowing arbitrary ad-hoc codes */
-              <>
-                <datalist id="live-simulator-item-codes">
-                  {HOST_BROADCAST_SEGMENTS.map((s) => (
-                    <option key={s.itemCode} value={s.itemCode} />
-                  ))}
-                  {Array.from(new Set(inventory.map((i) => i.itemCode))).map((code) => (
-                    <option key={code} value={code} />
-                  ))}
-                </datalist>
-
-                <datalist id="live-simulator-sizes">
-                  <option value="FREE SIZE (PLUS)" />
-                  <option value="XL" />
-                  <option value="2XL" />
-                  <option value="3XL" />
-                  <option value="4XL" />
-                  <option value="5XL" />
-                  <option value="6XL" />
-                </datalist>
-
-                <datalist id="live-simulator-colours">
-                  {currentHostSegment.availableColors.map((col) => (
-                    <option key={col} value={col} />
-                  ))}
-                  <option value="BLACK" />
-                  <option value="WHITE" />
-                  <option value="PINK" />
-                  <option value="CHARCOAL" />
-                  <option value="MAROON" />
-                  <option value="BROWN" />
-                  <option value="VIOLET" />
-                  <option value="NAVY" />
-                  <option value="ASSORTED" />
-                </datalist>
-
-                <form onSubmit={handleSimulateMineComment} className="space-y-2 text-xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-neutral-400 block mb-0.5">Buyer Name *</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Aileen Cruz"
-                        value={newBuyerName}
-                        onChange={(e) => setNewBuyerName(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-neutral-400 block mb-0.5">Item Code (blank = {currentHostSegment.itemCode})</label>
-                      <input
-                        type="text"
-                        list="live-simulator-item-codes"
-                        placeholder={currentHostSegment.itemCode}
-                        value={newItemCode}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setNewItemCode(val);
-                          const segMatch = HOST_BROADCAST_SEGMENTS.find(
-                            (s) => s.itemCode.toLowerCase() === val.trim().toLowerCase()
-                          );
-                          if (segMatch && !newPrice) {
-                            setNewPrice(String(segMatch.pricePhp));
-                          }
-                        }}
-                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <div>
-                      <label className="text-[10px] text-neutral-400 block mb-0.5">Size</label>
-                      <input
-                        type="text"
-                        list="live-simulator-sizes"
-                        placeholder={currentHostSegment.availableSizes[0] || 'FREE SIZE'}
-                        value={newSize}
-                        onChange={(e) => setNewSize(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] text-neutral-400 block mb-0.5">Colour</label>
-                      <input
-                        type="text"
-                        list="live-simulator-colours"
-                        placeholder={currentHostSegment.availableColors[0] || 'ASSORTED'}
-                        value={newColour}
-                        onChange={(e) => setNewColour(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 placeholder:text-neutral-600 focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] text-neutral-400 block mb-0.5">Price (₱)</label>
-                      <input
-                        type="number"
-                        placeholder={String(currentHostSegment.pricePhp)}
-                        value={newPrice}
-                        onChange={(e) => setNewPrice(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] text-neutral-400 block mb-0.5">Qty</label>
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="1"
-                        value={newQuantity}
-                        onChange={(e) => setNewQuantity(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-200 font-mono placeholder:text-neutral-600 focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
-                    <div className="sm:col-span-6">
-                      <select
-                        value={newChannel}
-                        onChange={(e) => setNewChannel(e.target.value as 'live_chat' | 'messenger')}
-                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-neutral-200 text-xs"
-                      >
-                        <option value="live_chat">📹 Channel: Facebook Live Chat</option>
-                        <option value="messenger">💬 Channel: Business Messenger DM</option>
-                      </select>
-                    </div>
-
-                    <div className="sm:col-span-6">
-                      <button
-                        type="submit"
-                        disabled={!newBuyerName && !newItemCode}
-                        className="w-full bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 disabled:opacity-50 text-white font-semibold rounded-lg py-1.5 flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Mine Claim</span>
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </>
-            )}
-          </div>
+          {/* Add an order by hand (no preset item or price: a missing price waits for review) */}
+          <ManualOrderForm onAddOrder={onAddOrder} />
 
           {/* Real-time Live Comments Stream */}
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col h-[460px]">
@@ -1474,7 +1059,21 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
           </div>
         </div>
       </div>
+      ) : (
+        <ReadyForNextLive
+          lastLive={live}
+          orders={orders.filter((o) => o.liveId === live.id)}
+          onStartNewLive={onStartNewLive}
+          onResumeLive={() => onToggleLive('start')}
+          onOpenReview={onOpenReview}
+          onOpenReconciliation={onSwitchToSummary}
+          onOpenPayments={onOpenPayments}
+          onStartFresh={canManageMetaToken ? onStartFresh : undefined}
+        />
+      )}
 
+      {/* Live-only sections: hidden while the screen is "Ready for the next live" */}
+      {isOnAir && (<>
       {/* Live Business Messenger & In-Live Amendments Inbox (Requirement 2A) */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-neutral-800">
@@ -1768,6 +1367,7 @@ export const LiveSessionCommand: React.FC<LiveSessionCommandProps> = ({
           })}
         </div>
       </div>
+      </>)}
     </div>
   );
 };
