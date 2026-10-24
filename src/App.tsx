@@ -13,6 +13,7 @@ import { PreOrdersLane } from './components/PreOrdersLane';
 import { OwnerOverrideModal } from './components/OwnerOverrideModal';
 import { MobileAccessQRModal } from './components/MobileAccessQRModal';
 import { MetaTokenModal } from './components/MetaTokenModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { 
   LiveSession, 
   BuyerOrder, 
@@ -182,7 +183,7 @@ export default function App() {
     isPreOrder: false,
   });
 
-  const activeLive = lives[0];
+  const activeLive = lives[0] || SEED_LIVE_SESSIONS[0];
 
   // Helper toast notification
   const showToast = (msg: string) => {
@@ -1086,6 +1087,7 @@ export default function App() {
 
       {/* Main Body Content based on active tab */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <ErrorBoundary key={activeTab}>
         {activeTab === 'live_command' && (
           <LiveSessionCommand
             live={activeLive}
@@ -1223,6 +1225,7 @@ export default function App() {
         {activeTab === 'pola_ai' && (
           <PolaAICopilot summary={summary} />
         )}
+        </ErrorBoundary>
       </main>
 
       {/* Executive Owner / Admin Override Modal */}

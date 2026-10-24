@@ -22,6 +22,8 @@ import {
   MessageSquare,
   Video,
   ArrowRightLeft,
+  Plus,
+  ShoppingBag,
 } from 'lucide-react';
 import { 
   BuyerOrder, 
@@ -58,10 +60,10 @@ interface OrderReviewApprovalWorkspaceProps {
 }
 
 export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspaceProps> = ({
-  orders,
+  orders = [],
   summary,
   activeLive,
-  userRole,
+  userRole = 'owner',
   amendments = [],
   messengerThreads = [],
   onApproveOrder,
@@ -116,19 +118,21 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
     'SKORT': 450,
   };
 
-  const pendingOrders = orders.filter((o) => o.status === 'pending');
-  const confirmedOrders = orders.filter((o) => o.status === 'confirmed' || o.status === 'invoiced');
-  const shortOrders = orders.filter((o) => o.status === 'short');
-  const duplicateOrders = orders.filter((o) => o.isDuplicateFlagged);
+  const safeOrders = orders || [];
+  const pendingOrders = safeOrders.filter((o) => o?.status === 'pending');
+  const confirmedOrders = safeOrders.filter((o) => o?.status === 'confirmed' || o?.status === 'invoiced');
+  const shortOrders = safeOrders.filter((o) => o?.status === 'short');
+  const duplicateOrders = safeOrders.filter((o) => o?.isDuplicateFlagged);
 
-  const filteredOrders = orders.filter((o) => {
+  const filteredOrders = safeOrders.filter((o) => {
+    if (!o) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      return (
-        o.buyerName.toLowerCase().includes(q) ||
-        o.itemCode.toLowerCase().includes(q) ||
-        o.size.toLowerCase().includes(q) ||
-        o.colour.toLowerCase().includes(q)
+      return Boolean(
+        (o.buyerName && o.buyerName.toLowerCase().includes(q)) ||
+        (o.itemCode && o.itemCode.toLowerCase().includes(q)) ||
+        (o.size && o.size.toLowerCase().includes(q)) ||
+        (o.colour && o.colour.toLowerCase().includes(q))
       );
     }
     if (filterStatus === 'pending') return o.status === 'pending';
@@ -165,6 +169,38 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
     });
 
     setEditingOrder(null);
+  };
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onAddOrder) return;
+    if (!newBuyerName.trim() || !newItemCode.trim()) {
+      alert('Please fill in Buyer Name and Item Code.');
+      return;
+    }
+    setIsAddingOrder(true);
+    try {
+      await onAddOrder({
+        buyerName: newBuyerName.trim(),
+        itemCode: newItemCode.trim().toUpperCase(),
+        size: newSize.trim().toUpperCase(),
+        colour: newColour.trim().toUpperCase(),
+        quantity: Math.max(1, parseInt(newQty, 10) || 1),
+        channel: newChannel,
+        statedPrice: parseFloat(newPrice) || 0,
+      });
+      setShowAddModal(false);
+      setNewBuyerName('');
+      setNewItemCode('');
+      setNewSize('FREE SIZE (PLUS)');
+      setNewColour('ASSORTED');
+      setNewQty('1');
+      setNewPrice('550');
+    } catch (err) {
+      console.error('Failed to add manual order', err);
+    } finally {
+      setIsAddingOrder(false);
+    }
   };
 
   const handleAttemptApprove = (ord: BuyerOrder) => {
@@ -220,7 +256,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
   return (
     <div className="space-y-6">
       {/* Executive Owner / Admin Review Gate Banner */}
-      {activeLive.reconciliationStatus === 'awaiting_owner_review' && (
+      {activeLive?.reconciliationStatus === 'awaiting_owner_review' && (
         <div className="bg-gradient-to-r from-amber-950/80 via-neutral-900 to-rose-950/80 border-2 border-amber-500 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div className="flex items-start gap-3.5">
@@ -280,7 +316,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
         </div>
       )}
 
-      {activeLive.ownerApprovedBy && (
+      {activeLive?.ownerApprovedBy && (
         <div className="p-3.5 bg-emerald-950/40 border border-emerald-500/50 rounded-xl flex items-center justify-between text-xs text-emerald-200">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -317,7 +353,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
               className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-950/40 transition"
             >
               <ShieldCheck className="w-4 h-4" />
-              <span>Final Invoice Approval ({summary?.invoicingQueue.eligibleInvoicesCount || 0} Ready)</span>
+              <span>Final Invoice Approval ({summary?.invoicingQueue?.eligibleInvoicesCount || 0} Ready)</span>
             </button>
           </div>
         </div>
@@ -474,15 +510,15 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                 const isConfirmed = ord.status === 'confirmed';
                 const isDuplicate = ord.isDuplicateFlagged;
 
-                const matchingAmendment = amendments.find(
+                const matchingAmendment = (amendments || []).find(
                   (a) => a.originalOrderId === ord.id || 
-                         a.buyerName.toLowerCase() === ord.buyerName.toLowerCase()
+                         (a.buyerName && ord.buyerName && a.buyerName.toLowerCase() === ord.buyerName.toLowerCase())
                 );
-                const matchingMessengerThread = messengerThreads.find(
-                  (t) => t.buyerName.toLowerCase() === ord.buyerName.toLowerCase() ||
-                         (t.psid && ord.sourceCommentId?.includes(t.psid))
+                const matchingMessengerThread = (messengerThreads || []).find(
+                  (t) => (t.buyerName && ord.buyerName && t.buyerName.toLowerCase() === ord.buyerName.toLowerCase()) ||
+                         (t.psid && ord.sourceCommentId && ord.sourceCommentId.includes(t.psid))
                 );
-                const isAmended = !!matchingAmendment || ord.status === 'replaced' || (ord.hostVerificationNote && ord.hostVerificationNote.includes('Adjusted'));
+                const isAmended = !!matchingAmendment || ord.status === 'replaced' || Boolean(ord.hostVerificationNote && ord.hostVerificationNote.includes('Adjusted'));
 
                 return (
                   <tr key={ord.id} className={`hover:bg-neutral-800/30 transition ${isSelected ? 'bg-rose-950/20' : ''}`}>
@@ -540,7 +576,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                           </button>
                         ) : (
                           <a
-                            href={activeLive.videoUrl || `https://www.facebook.com/watch/?v=${activeLive.fbVideoId || '1126219396590785'}`}
+                            href={activeLive?.videoUrl || `https://www.facebook.com/watch/?v=${activeLive?.fbVideoId || '1126219396590785'}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1"
@@ -680,7 +716,7 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                               </button>
                             ) : (
                               <a
-                                href={activeLive.videoUrl || `https://www.facebook.com/watch/?v=${activeLive.fbVideoId || '1126219396590785'}`}
+                                href={activeLive?.videoUrl || `https://www.facebook.com/watch/?v=${activeLive?.fbVideoId || '1126219396590785'}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1"
@@ -997,6 +1033,177 @@ export const OrderReviewApprovalWorkspace: React.FC<OrderReviewApprovalWorkspace
                 Close Snapshot
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Add Manual Buyer / Order Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5 text-rose-500" />
+                <span>Add Manual Order / Claim</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-neutral-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSubmit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-neutral-400 block mb-1 font-semibold">Buyer Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newBuyerName}
+                  onChange={(e) => setNewBuyerName(e.target.value)}
+                  placeholder="e.g. Donna Cruz"
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2.5 text-white font-medium focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-neutral-400 block mb-1 font-semibold">Bangkok Item Code *</label>
+                <input
+                  type="text"
+                  list="add-modal-item-codes"
+                  required
+                  value={newItemCode}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewItemCode(val);
+                    const upper = val.trim().toUpperCase();
+                    if (KNOWN_BANGKOK_PRICES[upper]) {
+                      setNewPrice(String(KNOWN_BANGKOK_PRICES[upper]));
+                    }
+                  }}
+                  placeholder="e.g. RUSTANS, LU PANTS, FLOWY DRESS..."
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2.5 text-white font-mono uppercase focus:border-rose-500 focus:outline-none"
+                />
+                <datalist id="add-modal-item-codes">
+                  <option value="RUSTANS" />
+                  <option value="LU PANTS" />
+                  <option value="LINEN PANTS" />
+                  <option value="LONG DRESS" />
+                  <option value="FLOWY DRESS" />
+                  <option value="SEXY BLACK" />
+                  <option value="HALF SET" />
+                  <option value="ELEGANT SET" />
+                  <option value="GIG 5" />
+                  <option value="TALI TIE DYE" />
+                  <option value="SKORT" />
+                </datalist>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-neutral-400 block mb-1">Size</label>
+                  <select
+                    value={newSize}
+                    onChange={(e) => setNewSize(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2.5 text-white focus:border-rose-500 focus:outline-none"
+                  >
+                    <option value="FREE SIZE (PLUS)">FREE SIZE (PLUS)</option>
+                    <option value="FS (PLUS)">FS (PLUS)</option>
+                    <option value="XL">XL</option>
+                    <option value="2XL">2XL</option>
+                    <option value="3XL">3XL</option>
+                    <option value="4XL">4XL</option>
+                    <option value="5XL">5XL</option>
+                    <option value="6XL">6XL</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-neutral-400 block mb-1">Colour</label>
+                  <input
+                    type="text"
+                    value={newColour}
+                    onChange={(e) => setNewColour(e.target.value)}
+                    placeholder="e.g. BLACK, MAROON"
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2.5 text-white uppercase focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-neutral-400 block mb-1 font-semibold">Unit Price (PHP)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newPrice}
+                    onChange={(e) => setNewPrice(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2.5 text-white font-mono focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-neutral-400 block mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newQty}
+                    onChange={(e) => setNewQty(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2.5 text-white font-mono focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-neutral-400 block mb-1">Intake Channel</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewChannel('live_chat')}
+                    className={`p-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                      newChannel === 'live_chat'
+                        ? 'bg-rose-950/60 border-rose-500 text-rose-300'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400'
+                    }`}
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    <span>Live Chat</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewChannel('messenger')}
+                    className={`p-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                      newChannel === 'messenger'
+                        ? 'bg-sky-950/60 border-sky-500 text-sky-300'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400'
+                    }`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Page Messenger</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAddingOrder}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{isAddingOrder ? 'Adding...' : 'Add Order'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
