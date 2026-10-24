@@ -57,3 +57,18 @@ test('expired sessions are refused; the owner cannot be issued an admin code', a
   assert.equal(await auth.userForToken(s!.token), null);
   await assert.rejects(auth.issueCode('owner', false));
 });
+
+test('the co-owner gets owner access from an owner-issued code; admin 3 is an admin', async () => {
+  const db = new MemoryBackend();
+  const auth = new PortalAuth(db, 'OWNER');
+  const coOwner = await auth.login((await auth.issueCode('owner2', false)).code, {});
+  assert.equal(coOwner!.user.role, 'owner');
+  assert.equal(coOwner!.user.staffId, 'owner2');
+  const admin3 = await auth.login((await auth.issueCode('admin3', false)).code, {});
+  assert.equal(admin3!.user.role, 'admin');
+
+  await auth.revoke('owner2');
+  assert.equal(await auth.userForToken(coOwner!.token), null, 'the co-owner seat can be revoked');
+  await auth.revoke('owner');
+  assert.ok(await auth.login('OWNER', {}), 'the primary owner can never be revoked');
+});

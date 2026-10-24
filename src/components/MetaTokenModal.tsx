@@ -21,6 +21,7 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
     maskedToken: string | null;
     pageId: string;
     mode: string;
+    canManage?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -123,7 +124,7 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
           </div>
           {currentTokenInfo?.hasToken ? (
             <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[11px] font-bold border border-emerald-500/40">
-              🟢 Connected ({currentTokenInfo.maskedToken})
+              🟢 Connected{currentTokenInfo.maskedToken ? ` (${currentTokenInfo.maskedToken})` : ''}
             </span>
           ) : (
             <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold border border-amber-500/40">
@@ -132,7 +133,11 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
           )}
         </div>
 
-        {/* Form */}
+        {currentTokenInfo?.canManage === false ? (
+          <p className="p-3.5 bg-neutral-950 rounded-2xl border border-neutral-800 text-xs text-neutral-300">
+            Only an owner can view or change the Facebook token.
+          </p>
+        ) : (
         <form onSubmit={handleSaveToken} className="space-y-4 text-xs">
           <div>
             <label className="block text-xs font-bold text-neutral-200 mb-1.5">
@@ -199,6 +204,7 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

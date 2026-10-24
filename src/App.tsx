@@ -1117,6 +1117,7 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
             onGraphSync={handleGraphSync}
             onBulkImportOrders={handleBulkImportOrders}
             onReplyMessenger={handleReplyMessenger}
+            canManageMetaToken={!authEnabled || userRole === 'owner'}
           />
         )}
 

@@ -1190,7 +1190,7 @@ app.get('/api/auth/sessions', async (_req, res) => {
   res.json({ success: true, authEnabled: false, sessions: publicSessions(), predefinedUsers: PREDEFINED_USERS });
 });
 
-// Owner creates a phone sign-in code for Admin 1 / Admin 2 (the old code stops working)
+// Owner creates a sign-in code for the co-owner or an admin (the old code stops working)
 app.post('/api/auth/invite', async (req, res) => {
   if (!portalAuth.enabled) {
     return res.status(400).json({ error: 'Sign-in is not set up yet. Add PORTAL_OWNER_CODE in Vercel first.' });
@@ -1260,12 +1260,19 @@ app.post('/api/auth/heartbeat', (req, res) => {
 });
 
 // Meta Facebook Page Access Token Management (supports META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN)
+// Admins see only whether a token is set; the masked token and changing it are for owners
+function canManageMetaToken(req: express.Request): boolean {
+  return !portalAuth.enabled || portalUserOf(req)?.role === 'owner';
+}
+
 app.get('/api/meta/token', (req, res) => {
   const activeToken = getMetaPageAccessToken();
+  const showToken = canManageMetaToken(req);
   res.json({
     success: true,
     hasToken: !!activeToken,
-    maskedToken: activeToken ? `${activeToken.slice(0, 8)}...${activeToken.slice(-6)}` : null,
+    canManage: showToken,
+    maskedToken: activeToken && showToken ? `${activeToken.slice(0, 8)}...${activeToken.slice(-6)}` : null,
     pageId: getMetaPageId(),
     mode: activeToken ? 'live_graph_api' : 'manual_messenger',
     tokenSource: process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN
@@ -1277,7 +1284,7 @@ app.get('/api/meta/token', (req, res) => {
 });
 
 app.post('/api/meta/token', (req, res) => {
-  if (!requireRole(req, res, ['owner', 'admin'])) return;
+  if (!requireRole(req, res, ['owner'])) return;
   const { token, pageId } = req.body;
   if (token && typeof token === 'string') {
     setMetaCredentials(token, pageId);
@@ -2217,6 +2224,9 @@ app.post('/api/facebook/live-sync', async (req, res) => {
     graphSyncStats.onAirVideoId = cleanVid;
   }
 
+  if ((accessToken || fbPageId) && !canManageMetaToken(req)) {
+    return res.status(403).json({ error: 'Only an owner can change the Facebook token or Page ID.' });
+  }
   if (accessToken && String(accessToken).trim()) {
     setMetaCredentials(String(accessToken).trim(), fbPageId ? String(fbPageId).trim() : undefined);
   } else if (fbPageId && String(fbPageId).trim()) {

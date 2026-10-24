@@ -185,7 +185,7 @@ test('orders added on two copies at the same time are all kept', async () => {
   assert.equal(added.length, 8);
 });
 
-test('owner creates an admin phone link; admins cannot create links or change the token', async () => {
+test('owner creates admin and co-owner links; admins cannot create links or see or change the token', async () => {
   const inv = await call(B, '/api/auth/invite', { token: ownerToken, body: { staffId: 'admin1' } });
   assert.equal(inv.status, 200);
   const login = await call(A, '/api/auth/login', { body: { code: inv.data.code, deviceType: 'mobile' } });
@@ -194,7 +194,18 @@ test('owner creates an admin phone link; admins cannot create links or change th
   const adminToken = login.data.token;
 
   assert.equal((await call(A, '/api/auth/invite', { token: adminToken, body: { staffId: 'admin2' } })).status, 403);
-  assert.equal((await call(A, '/api/meta/token', { token: adminToken, body: { token: 'x' } })).status, 200, 'admins may still connect the Page token');
+  assert.equal((await call(A, '/api/meta/token', { token: adminToken, body: { token: 'x' } })).status, 403, 'admins cannot change the Page token');
+  const seen = await call(A, '/api/meta/token', { token: adminToken });
+  assert.equal(seen.status, 200);
+  assert.equal(seen.data.maskedToken, null, 'admins never see the token, even masked');
+  assert.equal(seen.data.canManage, false);
+  const sync = await call(B, '/api/facebook/live-sync', { token: adminToken, body: { accessToken: 'x' } });
+  assert.equal(sync.status, 403, 'admins cannot slip a token in through the live sync');
+
+  const co = await call(B, '/api/auth/invite', { token: ownerToken, body: { staffId: 'owner2' } });
+  const coLogin = await call(A, '/api/auth/login', { body: { code: co.data.code } });
+  assert.equal(coLogin.data.user.role, 'owner', 'the co-owner has owner access');
+  assert.equal((await call(A, '/api/auth/invite', { token: coLogin.data.token, body: { staffId: 'admin3' } })).status, 200, 'the co-owner can create admin links');
   const override = await call(B, '/api/owner/order-override', { token: adminToken, body: { orderId: 'ord_live_2', role: 'staff', reason: 'size fix', overrides: { size: '3XL' } } });
   assert.equal(override.status, 200, 'the role comes from the sign-in, not from the request body');
 });
