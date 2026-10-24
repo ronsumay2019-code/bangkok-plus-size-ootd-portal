@@ -481,7 +481,7 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
                         ? activeThread.buyerHandle
                         : activeThread.psid && /^\d{8,}$/.test(activeThread.psid)
                         ? `https://m.me/${activeThread.psid}`
-                        : `https://business.facebook.com/latest/inbox/messenger?asset_id=100064426114382`
+                        : `https://business.facebook.com/latest/inbox/messenger?asset_id=109603071381200`
                     }
                     target="_blank"
                     rel="noreferrer"

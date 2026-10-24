@@ -60,17 +60,17 @@ export const MetaGraphApiBadge: React.FC<MetaGraphApiBadgeProps> = ({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-950/70 via-neutral-900 to-sky-950/70 border border-blue-500/40 hover:border-blue-400 text-xs text-neutral-200 transition shadow-sm hover:shadow-blue-900/30 cursor-pointer ${className}`}
+      className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-950/70 via-neutral-900 to-sky-950/70 border border-blue-500/40 hover:border-blue-400 text-xs text-neutral-200 transition shadow-sm hover:shadow-blue-900/30 cursor-pointer ${className}`}
       title="Meta Official Graph API v22.0 Connected - Click to view connection status"
     >
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex items-center justify-center shrink-0">
         <MetaGraphApiIcon className="w-4 h-4" />
         <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
       </div>
-      <span className="font-semibold tracking-tight text-white flex items-center gap-1.5">
-        <span>Connected via</span>
+      <span className="hidden sm:flex font-semibold tracking-tight text-white items-center gap-1.5">
+        <span className="hidden md:inline">Connected via</span>
         <span className="bg-gradient-to-r from-blue-400 to-sky-300 bg-clip-text text-transparent font-bold">
-          Meta Official Graph API
+          Meta Graph API
         </span>
       </span>
       <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono border border-blue-500/30">

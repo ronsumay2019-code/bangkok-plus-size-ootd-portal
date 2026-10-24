@@ -130,12 +130,13 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Zero-Refund Invoicing Gate</span>
           </div>
 
-          {/* Meta Webhook & Graph API Status / Token Config */}
-          <MetaGraphApiBadge 
-            variant="header" 
-            onClick={onOpenMetaTokenModal}
-            className="hidden lg:flex" 
-          />
+          {/* Meta Webhook & Graph API Status / Token Config (Owner & Admin only; responsive across mobile and desktop) */}
+          {userRole !== 'staff' && (
+            <MetaGraphApiBadge 
+              variant="header" 
+              onClick={onOpenMetaTokenModal}
+            />
+          )}
 
           {/* User Executive Role Switcher & Current User */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-800/90 border border-neutral-700 text-xs">
