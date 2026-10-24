@@ -1,3 +1,4 @@
+import { dataUrlToFile, shrinkPhoto } from '../utils/photos';
 import React, { useState, useRef } from 'react';
 import { 
   FileCheck, 
@@ -100,21 +101,39 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
   const [attachedPhotos, setAttachedPhotos] = useState<string[]>([]);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceSentSuccess, setInvoiceSentSuccess] = useState(false);
+  /** What Messenger said about the photos sent with the invoice */
+  const [photoSendResult, setPhotoSendResult] = useState<{ sent: number; total: number; error?: string } | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
-        const result = uploadEvent.target?.result;
-        if (typeof result === 'string') {
-          setAttachedPhotos((prev) => [...prev, result]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of Array.from(files)) {
+      const small = await shrinkPhoto(file);
+      if (small) setAttachedPhotos((prev) => [...prev, small]);
+    }
+    e.target.value = '';
+  };
+
+  /** Sends each photo to the buyer's Messenger conversation, one at a time, after the invoice text. */
+  const sendPhotosToThread = async (threadId: string, photos: string[]) => {
+    let sent = 0;
+    let error: string | undefined;
+    for (const [i, photo] of photos.entries()) {
+      try {
+        const res = await fetch('/api/meta/messenger/send-photo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ threadId, imageDataUrl: photo, clientMessageId: `m_photo_${Date.now()}_${i}` }),
+        });
+        const data: any = await res.json().catch(() => ({}));
+        if (res.ok && data.success) sent++;
+        else error = data.metaApiDetail || data.error || `Photo ${i + 1} was not delivered`;
+      } catch (err: any) {
+        error = err?.message || `Photo ${i + 1} was not delivered`;
+      }
+    }
+    setPhotoSendResult({ sent, total: photos.length, error });
   };
 
   const handleRemovePhoto = (indexToRemove: number) => {
@@ -279,6 +298,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
   const handleOpenInvoicePreview = (bag: BuyerBag) => {
     setPreviewBag(bag);
     setAttachedPhotos([]);
+    setPhotoSendResult(null);
     setHandwrittenNote(
       `Hi Sis ${bag.buyerName}! 💖 Maraming salamat sa pag-mine kanina sa ating live selling! Sinigurado ko talagang maganda at bago tong items mo diretso galing Bangkok Pratunam store. May kasama itong special freebie para sa yo! Ingat always and enjoy your plus-size OOTD! ✨\n— Live Host / BPSO Team`
     );
@@ -303,7 +323,7 @@ export const AutoReconciliationSummary: React.FC<AutoReconciliationSummaryProps>
       .join('\n');
 
     const photoNotice = photos.length > 0
-      ? `\n📸 [${photos.length} Pratunam Bangkok Garment Photo(s) Attached on File]\n`
+      ? `\n📸 ${photos.length} garment photo${photos.length === 1 ? '' : 's'} sent with this invoice\n`
       : '';
 
     return `${note.trim()}
@@ -329,6 +349,16 @@ PAYMENT OPTIONS:
 ===============================${photoNotice}`;
   };
 
+  /** The phone's share sheet gets the photos as files when it can take them (Messenger, Viber) */
+  const shareData = (buyerName: string, text: string, photos: string[]): ShareData => {
+    const base: ShareData = { title: `Invoice for ${buyerName} - Bangkok Plus Size OOTD`, text };
+    const files = photos
+      .map((p, i) => dataUrlToFile(p, `invoice-photo-${i + 1}.jpg`))
+      .filter((f): f is File => !!f);
+    if (files.length && typeof navigator !== 'undefined' && navigator.canShare?.({ files })) return { ...base, files };
+    return base;
+  };
+
   const handleSendInvoiceWithHandwrittenNote = async () => {
     if (!previewBag) return;
     setIsSendingInvoice(true);
@@ -342,8 +372,12 @@ PAYMENT OPTIONS:
       const matchingThread = messengerThreads?.find(
         (t) => t.buyerName.toLowerCase() === previewBag.buyerName.toLowerCase()
       );
+      setPhotoSendResult(null);
       if (matchingThread && onReplyMessenger) {
         await onReplyMessenger(matchingThread.id, fullMsg);
+        if (attachedPhotos.length) await sendPhotosToThread(matchingThread.id, attachedPhotos);
+      } else if (attachedPhotos.length) {
+        setPhotoSendResult({ sent: 0, total: attachedPhotos.length, error: 'No Messenger conversation with this buyer in the portal yet. Share the photos from your phone instead.' });
       }
 
       // 3. Automatically copy to clipboard for 1-tap pasting into Messenger
@@ -355,10 +389,7 @@ PAYMENT OPTIONS:
       // 4. Try native OS mobile share if available (opens Messenger / Viber app on phone)
       if (typeof navigator !== 'undefined' && 'share' in navigator) {
         try {
-          await navigator.share({
-            title: `Invoice for ${previewBag.buyerName} - Bangkok Plus Size OOTD`,
-            text: fullMsg,
-          });
+          await navigator.share(shareData(previewBag.buyerName, fullMsg, attachedPhotos));
         } catch {
           // Native share closed or dismissed
         }
@@ -375,10 +406,7 @@ PAYMENT OPTIONS:
     const fullMsg = buildFullInvoiceMessage(previewBag, handwrittenNote, attachedPhotos);
     if (typeof navigator !== 'undefined' && 'share' in navigator) {
       try {
-        await navigator.share({
-          title: `Invoice for ${previewBag.buyerName} - Bangkok Plus Size OOTD`,
-          text: fullMsg,
-        });
+        await navigator.share(shareData(previewBag.buyerName, fullMsg, attachedPhotos));
       } catch {}
     } else {
       navigator.clipboard.writeText(fullMsg);
@@ -1505,6 +1533,19 @@ PAYMENT OPTIONS:
                     Copied ✓
                   </span>
                 </div>
+
+                {photoSendResult && (
+                  <div
+                    className={`p-2.5 rounded-xl border text-[11px] ${
+                      photoSendResult.sent === photoSendResult.total
+                        ? 'bg-emerald-950/60 border-emerald-600/50 text-emerald-200'
+                        : 'bg-amber-950/60 border-amber-600/50 text-amber-200'
+                    }`}
+                  >
+                    📷 Photos sent to {previewBag.buyerName} in Messenger: {photoSendResult.sent} of {photoSendResult.total}
+                    {photoSendResult.error ? ` — ${photoSendResult.error}` : ' ✓'}
+                  </div>
+                )}
 
                 <div className="p-3 bg-neutral-950/90 rounded-xl border border-neutral-800 text-[11px] text-neutral-300 space-y-2.5">
                   <p className="leading-relaxed">

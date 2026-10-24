@@ -281,6 +281,28 @@ test('without the database settings the portal still starts (old in-memory behav
   assert.equal(st.data.authEnabled, false);
 });
 
+test('sending an invoice photo records it in the conversation with Messenger\'s answer', async () => {
+  const psid = '24000000000000099';
+  await call(A, '/api/meta/webhook', { body: { object: 'page', entry: [{ messaging: [{ sender: { id: psid }, recipient: { id: '1' }, timestamp: Date.now(), message: { mid: 'm_photo_buyer_1', text: 'invoice po' } }] }] } });
+  const s = await call(B, '/api/state', { token: ownerToken });
+  const thread = s.data.messengerThreads.find((t: any) => t.psid === psid);
+  assert.ok(thread);
+
+  const tiny = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==';
+  const r = await call(A, '/api/meta/messenger/send-photo', { token: ownerToken, body: { threadId: thread.id, imageDataUrl: tiny, clientMessageId: 'm_photo_test_1' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.message.text, '📷 Photo');
+  assert.equal(r.data.message.deliveryStatus, 'not_sent', 'no Page token in tests, so it is reported, not faked');
+
+  const bad = await call(A, '/api/meta/messenger/send-photo', { token: ownerToken, body: { threadId: thread.id, imageDataUrl: 'not-a-photo' } });
+  assert.equal(bad.data.success, false);
+  const after = await call(B, '/api/state', { token: ownerToken });
+  const saved = after.data.messengerThreads.find((t: any) => t.psid === psid).messages.find((m: any) => m.id === 'm_photo_test_1');
+  assert.ok(saved, 'the photo message is saved for every copy');
+  assert.equal((await call(A, '/api/meta/messenger/send-photo', { body: { threadId: thread.id, imageDataUrl: tiny } })).status, 401, 'signed-in staff only');
+});
+
+
 test('if the database is down the portal says so and changes nothing', async () => {
   const before = JSON.stringify(db.tables.portal_records);
   const url = db.url;

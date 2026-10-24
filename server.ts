@@ -493,6 +493,40 @@ async function sendMessengerText(psid: string, text: string, timeoutMs = 20000):
   }
 }
 
+/** Sends one photo (a data: URL from the phone camera, already shrunk in the browser) to a buyer in Messenger. */
+async function sendMessengerImage(psid: string, imageDataUrl: string, timeoutMs = 30000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
+  const fbToken = getMetaPageAccessToken();
+  const cleanPsid = String(psid || '').trim();
+  if (!fbToken) return { status: 'not_sent', detail: 'No Meta Page Access Token configured.' };
+  if (!/^\d{10,25}$/.test(cleanPsid)) {
+    return { status: 'not_sent', detail: "This buyer has no real Messenger ID yet. They must message the Page first — use 'Open in Messenger' instead." };
+  }
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(imageDataUrl || ''));
+  if (!match) return { status: 'not_sent', detail: 'The photo could not be read. Take it again.' };
+  const bytes = Buffer.from(match[2], 'base64');
+  if (bytes.length > 8 * 1024 * 1024) return { status: 'not_sent', detail: 'The photo is too large to send (over 8 MB).' };
+  try {
+    const form = new FormData();
+    form.append('recipient', JSON.stringify({ id: cleanPsid }));
+    form.append('messaging_type', 'RESPONSE');
+    form.append('message', JSON.stringify({ attachment: { type: 'image', payload: { is_reusable: false } } }));
+    form.append('filedata', new Blob([bytes], { type: match[1] }), `invoice-photo.${match[1].split('/')[1]}`);
+    const metaRes = await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const metaData: any = await metaRes.json().catch(() => ({}));
+    if (metaRes.ok && metaData.message_id) {
+      return { status: 'sent', detail: `Photo delivered to Facebook Messenger (Message ID: ${metaData.message_id})`, messageId: metaData.message_id };
+    }
+    console.warn('[Messenger Send API Error (photo)]:', metaData);
+    return { status: 'failed', detail: metaData?.error?.message || `Meta API Error (${metaRes.status})` };
+  } catch (e: any) {
+    return { status: 'failed', detail: e?.message || 'Network error reaching graph.facebook.com' };
+  }
+}
+
 /** Meta's 24-hour window starts at the buyer's last message, not at the Page's replies. */
 function windowFromLastBuyerMessage(messages: Array<{ sender: string; timestamp: string }>, fallbackIso?: string): string {
   const lastBuyer = [...messages].reverse().find((m) => m.sender === 'buyer');
@@ -2801,6 +2835,34 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
     metaApiStatus,
     metaApiDetail: delivery.detail,
   });
+});
+
+// 8d-2b. Send a photo to a buyer (invoice garment photos taken on an admin's phone)
+app.post('/api/meta/messenger/send-photo', async (req, res) => {
+  const { threadId, imageDataUrl, clientMessageId } = req.body || {};
+  const thread = messengerThreads.find((t) => t.id === threadId);
+  if (!thread) return res.status(404).json({ error: 'Messenger conversation not found' });
+  if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl is required' });
+
+  const delivery = await sendMessengerImage(thread.psid, String(imageDataUrl));
+  const safeClientId = typeof clientMessageId === 'string' && /^[\w-]{6,80}$/.test(clientMessageId) ? clientMessageId : '';
+  // The photo itself is not stored in the portal; the conversation shows that one was sent
+  const newMsg = {
+    id: safeClientId || `m_photo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    sender: 'page_agent' as const,
+    text: '📷 Photo',
+    timestamp: new Date().toISOString(),
+    deliveryStatus: delivery.status,
+    deliveryDetail: delivery.detail,
+    ...(delivery.messageId ? { mid: delivery.messageId } : {}),
+  };
+  if (delivery.messageId) seenMessageIds.add(delivery.messageId);
+  const existingIdx = thread.messages.findIndex((m) => m.id === newMsg.id);
+  if (existingIdx >= 0) thread.messages[existingIdx] = newMsg;
+  else thread.messages.push(newMsg);
+  sortMessengerThreads();
+  saveRuntimeState();
+  res.json({ success: delivery.status === 'sent', thread, message: newMsg, metaApiDetail: delivery.detail });
 });
 
 // 8d-3. Simulate Incoming Buyer Business Messenger DM (POST /api/meta/messenger/simulate-dm)
