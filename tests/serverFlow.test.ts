@@ -183,7 +183,14 @@ test('only real order comments on the live become orders, pending and with no ma
   for (const e of events) assert.equal((await call(A, '/api/meta/webhook', { body: e })).status, 200);
   const s = await call(B, '/api/state', { token: ownerToken });
   const made = s.data.orders.filter((o: any) => ['q1', 'q2', 'e1', 'p1', 'o1', 'n1', 'm1', 'm2'].includes(o.sourceCommentId));
-  assert.deepEqual(made.map((o: any) => o.buyerName).sort(), ['Code Only', 'Real Buyer'], 'reactions, questions, empty, the Page, other posts and nameless comments are not orders');
+  assert.deepEqual(made.map((o: any) => o.buyerName).sort(), ['Code Only', 'Name needed', 'Real Buyer'], 'reactions, questions, empty, the Page and other posts are not orders; a nameless order is kept');
+  const nameless = made.find((o: any) => o.sourceCommentId === 'n1');
+  assert.match(nameless.reviewNotes, /facebook\.com\/n1/, 'links to the comment so staff can see who wrote it');
+  // Facebook gives the name later (e.g. the webhook): the order picks it up
+  await call(B, '/api/meta/webhook', { body: feed({ item: 'comment', comment_id: 'n1', message: 'Mine T3', from: { id: '7', name: 'Late Name' } }) });
+  const after = await call(A, '/api/state', { token: ownerToken });
+  assert.equal(after.data.orders.find((o: any) => o.sourceCommentId === 'n1').buyerName, 'Late Name');
+  assert.equal(after.data.orders.filter((o: any) => o.sourceCommentId === 'n1').length, 1, 'still one order');
   for (const o of made) {
     assert.equal(o.status, 'pending', 'waits for review');
     assert.equal(o.statedUnitPricePhp, null, 'no price until the host price is added');
@@ -247,7 +254,7 @@ test('starting a live after an earlier day’s live ended opens a new live sessi
   const s = await call(B, '/api/state', { token: ownerToken });
   assert.equal(s.data.lives[0].id, r.data.live.id, 'the new live is the active one on every copy');
   assert.equal(s.data.lives.length, 2, 'the earlier live and its orders are kept');
-  assert.equal(s.data.orders.filter((o: any) => o.liveId === LIVE_ID).length, 13, 'the 11 earlier orders plus the 2 order comments from the replay');
+  assert.equal(s.data.orders.filter((o: any) => o.liveId === LIVE_ID).length, 14, 'the 11 earlier orders plus the 3 order comments from the replay');
 });
 
 test('webhook signature is checked over the exact bytes Meta sent', async () => {

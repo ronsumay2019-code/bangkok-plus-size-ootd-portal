@@ -194,6 +194,17 @@ let phpPerThbRate = 1.62; // Default rate (Pratunam wholesale currency)
 
 // Idempotency registries for Meta Webhook + Graph API dual sync
 const seenCommentIds = new Set<string>();
+/** Facebook names of commenters by comment id, from the webhook. Facebook hides names when comments are read
+    later (until Meta's App Review), so these fill them in for orders read from the live afterwards. */
+let commenterNames: Record<string, string> = {};
+const NAME_NEEDED = 'Name needed';
+
+function rememberCommenter(commentId?: string, name?: string) {
+  if (!commentId || !name) return;
+  commenterNames[commentId] = name;
+  const keys = Object.keys(commenterNames);
+  if (keys.length > 4000) for (const k of keys.slice(0, keys.length - 4000)) delete commenterNames[k];
+}
 const seenMessageIds = new Set<string>();
 
 // Meta Webhook & Periodic Graph API state (starts clean with zero fake test events)
@@ -323,6 +334,10 @@ const stateSync = portalBackend
         graphSyncStats: { get: () => graphSyncStats, set: (v) => (graphSyncStats = { ...graphSyncStats, ...v }) },
         webhookEventsLog: { get: () => webhookEventsLog, set: (v) => (webhookEventsLog = Array.isArray(v) ? v : []) },
         seenCommentIds: setAccessor(seenCommentIds),
+        commenterNames: {
+          get: () => commenterNames,
+          set: (v) => (commenterNames = v && typeof v === 'object' && !Array.isArray(v) ? v : {}),
+        },
         seenMessageIds: setAccessor(seenMessageIds),
         metaCredentials: {
           get: () => ({ token: storedFbAccessToken, pageId: storedFbPageId }),
@@ -2187,7 +2202,12 @@ function captureLiveComment(c: {
   pageId?: string;
 }): { captured: number; detail: string } {
   const message = String(c.message || '').trim();
-  const who = c.senderName || 'unknown buyer';
+  const knownName = c.senderName || (c.commentId ? commenterNames[c.commentId] : '') || '';
+  const who = knownName || NAME_NEEDED;
+  // An order saved earlier without a name gets it as soon as Facebook gives it
+  if (knownName && c.commentId) {
+    for (const o of orders) if (o.sourceCommentId === c.commentId && o.buyerName === NAME_NEEDED) o.buyerName = cleanBuyerName(knownName);
+  }
   if (!c.commentId) return { captured: 0, detail: 'Comment without an id ignored' };
   const pageIds = [c.pageId, getMetaPageId()].filter(Boolean).map(String);
   if (c.senderId && pageIds.includes(String(c.senderId))) return { captured: 0, detail: `Page's own comment ignored: "${message}"` };
@@ -2195,8 +2215,6 @@ function captureLiveComment(c: {
   const live = c.live || liveForComment(c.postId, c.commentId);
   if (!live) return { captured: 0, detail: `Comment outside a live, not captured: "${message}" by ${who}` };
   const intent = orderComment(message);
-  // No anonymous orders (handoff 0fc6590). Left unmarked so the webhook, which carries the name, can still save it.
-  if (intent && !c.senderName) return { captured: 0, detail: `Order comment without a buyer name, left for the webhook or replay: "${message}"` };
   seenCommentIds.add(c.commentId);
   if (!c.live) live.totalComments = (live.totalComments || 0) + 1; // the live sync counts its own comments
   if (!intent) return { captured: 0, detail: `Not an order: "${message}" by ${who}` };
@@ -2209,14 +2227,22 @@ function captureLiveComment(c: {
     if (orders.some((o) => o.id === orderId)) continue;
     const size = spec.size || 'FREE SIZE (PLUS)';
     const colour = spec.colour || 'ASSORTED';
-    const repeat = orders.some(
+    // Repeats are judged per named buyer only (all nameless orders share "Name needed")
+    const repeat = !!knownName && orders.some(
       (o) => o.liveId === live.id && o.buyerName.toLowerCase() === who.toLowerCase() && o.itemCode === spec.itemCode && o.size === size && o.colour === colour
     );
-    const note = [`Live comment: "${message}"`, intent.note, 'Price: add the host\'s price from the replay.'].filter(Boolean).join(' ');
+    const note = [
+      `Live comment: "${message}"`,
+      intent.note,
+      knownName ? '' : `Facebook hid the buyer's name: open the comment to see who wrote it: https://www.facebook.com/${c.commentId}`,
+      'Price: add the host\'s price from the replay.',
+    ]
+      .filter(Boolean)
+      .join(' ');
     orders.push({
       id: orderId,
       liveId: live.id,
-      buyerName: cleanBuyerName(who),
+      buyerName: knownName ? cleanBuyerName(knownName) : NAME_NEEDED,
       channel: 'live_chat',
       sourceCommentId: c.commentId,
       itemCode: spec.itemCode,
@@ -2379,6 +2405,7 @@ app.post('/api/meta/webhook', async (req, res) => {
               continue;
             }
             eventType = 'comment';
+            if (String(v.from?.id || '') !== String(entry.id || '')) rememberCommenter(v.comment_id || v.id, v.from?.name);
             const result = captureLiveComment({
               commentId: v.comment_id || v.id,
               postId: v.post_id,
@@ -2451,7 +2478,7 @@ app.post('/api/facebook/live-sync', async (req, res) => {
   if (fbToken) {
     graphSyncStats.mode = 'live_graph_api';
     try {
-      const graph = async (pathAndQuery: string, label: string): Promise<any | null> => {
+      const graph = async (pathAndQuery: string, label: string, quiet = false): Promise<any | null> => {
         const sep = pathAndQuery.includes('?') ? '&' : '?';
         try {
           const r = await fetch(`https://graph.facebook.com/v22.0/${pathAndQuery}${sep}access_token=${encodeURIComponent(fbToken)}`, {
@@ -2459,9 +2486,9 @@ app.post('/api/facebook/live-sync', async (req, res) => {
           });
           const j: any = await r.json().catch(() => ({}));
           if (r.ok) return j;
-          graphError = `${label}: ${j?.error?.message || `HTTP ${r.status}`}`;
+          if (!quiet) graphError = `${label}: ${j?.error?.message || `HTTP ${r.status}`}`;
         } catch (err: any) {
-          graphError = `${label}: ${err?.message || 'network error'}`;
+          if (!quiet) graphError = `${label}: ${err?.message || 'network error'}`;
         }
         return null;
       };
@@ -2484,7 +2511,8 @@ app.post('/api/facebook/live-sync', async (req, res) => {
       if (!fbVideoId) {
         const onAir = await graph(
           `${encodeURIComponent(pageId)}/live_videos?broadcast_status=${encodeURIComponent('["LIVE"]')}&fields=id,status,title,creation_time,permalink_url,video{id}&limit=1`,
-          'On-air check'
+          'On-air check',
+          true // Facebook refuses this until Meta's App Review of the live video API; the live's link is used instead
         );
         const live = (onAir?.data || []).find((v: any) => v.status === 'LIVE');
         const onAirId = live ? String(live.video?.id || live.id) : '';
