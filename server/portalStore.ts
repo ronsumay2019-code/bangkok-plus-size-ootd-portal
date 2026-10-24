@@ -209,6 +209,7 @@ export class MemoryBackend implements PortalBackend {
     for (const id of ids) this.records.delete(`${collection}:${id}`);
   }
   async upsertKv(entries: StoredKv[]) {
+    if (entries.some((e) => e.value === null)) throw new Error('portal_kv.value cannot be null');
     for (const e of entries) this.kv.set(e.key, this.clone(e.value));
   }
   async deleteKv(keys: string[]) {
@@ -317,20 +318,27 @@ export class StateSync {
     }
 
     const kvUpserts: StoredKv[] = [];
+    const kvDeletes: string[] = [];
     for (const [key, acc] of Object.entries(this.bindings.values)) {
       const value = acc.get();
       if (value === undefined) continue;
       const json = JSON.stringify(value);
-      if (this.kvSnapshot.get(key) !== json) {
-        kvUpserts.push({ key, value: JSON.parse(json) });
-        this.kvSnapshot.set(key, json);
+      if (this.kvSnapshot.get(key) === json) continue;
+      // The database keeps no empty (null) values: the row is removed and loading falls back to the default
+      if (value === null) {
+        if (this.kvSnapshot.has(key)) kvDeletes.push(key);
+        this.kvSnapshot.delete(key);
+        continue;
       }
+      kvUpserts.push({ key, value: JSON.parse(json) });
+      this.kvSnapshot.set(key, json);
     }
 
     await this.backend.upsertRecords(upserts);
     for (const [collection, ids] of deletes) await this.backend.deleteRecords(collection, ids);
     await this.backend.upsertKv(kvUpserts);
-    return upserts.length + kvUpserts.length + [...deletes.values()].reduce((n, ids) => n + ids.length, 0);
+    if (kvDeletes.length) await this.backend.deleteKv(kvDeletes);
+    return upserts.length + kvUpserts.length + kvDeletes.length + [...deletes.values()].reduce((n, ids) => n + ids.length, 0);
   }
 }
 

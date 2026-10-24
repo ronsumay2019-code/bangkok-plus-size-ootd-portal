@@ -121,3 +121,20 @@ test('SupabaseBackend speaks the REST API: paging, upsert, delete by id list', a
     await fake.close();
   }
 });
+
+test('a value set back to empty (null) is removed, not saved as null, and loads as its default', async () => {
+  const db = new MemoryBackend();
+  const state = { summary: null as any };
+  const sync = new StateSync(db, { collections: {}, values: { latestSummary: { get: () => state.summary, set: (v) => (state.summary = v) } } });
+  await sync.load();
+  state.summary = { liveId: 'L1' };
+  await sync.save();
+  assert.deepEqual(db.kv.get('latestSummary'), { liveId: 'L1' });
+
+  await sync.load();
+  state.summary = null; // e.g. Start fresh or a new live clears the summary
+  await sync.save(); // the in-memory database refuses null values, like the real table
+  assert.equal(db.kv.has('latestSummary'), false);
+  await sync.load();
+  assert.equal(state.summary, null);
+});
