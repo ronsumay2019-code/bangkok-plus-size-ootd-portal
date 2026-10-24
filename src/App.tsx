@@ -33,6 +33,47 @@ import {
 } from './data/seedData';
 import { runAutomaticLiveReconciliation } from './services/reconciliationEngine';
 
+function mergeThreads(incoming: MessengerThread[], existing: MessengerThread[]): MessengerThread[] {
+  const map = new Map<string, MessengerThread>();
+  for (const t of existing) {
+    if (t.id) map.set(t.id, t);
+    if (t.psid) map.set(t.psid, t);
+  }
+  for (const inc of incoming) {
+    const key = inc.id;
+    const match = map.get(key) || (inc.psid ? map.get(inc.psid) : null);
+    if (!match) {
+      map.set(key, inc);
+      if (inc.psid) map.set(inc.psid, inc);
+    } else {
+      const msgMap = new Map<string, any>();
+      for (const m of match.messages || []) msgMap.set(m.id || m.mid || m.timestamp, m);
+      for (const m of inc.messages || []) msgMap.set(m.id || m.mid || m.timestamp, m);
+      const mergedMsgs = Array.from(msgMap.values()).sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      const mergedThread: MessengerThread = {
+        ...match,
+        ...inc,
+        messages: mergedMsgs,
+        unreadCount: Math.max(match.unreadCount || 0, inc.unreadCount || 0),
+        windowExpiresAt: inc.windowExpiresAt || match.windowExpiresAt,
+      };
+      map.set(match.id, mergedThread);
+      if (match.psid) map.set(match.psid, mergedThread);
+    }
+  }
+  const unique = Array.from(new Set(Array.from(map.values())));
+  unique.sort((a, b) => {
+    const aLast = a.messages && a.messages.length > 0 ? a.messages[a.messages.length - 1] : null;
+    const bLast = b.messages && b.messages.length > 0 ? b.messages[b.messages.length - 1] : null;
+    const aTime = aLast?.timestamp ? new Date(aLast.timestamp).getTime() : 0;
+    const bTime = bLast?.timestamp ? new Date(bLast.timestamp).getTime() : 0;
+    return bTime - aTime;
+  });
+  return unique;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('live_command');
   const [showAnalysisModal, setShowAnalysisModal] = useState<boolean>(false);
@@ -163,7 +204,9 @@ export default function App() {
           if (syncData.targetLive) setLives((prev) => prev.map((l) => (l.id === syncData.targetLive.id ? syncData.targetLive : l)));
           if (Array.isArray(syncData.orders)) setOrders(syncData.orders);
           if (Array.isArray(syncData.inventory)) setInventory(syncData.inventory.filter((i: any) => !i.id?.startsWith('inv_')));
-          if (Array.isArray(syncData.messengerThreads)) setMessengerThreads(syncData.messengerThreads);
+          if (Array.isArray(syncData.messengerThreads) && syncData.messengerThreads.length) {
+            setMessengerThreads((prev) => mergeThreads(syncData.messengerThreads, prev));
+          }
           if (syncData.latestSummary) setSummary(syncData.latestSummary);
           if (syncData.graphSyncStats) setGraphSyncStats(syncData.graphSyncStats);
         }
@@ -186,7 +229,9 @@ export default function App() {
           if (Array.isArray(data.orders)) setOrders(data.orders);
           if (Array.isArray(data.amendments)) setAmendments(data.amendments);
           if (Array.isArray(data.preOrders)) setPreOrders(data.preOrders);
-          if (Array.isArray(data.messengerThreads)) setMessengerThreads(data.messengerThreads);
+          if (Array.isArray(data.messengerThreads) && data.messengerThreads.length) {
+            setMessengerThreads((prev) => mergeThreads(data.messengerThreads, prev));
+          }
           if (Array.isArray(data.webhookEventsLog)) setWebhookEventsLog(data.webhookEventsLog);
           if (data.graphSyncStats) setGraphSyncStats(data.graphSyncStats);
           if (data.phpPerThbRate) setPhpRate(data.phpPerThbRate);
@@ -856,7 +901,9 @@ export default function App() {
         const stateData: any = await stateRes.json();
         if (stateData.lives) setLives(stateData.lives);
         if (stateData.orders) setOrders(stateData.orders);
-        if (stateData.messengerThreads) setMessengerThreads(stateData.messengerThreads);
+        if (Array.isArray(stateData.messengerThreads) && stateData.messengerThreads.length) {
+          setMessengerThreads((prev) => mergeThreads(stateData.messengerThreads, prev));
+        }
         if (stateData.latestSummary) setSummary(stateData.latestSummary);
         if (stateData.webhookEventsLog) setWebhookEventsLog(stateData.webhookEventsLog);
         if (stateData.graphSyncStats) setGraphSyncStats(stateData.graphSyncStats);
@@ -867,14 +914,50 @@ export default function App() {
 
   const handleReplyMessenger = async (threadId: string, text: string) => {
     try {
+      const targetThread = messengerThreads.find((t) => t.id === threadId);
+      const cleanPsid = targetThread?.psid;
+      const cleanBuyer = targetThread?.buyerName;
+      const savedToken = typeof window !== 'undefined' ? localStorage.getItem('meta_page_access_token') : null;
+
+      // Optimistically add reply immediately so the message stays on screen permanently
+      const optimisticMsg = {
+        id: `m_reply_${Date.now()}`,
+        mid: `m_reply_${Date.now()}`,
+        sender: 'page_agent' as const,
+        text: text.trim(),
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessengerThreads((prev) => {
+        return prev.map((t) => {
+          if (t.id === threadId || (cleanPsid && t.psid === cleanPsid)) {
+            return {
+              ...t,
+              messages: [...(t.messages || []), optimisticMsg],
+              unreadCount: 0,
+            };
+          }
+          return t;
+        });
+      });
+
       const res = await fetch('/api/meta/messenger/reply', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threadId, text }),
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(savedToken ? { 'x-meta-page-token': savedToken } : {})
+        },
+        body: JSON.stringify({ 
+          threadId, 
+          text,
+          psid: cleanPsid,
+          buyerName: cleanBuyer,
+          token: savedToken,
+        }),
       });
       const data: any = await res.json();
       if (res.ok && data.thread) {
-        setMessengerThreads((prev) => prev.map((t) => (t.id === threadId ? data.thread : t)));
+        setMessengerThreads((prev) => mergeThreads([data.thread], prev));
         if (data.metaApiStatus === 'sent_to_facebook') {
           showToast(`✅ Delivered to Facebook Messenger: ${data.thread.buyerName}`);
         } else if (data.metaApiStatus === 'error') {
@@ -887,8 +970,8 @@ export default function App() {
       } else {
         showToast(data.metaApiDetail || data.error || 'Could not send Messenger reply');
       }
-    } catch (e) {
-      showToast('Messenger reply logged locally.');
+    } catch (e: any) {
+      showToast(e.message || 'Messenger reply error.');
     }
   };
 

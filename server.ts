@@ -949,7 +949,12 @@ app.post('/api/auth/heartbeat', (req, res) => {
 });
 
 // Meta Facebook Page Access Token Management (supports META_PAGE_ACCESS_TOKEN and FB_PAGE_ACCESS_TOKEN)
-app.get('/api/meta/token', (_req, res) => {
+app.get('/api/meta/token', (req, res) => {
+  const headerToken = (req.headers['x-meta-page-token'] as string) || '';
+  if (headerToken && !process.env.META_PAGE_ACCESS_TOKEN) {
+    process.env.META_PAGE_ACCESS_TOKEN = headerToken.trim();
+    process.env.FB_PAGE_ACCESS_TOKEN = headerToken.trim();
+  }
   const activeToken = getMetaPageAccessToken();
   const detectedEnvKeys = Object.keys(process.env).filter((k) => 
     /meta|fb|token|page|access/i.test(k) && !/npm|pnpm|node|path|gemini/i.test(k)
@@ -2000,7 +2005,11 @@ app.post('/api/facebook/live-sync', async (req, res) => {
         for (const conv of convData.data || []) {
           const msgs = (conv.messages?.data || []).slice().reverse();
           if (!msgs.length) continue;
-          const buyerParticipant = conv.participants?.data?.[0];
+          const participants = conv.participants?.data || [];
+          const canonicalPageId = getMetaPageId();
+          const buyerParticipant = participants.find(
+            (p: any) => String(p.id) !== String(canonicalPageId) && String(p.id) !== '100064426114382' && !/bangkok plus size ootd/i.test(p.name || '')
+          ) || participants[0];
           const buyerName = buyerParticipant?.name || 'Messenger Buyer';
           const psid = buyerParticipant?.id || conv.id;
           const lastBuyerMsg = [...msgs].reverse().find((m: any) => m.from?.name === buyerName) || msgs[msgs.length - 1];
@@ -2300,30 +2309,48 @@ app.get('/api/meta/messenger/threads', (_req, res) => {
 
 // 8d-2. Send Reply or Reconciled Invoice via Business Messenger (POST /api/meta/messenger/reply)
 app.post('/api/meta/messenger/reply', async (req, res) => {
-  const { threadId, text } = req.body;
-  if (!threadId || !text) {
-    return res.status(400).json({ error: 'threadId and text are required' });
+  const { threadId, text, psid: reqPsid, buyerName: reqBuyerName, token: reqToken } = req.body;
+  if (!text || (!threadId && !reqPsid)) {
+    return res.status(400).json({ error: 'threadId or psid, and text are required' });
   }
 
-  const thread = messengerThreads.find((t) => t.id === threadId);
+  // 1. Recover or resolve thread (stateless resilience for Vercel ephemeral cold starts)
+  let thread = messengerThreads.find(
+    (t) => (threadId && t.id === threadId) || (reqPsid && t.psid === reqPsid)
+  );
+
   if (!thread) {
-    return res.status(404).json({ error: 'Messenger thread not found' });
+    const fallbackPsid = reqPsid || threadId;
+    thread = {
+      id: threadId || `th_${Date.now()}`,
+      psid: fallbackPsid,
+      buyerName: reqBuyerName || 'Messenger Buyer',
+      buyerHandle: `fb.com/${(reqBuyerName || 'buyer').toLowerCase().replace(/\s+/g, '.')}`,
+      windowExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      unreadCount: 0,
+      messages: [],
+    };
+    messengerThreads.unshift(thread);
   }
 
-  // Check Meta 24-hour standard messaging window
-  const windowRemainingMs = new Date(thread.windowExpiresAt).getTime() - Date.now();
-  if (windowRemainingMs <= 0) {
-    return res.status(400).json({
-      error: 'Meta 24-Hour Standard Messaging Window has expired for this buyer. Buyer must message first or use a Human-Agent tag.',
-    });
-  }
+  // 2. Token resolution: check request body, custom header, or env
+  const incomingToken = (
+    reqToken ||
+    (req.headers['x-meta-page-token'] as string) ||
+    ''
+  ).trim();
 
-  // If META_PAGE_ACCESS_TOKEN or FB_PAGE_ACCESS_TOKEN is configured, dispatch real outbound Graph API v22.0 Send API request
-  const fbToken = getMetaPageAccessToken();
+  if (incomingToken && !process.env.META_PAGE_ACCESS_TOKEN) {
+    process.env.META_PAGE_ACCESS_TOKEN = incomingToken;
+    process.env.FB_PAGE_ACCESS_TOKEN = incomingToken;
+  }
+  const fbToken = (incomingToken || getMetaPageAccessToken()).trim();
+
   let metaApiStatus: 'sent_to_facebook' | 'local_only' | 'error' = 'local_only';
   let metaApiDetail = '';
 
-  const isRealNumericPsid = thread.psid && /^\d{10,25}$/.test(String(thread.psid).trim());
+  const cleanPsid = String(thread.psid || reqPsid || '').trim();
+  const isRealNumericPsid = /^\d{10,25}$/.test(cleanPsid);
 
   if (fbToken && isRealNumericPsid) {
     try {
@@ -2334,7 +2361,7 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messaging_type: 'RESPONSE',
-            recipient: { id: String(thread.psid).trim() },
+            recipient: { id: cleanPsid },
             message: { text: text.trim() },
           }),
         }
@@ -2355,10 +2382,10 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
     }
   } else if (!fbToken) {
     metaApiStatus = 'local_only';
-    metaApiDetail = 'No Meta Page Access Token configured on the server. Please add META_PAGE_ACCESS_TOKEN to Vercel Environment Variables or connect via Header.';
+    metaApiDetail = 'No Meta Page Access Token configured. Connect via Header or set META_PAGE_ACCESS_TOKEN in Vercel.';
   } else if (!isRealNumericPsid) {
     metaApiStatus = 'local_only';
-    metaApiDetail = `Buyer ${thread.buyerName} does not have a real Meta PSID yet (PSID: ${thread.psid || 'none'}). On Facebook, a buyer must send an initial DM to the Page before the API can send them messages. Use 1-tap 'Open Messenger' instead.`;
+    metaApiDetail = `Buyer ${thread.buyerName} does not have a real Meta PSID yet (PSID: ${cleanPsid || 'none'}). On Facebook, a buyer must message the Page before the API can send them messages. Use 1-tap 'Open in Messenger' instead.`;
   }
 
   const newMsg = {
@@ -2370,6 +2397,7 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
 
   thread.messages.push(newMsg);
   thread.unreadCount = 0;
+  sortMessengerThreads();
   saveRuntimeState();
 
   res.json({
