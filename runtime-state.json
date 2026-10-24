@@ -1,24 +1,6 @@
 {
   "lives": [
     {
-      "id": "live_2026_10_24_2100",
-      "title": "Live · 2026-10-24",
-      "status": "live",
-      "startedAt": "2026-10-24T13:00:53.704Z",
-      "endedAt": null,
-      "fbVideoId": "3310662652470857",
-      "videoUrl": "https://www.facebook.com/watch/?v=3310662652470857",
-      "storeName": "Pratunam Market Wholesale Floor",
-      "storeDate": "2026-10-24",
-      "lineup": [],
-      "totalComments": 0,
-      "totalMined": 0,
-      "reconciledAt": null,
-      "reconciliationStatus": "unreconciled",
-      "lastGraphSyncAt": "2026-10-24T13:00:54.895Z",
-      "graphSyncCount": 1
-    },
-    {
       "id": "live_2026_10_24_morning",
       "title": "NEW SHOP · 2026-10-24",
       "status": "ended",
@@ -42,8 +24,8 @@
       "totalMined": 152,
       "reconciledAt": null,
       "reconciliationStatus": "awaiting_owner_review",
-      "lastGraphSyncAt": "2026-10-24T13:00:37.511Z",
-      "graphSyncCount": 229
+      "lastGraphSyncAt": "2026-10-24T09:52:13.217Z",
+      "graphSyncCount": 225
     }
   ],
   "inventory": [
@@ -67,7 +49,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 30,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 30 pcs on rack with zero live claims."
     },
     {
@@ -90,7 +72,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 25,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 25 pcs on rack with zero live claims."
     },
     {
@@ -113,7 +95,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 20,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 20 pcs on rack with zero live claims."
     },
     {
@@ -136,7 +118,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 16,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 16 pcs on rack with zero live claims."
     },
     {
@@ -159,7 +141,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 16,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 16 pcs on rack with zero live claims."
     },
     {
@@ -182,7 +164,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 14,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 14 pcs on rack with zero live claims."
     },
     {
@@ -205,7 +187,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 16,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 16 pcs on rack with zero live claims."
     },
     {
@@ -228,7 +210,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 12,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 12 pcs on rack with zero live claims."
     },
     {
@@ -251,7 +233,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 12,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 12 pcs on rack with zero live claims."
     },
     {
@@ -274,7 +256,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 8,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 8 pcs on rack with zero live claims."
     },
     {
@@ -297,7 +279,7 @@
       "discrepancyFlag": "surplus",
       "discrepancyGap": 8,
       "liveDemand": 0,
-      "lastSyncedAt": "2026-10-24T13:00:37.512Z",
+      "lastSyncedAt": "2026-10-24T09:52:13.217Z",
       "syncNote": "Unsold stock: 8 pcs on rack with zero live claims."
     }
   ],
@@ -359,21 +341,6 @@
       "quantity": 1,
       "statedUnitPricePhp": 450,
       "orderedAt": "2026-10-24T09:52:05.412Z",
-      "status": "pending",
-      "invoiced": false
-    },
-    {
-      "id": "ord_1792846759927_afc2",
-      "liveId": "live_2026_10_24_morning",
-      "buyerName": "Ana Cruz",
-      "channel": "live_chat",
-      "itemCode": "T1",
-      "itemName": "T1",
-      "size": "FREE SIZE (PLUS)",
-      "colour": "ASSORTED",
-      "quantity": 1,
-      "statedUnitPricePhp": null,
-      "orderedAt": "2026-10-24T12:59:19.927Z",
       "status": "pending",
       "invoiced": false
     }
