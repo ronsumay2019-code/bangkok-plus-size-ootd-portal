@@ -130,6 +130,13 @@ kos/
   99-Templates/ Ticket · Handoff-Packet · Review-Verdict · ADR · Release · Retro
 ```
 
+**The Live Selling Bible (HARD RULE).**
+- `kos/01-Project/Live-Selling-Bible.md` is the owner's own description of how the live-selling business works, recorded with the owner's wording and a date on every rule.
+- It sits at the top of every agent's reading order.
+- Only the owner can change it.
+- Where any doc, code or agent conflicts with it, the Bible wins. Log the conflict in `Known-Issues` and fix the doc or code to match.
+- An agent who finds a gap asks the owner. It never fills the gap with an assumption.
+
 `00-START-HERE.md` always answers, in this order:
 1. **Current project:** one paragraph.
 2. **Last completed:** ticket, commit and evidence link.
