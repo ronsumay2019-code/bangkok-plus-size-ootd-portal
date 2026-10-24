@@ -66,6 +66,14 @@ export interface BuyerOrder {
   allocatedInventoryRowId?: string | null;
   invoiced: boolean;
   invoiceNumber?: string;
+  /** When the invoice was made */
+  invoicedAt?: string;
+  /** When the invoice reached the buyer (Messenger delivery or "mark sent"); the 24 hours to pay start here */
+  invoiceSentAt?: string;
+  paymentStatus?: 'unpaid' | 'paid';
+  paidAt?: string;
+  /** Payment proof checked by staff; no proof means not paid */
+  paymentProof?: { photoPath?: string; reference?: string; amountPhp?: number; recordedBy?: string; recordedAt: string };
   isDuplicateFlagged?: boolean;
   duplicateReason?: string;
   pendingReason?: string;

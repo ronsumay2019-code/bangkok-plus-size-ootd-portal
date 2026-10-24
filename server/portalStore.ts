@@ -346,3 +346,46 @@ export class AsyncLock {
     return ready;
   }
 }
+
+/** Private photo storage (Supabase Storage) for payment proofs. Photos are never public; staff get short-lived links. */
+export class ProofStore {
+  private bucketReady = false;
+  constructor(private url: string, private key: string, private bucket = 'payment-proofs', private fetchImpl: typeof fetch = fetch) {}
+
+  private headers(extra: Record<string, string> = {}) {
+    return { apikey: this.key, Authorization: `Bearer ${this.key}`, ...extra };
+  }
+
+  private async ensureBucket() {
+    if (this.bucketReady) return;
+    const res = await this.fetchImpl(`${this.url}/storage/v1/bucket`, {
+      method: 'POST',
+      headers: this.headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ id: this.bucket, name: this.bucket, public: false }),
+    });
+    // "already exists" comes back as 400/409
+    if (!res.ok && res.status !== 400 && res.status !== 409) throw new Error(`Photo storage unavailable (${res.status})`);
+    this.bucketReady = true;
+  }
+
+  async upload(path: string, bytes: Buffer, contentType: string): Promise<void> {
+    await this.ensureBucket();
+    const res = await this.fetchImpl(`${this.url}/storage/v1/object/${this.bucket}/${path}`, {
+      method: 'POST',
+      headers: this.headers({ 'Content-Type': contentType, 'x-upsert': 'true' }),
+      body: new Uint8Array(bytes),
+    });
+    if (!res.ok) throw new Error(`Could not save the photo (${res.status})`);
+  }
+
+  async signedUrl(path: string, seconds = 600): Promise<string> {
+    const res = await this.fetchImpl(`${this.url}/storage/v1/object/sign/${this.bucket}/${path}`, {
+      method: 'POST',
+      headers: this.headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ expiresIn: seconds }),
+    });
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok || !data.signedURL) throw new Error(`Could not open the photo (${res.status})`);
+    return `${this.url}/storage/v1${data.signedURL}`;
+  }
+}

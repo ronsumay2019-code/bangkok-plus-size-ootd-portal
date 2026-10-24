@@ -303,6 +303,41 @@ test('sending an invoice photo records it in the conversation with Messenger\'s 
 });
 
 
+test('invoices count 24 hours from being sent; a payment needs its photo and moves the invoice to Paid', async () => {
+  const add = await call(A, '/api/orders/add', { token: ownerToken, body: { liveId: LIVE_ID, buyerName: 'Payer One', itemCode: 'T9', statedPrice: 500 } });
+  assert.equal(add.status, 200);
+  const st = await call(A, '/api/state', { token: ownerToken });
+  const order = st.data.orders.find((o: any) => o.buyerName === 'Payer One');
+  await call(A, '/api/orders/approve', { token: ownerToken, body: { orderId: order.id } });
+  const inv = await call(B, '/api/invoices/generate', { token: ownerToken, body: { buyerNames: ['Payer One'], liveId: LIVE_ID } });
+  assert.equal(inv.status, 200);
+  const invoiceNumber = inv.data.generatedInvoices[0].invoiceNumber;
+  let s = await call(A, '/api/state', { token: ownerToken });
+  let mine = s.data.orders.find((o: any) => o.id === order.id);
+  assert.ok(mine.invoicedAt);
+  assert.equal(mine.paymentStatus, 'unpaid');
+  assert.equal(mine.invoiceSentAt, undefined, 'no Messenger delivery in tests, so the clock has not started');
+
+  assert.equal((await call(A, '/api/invoices/mark-sent', { token: ownerToken, body: { invoiceNumber } })).status, 200);
+  s = await call(B, '/api/state', { token: ownerToken });
+  mine = s.data.orders.find((o: any) => o.id === order.id);
+  assert.ok(mine.invoiceSentAt, 'marking it sent starts the 24 hours');
+
+  const noProof = await call(A, '/api/payments/record', { token: ownerToken, body: { invoiceNumber } });
+  assert.equal(noProof.status, 400, 'no proof means not paid');
+  const tiny = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==';
+  const paid = await call(B, '/api/payments/record', { token: ownerToken, body: { invoiceNumber, photoDataUrl: tiny, reference: 'GCash 1234', amountPhp: 500 } });
+  assert.equal(paid.status, 200);
+  s = await call(A, '/api/state', { token: ownerToken });
+  mine = s.data.orders.find((o: any) => o.id === order.id);
+  assert.equal(mine.paymentStatus, 'paid');
+  assert.equal(mine.paymentProof.reference, 'GCash 1234');
+  assert.ok(db.objects.size >= 1, 'the photo is stored privately');
+  const proof = await call(A, `/api/payments/proof?invoiceNumber=${encodeURIComponent(invoiceNumber)}`, { token: ownerToken });
+  assert.equal(proof.status, 200);
+  assert.match(proof.data.url, /\/storage\/v1\/object\/sign\//);
+});
+
 test('owner can start fresh from one Facebook live; admins cannot; Messenger chats are kept', async () => {
   const before = await call(A, '/api/state', { token: ownerToken });
   const threadsBefore = before.data.messengerThreads.length;

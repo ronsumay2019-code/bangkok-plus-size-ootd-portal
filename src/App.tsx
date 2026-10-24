@@ -15,6 +15,7 @@ import { MobileAccessQRModal } from './components/MobileAccessQRModal';
 import { MetaTokenModal } from './components/MetaTokenModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DateFilterBar } from './components/DateFilterBar';
+import { PaymentsShipping } from './components/PaymentsShipping';
 import { manilaDay } from './utils/dates';
 import type { PortalAuthContext } from './components/LoginGate';
 import { 
@@ -198,6 +199,8 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
   // View by date (Manila day) on Order Review, Reconciliation and Invoices. A live's orders keep the live's
   // date, so replay comments read the next morning stay with their live.
   const [viewDate, setViewDate] = useState<string>('');
+  /** The portal's data has loaded (until then the Live screen shows Loading, never sample data) */
+  const [stateLoaded, setStateLoaded] = useState(false);
   const liveDay = (l: LiveSession) => manilaDay(l.startedAt) || l.storeDate || '';
   const orderDay = (o: BuyerOrder) => {
     const l = lives.find((x) => x.id === o.liveId);
@@ -280,6 +283,7 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
           if (data.graphSyncStats) setGraphSyncStats(data.graphSyncStats);
           if (data.phpPerThbRate) setPhpRate(data.phpPerThbRate);
           if (data.latestSummary) setSummary(data.latestSummary);
+          setStateLoaded(true);
         }
       } catch (e) {
         // Fallback to local pure engine computation
@@ -359,7 +363,7 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
     colour: string;
     quantity: number;
     channel: 'live_chat' | 'messenger';
-    statedPrice: number;
+    statedPrice: number | null;
   }) => {
     try {
       const res = await fetch('/api/orders/add', {
@@ -1034,6 +1038,28 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
     }
   };
 
+  /** Opens a new live session, linked to its Facebook live when a link is given, and pulls comments now */
+  const handleStartNewLive = async (fbVideo: string) => {
+    try {
+      const res = await fetch('/api/live/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ liveId: activeLive.id, action: 'start', newLive: true, fbVideo }),
+      });
+      const data: any = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || 'Could not start the live');
+        return;
+      }
+      if (Array.isArray(data.lives)) setLives(data.lives);
+      setSummary(null);
+      showToast(`Live started: ${data.live?.title || 'new live'}`);
+      await handleGraphSync();
+    } catch (err: any) {
+      showToast(err?.message || 'Could not start the live');
+    }
+  };
+
   /** Owner: clears every order and live, starts again from one Facebook live and pulls its comments now */
   const handleStartFresh = async (fbVideo: string, confirm: string): Promise<string | null> => {
     try {
@@ -1129,6 +1155,7 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
         onOpenMobileAccessModal={() => setIsMobileAccessModalOpen(true)}
         onOpenMetaTokenModal={() => setIsMetaTokenModalOpen(true)}
         preOrdersCount={preOrders.length}
+        awaitingPaymentCount={new Set(orders.filter((o) => o.invoiced && o.invoiceNumber && o.paymentStatus !== 'paid').map((o) => o.invoiceNumber)).size}
         userRole={userRole}
         roleLocked={authEnabled}
         onSignOut={authEnabled ? signOut : undefined}
@@ -1179,6 +1206,13 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
             onReplyMessenger={handleReplyMessenger}
             canManageMetaToken={!authEnabled || userRole === 'owner'}
             onStartFresh={handleStartFresh}
+            onStartNewLive={handleStartNewLive}
+            onOpenReview={() => {
+              setViewDate(liveDay(activeLive));
+              setActiveTab('order_review');
+            }}
+            onOpenPayments={() => setActiveTab('payments')}
+            loading={!stateLoaded}
           />
         )}
 
@@ -1232,6 +1266,16 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
             onOwnerApproval={handleOwnerApproval}
             onOpenOverride={(order, isPreOrder) => setOverrideModal({ isOpen: true, order, isPreOrder })}
             onAddOrder={handleAddOrder}
+          />
+        )}
+
+        {activeTab === 'payments' && (
+          <PaymentsShipping
+            orders={orders}
+            lives={lives}
+            canRecord={!authEnabled || userRole !== 'staff'}
+            onOrdersUpdated={setOrders}
+            showToast={showToast}
           />
         )}
 

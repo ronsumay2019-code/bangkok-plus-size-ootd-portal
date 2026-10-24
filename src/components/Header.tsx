@@ -9,6 +9,7 @@ import {
   Sparkles,
   HelpCircle,
   ShoppingBag,
+  Wallet,
   Activity,
   UserCheck,
   QrCode,
@@ -27,6 +28,8 @@ interface HeaderProps {
   onOpenMobileAccessModal?: () => void;
   onOpenMetaTokenModal?: () => void;
   preOrdersCount?: number;
+  /** Invoices waiting for payment */
+  awaitingPaymentCount?: number;
   userRole: 'owner' | 'admin' | 'staff';
   setUserRole: (role: 'owner' | 'admin' | 'staff') => void;
   /** True when staff sign in: the role comes from the account and cannot be switched here */
@@ -51,6 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMobileAccessModal,
   onOpenMetaTokenModal,
   preOrdersCount = 0,
+  awaitingPaymentCount = 0,
   userRole,
   setUserRole,
   roleLocked = false,
@@ -62,10 +66,11 @@ export const Header: React.FC<HeaderProps> = ({
   const readyToLeave = summary?.checklist.readyToLeaveStore;
 
   const navItems = [
-    { id: 'live_command', label: 'Live Session Command', icon: Radio, badge: isOnAir ? 'ON AIR' : 'ENDED' },
+    { id: 'live_command', label: 'Live Session Command', icon: Radio, badge: isOnAir ? 'ON AIR' : 'READY' },
     { id: 'messenger_adjustments', label: 'Page Messenger Orders', icon: ShieldCheck, badge: 'Direct DMs' },
     { id: 'order_review', label: 'Order Review & Verification', icon: CheckCircle2, badge: activeLive.reconciliationStatus === 'awaiting_owner_review' ? 'Awaiting Review' : 'Verified Orders' },
     { id: 'reconciliation', label: 'Reconciliation & Invoices', icon: FileCheck, badge: summary ? `${summary.buyerBags.length} Bags` : undefined },
+    { id: 'payments', label: 'Payments & Shipping', icon: Wallet, badge: `${awaitingPaymentCount} to pay` },
     { id: 'pre_orders', label: 'Pre-Orders Lane', icon: ShoppingBag, badge: `${preOrdersCount} Pre-orders` },
     { id: 'replay_studio', label: 'Replay Review Studio', icon: CheckCircle2 },
     { id: 'buying_analytics', label: 'Sales & Demand Analytics', icon: Sparkles },
@@ -111,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
               : 'bg-emerald-950/40 border-emerald-600/40 text-emerald-300'
           }`}>
             <span className={`w-2 h-2 rounded-full ${isOnAir ? 'bg-rose-500' : 'bg-emerald-400'}`} />
-            <span>{isOnAir ? 'LIVE BROADCAST ON AIR' : 'LIVE CONCLUDED · RECONCILED'}</span>
+            <span>{isOnAir ? 'LIVE ON AIR' : 'READY FOR THE NEXT LIVE'}</span>
           </div>
 
           {/* Store Location */}

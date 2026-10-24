@@ -30,6 +30,8 @@ function parseFilter(raw: string): (v: any) => boolean {
 export interface FakeDb {
   url: string;
   tables: Record<string, Row[]>;
+  /** Supabase Storage stand-in: "bucket/path" -> bytes */
+  objects: Map<string, Buffer>;
   requests: number;
   close(): Promise<void>;
 }
@@ -37,15 +39,34 @@ export interface FakeDb {
 export async function startFakePostgrest(seed: Partial<Record<string, Row[]>> = {}): Promise<FakeDb> {
   const tables: Record<string, Row[]> = { portal_records: [], portal_kv: [], portal_staff: [], portal_sessions: [] };
   for (const [t, rows] of Object.entries(seed)) tables[t] = JSON.parse(JSON.stringify(rows));
-  const db: FakeDb = { url: '', tables, requests: 0, close: async () => {} };
+  const db: FakeDb = { url: '', tables, objects: new Map(), requests: 0, close: async () => {} };
 
   const server = http.createServer((req, res) => {
     db.requests++;
     let body = '';
-    req.on('data', (c) => (body += c));
+    const chunks: Buffer[] = [];
+    req.on('data', (c) => {
+      chunks.push(Buffer.from(c));
+      body += c;
+    });
     req.on('end', () => {
       try {
         const u = new URL(req.url || '/', 'http://localhost');
+        if (u.pathname.startsWith('/storage/v1/')) {
+          if (req.headers.apikey !== 'test-service-key') return void res.writeHead(401).end('{}');
+          const rest = u.pathname.slice('/storage/v1/'.length);
+          if (rest === 'bucket') return void res.writeHead(200).end('{}');
+          if (rest.startsWith('object/sign/')) {
+            const key = rest.slice('object/sign/'.length);
+            if (!db.objects.has(key)) return void res.writeHead(404).end('{}');
+            return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ signedURL: `/object/sign/${key}?token=t` }));
+          }
+          if (rest.startsWith('object/')) {
+            db.objects.set(rest.slice('object/'.length), Buffer.concat(chunks));
+            return void res.writeHead(200).end('{}');
+          }
+          return void res.writeHead(404).end('{}');
+        }
         const table = u.pathname.replace('/rest/v1/', '');
         const rows = tables[table];
         if (!rows) {
