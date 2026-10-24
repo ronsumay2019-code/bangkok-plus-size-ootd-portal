@@ -130,11 +130,11 @@ kos/
   99-Templates/ Ticket · Handoff-Packet · Review-Verdict · ADR · Release · Retro
 ```
 
-**The Live Selling Bible (HARD RULE).**
-- `kos/01-Project/Live-Selling-Bible.md` is the owner's own description of how the live-selling business works, recorded with the owner's wording and a date on every rule.
+**The Live Selling Business (HARD RULE).**
+- `kos/01-Project/Live-Selling-Business.md` is the owner's own description of how the live-selling business works, recorded with the owner's wording and a date on every rule.
 - It sits at the top of every agent's reading order.
 - Only the owner can change it.
-- Where any doc, code or agent conflicts with it, the Bible wins. Log the conflict in `Known-Issues` and fix the doc or code to match.
+- Where any doc, code or agent conflicts with it, the Live Selling Business wins. Log the conflict in `Known-Issues` and fix the doc or code to match.
 - An agent who finds a gap asks the owner. It never fills the gap with an assumption.
 
 `00-START-HERE.md` always answers, in this order:
@@ -181,9 +181,9 @@ Seed `Lessons` with the mistakes already made:
 | Vercel: deployments, env var *names*, runtime errors | What is actually live |
 | Meta app: permissions granted, App Review status, webhook subscriptions | What Facebook allows today |
 
-## 5. The counting method: the Live Selling Bible
+## 5. The counting method: the Live Selling Business
 
-The method is `kos/01-Project/Live-Selling-Bible.md` (HARD RULE, recorded by the owner on 24 Oct). It replaces earlier rack-based descriptions. In short:
+The method is `kos/01-Project/Live-Selling-Business.md` (HARD RULE, recorded by the owner on 24 Oct). It replaces earlier rack-based descriptions. In short:
 
 1. **Item Events come from the host.** Code, price, description, colours and sizes are taken from what the host says, never from the chat. While capturing an event, do nothing else.
 2. **Job 1.** Inside the window from event N to event N+1, a buyer's first comment containing MINE+code, MINE only, code only, or code+size/colour is their **1st capture**.

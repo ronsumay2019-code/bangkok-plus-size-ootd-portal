@@ -1,7 +1,7 @@
 # Master Plan: production-ready by Mon 26 Oct 2026, 4:00 PM Manila
 
-Author: Claude (lead). Status: **G1 draft, waiting on Grok's independent review (G3) and the owner's answers to the Bible questions.**
-Built on: [[Live-Selling-Bible]] (HARD RULE), [[Current-State]], [[Known-Issues]], [[Lessons]].
+Author: Claude (lead). Status: **G1 draft, waiting on Grok's independent review (G3) and the owner's answers to the Live Selling Business questions.**
+Built on: [[Live-Selling-Business]] (HARD RULE), [[Current-State]], [[Known-Issues]], [[Lessons]].
 
 ## 1. What "done" means
 
@@ -21,9 +21,9 @@ GO requires:
 - the golden tests pass;
 - the owner says GO.
 
-## 2. The design of the core (W2), from the Bible
+## 2. The design of the core (W2), from the Live Selling Business
 
-| Piece | What it is | Bible rule |
+| Piece | What it is | Business rule |
 |---|---|---|
 | **ItemEvent** | `{live, seq, code, price, description, colours[], sizes[], calledAt, source: staff \| replay, note}` | B3 |
 | **Event capture panel** (live screen) | One tap, "Host called an item", stamps the time. Staff then type the code, price, colours and sizes. Details can be edited until the next event, because hosts say them before or after the code. Nothing else happens on this screen. | B3, B4 |
@@ -31,9 +31,9 @@ GO requires:
 | **Job 1** (pure function) | `windowOf(comment.time)` gives event N. A match is any of MINE+code, MINE only, code only, or code+size/colour, loosely matched. A buyer's first match is their **1st capture**. | B5, B6 |
 | **Job 2** (review queue) | For each 1st capture, list every later mention by that buyer in the chat and in Messenger. Each mention gets a type (replacement / additional / swap / chatter). An agent may *propose* the type; **a person sets the type and granted / denied**. The final order count follows the outcomes table. | B7 |
 | **Golden test** | Real comments plus the real Item Events of one past live go through Job 1. The owner-approved Job 2 decisions are applied. The result must equal the **owner-confirmed final order list**. Expected values are never typed into code (L-008). | — |
-| **Rack-based engine and Inventory board** | Taken off the critical path (Bible B1). Whether the store-purchase check stays depends on owner answer Q8. | B1, B2 |
+| **Rack-based engine and Inventory board** | Taken off the critical path (Business B1). Whether the store-purchase check stays depends on owner answer Q8. | B1, B2 |
 
-**Proposal for Bible Q1, waiting for the owner:**
+**Proposal for Business Q1, waiting for the owner:**
 - During the live, staff capture the events (the panel above). This is the only source that exists in real time.
 - After the live, the replay is the check. Replay transcription is a paid service, so it needs the owner's approval of the cost, and it is **not** on the Monday critical path.
 
@@ -41,7 +41,7 @@ GO requires:
 
 | Ticket | Work | Builder | Review | Needs |
 |---|---|---|---|---|
-| T-001 | Owner answers Bible Q1–Q9 | Owner | — | **Blocks T-010 to T-016** |
+| T-001 | Owner answers Business Q1–Q9 | Owner | — | **Blocks T-010 to T-016** |
 | T-002 | **Golden fixture.** Record the Item Events of one past live from its replay (NEW SHOP 22 Oct, video `1126219396590785`, or LINEN SHOP) and get the owner-confirmed final order list | Owner or staff, with Claude preparing the sheet | Claude | **Owner time on Sunday morning** |
 | T-003 | **W7 infrastructure:** CI on PRs (`typecheck`, `test`, `build`, `kos-check`), branch protection on `main`, the Timeline Action | Codex | Grok, Claude | Owner allows branch protection on GitHub |
 | T-004 | **W7:** a Supabase branch (or schema copy) holding the backup data, for the preview | Codex | Claude | Owner approves the branch's cost, if any |
@@ -70,7 +70,7 @@ GO requires:
 
 | By | Done |
 |---|---|
-| Sat 11 PM | This plan reviewed by Grok; the owner has the Bible questions |
+| Sat 11 PM | This plan reviewed by Grok; the owner has the Live Selling Business questions |
 | Sun 12 PM | T-001, T-002, T-003, T-004, T-020 |
 | Sun 10 PM | T-005, T-010 to T-015 through G4 |
 | Mon 10 AM | Code freeze; T-016; full acceptance run on the preview (G5) |
@@ -79,7 +79,7 @@ GO requires:
 
 ## 5. What only the owner can do
 
-- Answer Bible Q1–Q9.
+- Answer Business Q1–Q9.
 - Give the golden-fixture time on Sunday morning (T-002).
 - Approve the RLS migration (T-005).
 - Enter `META_APP_SECRET` in Vercel.
@@ -92,23 +92,23 @@ GO requires:
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Bible answers arrive late | Medium | Blocks W2 | The questions are small and specific; Claude collects the answers Saturday night |
+| Business answers arrive late | Medium | Blocks W2 | The questions are small and specific; Claude collects the answers Saturday night |
 | No golden fixture by Sunday noon | Medium | No proof, so NO-GO | Use the shorter live; Claude prepares the sheet so staff only fill it in |
 | Staff miss an event call during a live | Medium | Wrong windows | Events stay editable; the replay check after the live; an "unassigned comments" list |
-| Comment delay puts a "mine" in the wrong window | High | Wrong item | Bible Q3 grace period; Job 2 review |
+| Comment delay puts a "mine" in the wrong window | High | Wrong item | Business Q3 grace period; Job 2 review |
 | Webhook names missing for some buyers | Medium | Can't invoice | "Name needed" queue; Messenger match |
 | Vercel access for agents (403 today) | Known | Can't audit deploys | Owner checks the Vercel team permissions for the connected account |
 
 ## Handoff Packet
 
 1. **What I did:**
-   - recorded the Bible;
+   - recorded the Live Selling Business;
    - ran the truth audit with real queries;
    - seeded the KOS (Current-State, Known-Issues, Lessons, Story);
    - wrote this plan.
    No portal code was changed.
 2. **Why this is the real solution:**
-   - The portal fails because it reads item meaning from the chat. The Bible says meaning comes from the host's Item Events. Every past attempt had either no events or fixed events, so no amount of comment parsing could ever be right.
+   - The portal fails because it reads item meaning from the chat. The Live Selling Business says meaning comes from the host's Item Events. Every past attempt had either no events or fixed events, so no amount of comment parsing could ever be right.
    - The plan makes events the first-class input.
    - It keeps people deciding the Job 2 changes, because grant or deny is said on the live and isn't in the data.
    - It proves the result with a computed golden test instead of a typed number.
@@ -119,7 +119,7 @@ GO requires:
    - no code;
    - no migration;
    - Vercel deployment audit (403).
-7. **Next:** Grok, independent review of this plan (G3). The owner: Bible Q1–Q9.
+7. **Next:** Grok, independent review of this plan (G3). The owner: Business Q1–Q9.
 
 ## Evaluator Verdict (Claude)
 
@@ -128,7 +128,7 @@ GO requires:
 I wrote this plan, so my verdict is a self-check, not the independent review the loop requires. Grok reviews it next.
 
 Self-check reasoning:
-- The plan follows every Bible rule (B1–B8) and puts the owner's correction (L-007) at its centre.
+- The plan follows every Business rule (B1–B8) and puts the owner's correction (L-007) at its centre.
 - It doesn't depend on Meta App Review or a paid transcription service for Monday.
 
 Conditions before G1 passes:

@@ -1,15 +1,15 @@
 ---
-title: Live Selling Bible
+title: Live Selling Business (follow it like a bible)
 status: HARD RULE
 owner: Bangkok Plus Size OOTD (owner)
 recorded: 2026-10-24
 changed_by: owner only
 ---
 
-# Live Selling Bible: HARD RULE
+# Live Selling Business: HARD RULE (follow it like a bible)
 
 > This page is how the business sells on a live. **Every agent follows it.** It sits at the top of every reading order. Only the owner can change it.
-> Where any doc, code or agent disagrees with it, the Bible wins. Log the conflict in [[Known-Issues]] and fix the doc or code to match.
+> Where any doc, code or agent disagrees with it, the Live Selling Business wins. Log the conflict in [[Known-Issues]] and fix the doc or code to match.
 > An agent who finds a gap asks the owner. It never fills the gap with an assumption.
 
 ## 1. The owner's words (recorded 2026-10-24, verbatim)

@@ -23,9 +23,9 @@ Evidence: SQL row counts run by Claude on 24 Oct.
 | Messenger reply sent from inside the portal | Verified 24 Oct | Facebook returned message IDs; the recipient confirmed |
 | Staff sign-in and seats (owner, co-owner, 3 admins) | Verified 24 Oct | Owner signed in on production |
 | Saving to the database after the null-kv fix (PR #6) | Verified in tests (38 pass) | Not re-verified on production since |
-| **Item Event capture from the host** (Bible B3) | **Does not exist.** The controller from `283fd52` was removed in `6857377`. It used fixed segments (`HOST_BROADCAST_SEGMENTS`), not live input. | git history |
-| Order windows and Job 1 / Job 2 (Bible B5–B7) | **Do not exist.** `server/orderIntent.ts` reads each comment alone, with no window and no event. | Code |
-| Reconciliation engine | **Built on a rack** (`InventoryItem` rows, 25 uses in `src/services/reconciliationEngine.ts`). Conflicts with Bible B1. | Code |
+| **Item Event capture from the host** (Business B3) | **Does not exist.** The controller from `283fd52` was removed in `6857377`. It used fixed segments (`HOST_BROADCAST_SEGMENTS`), not live input. | git history |
+| Order windows and Job 1 / Job 2 (Business B5–B7) | **Do not exist.** `server/orderIntent.ts` reads each comment alone, with no window and no event. | Code |
+| Reconciliation engine | **Built on a rack** (`InventoryItem` rows, 25 uses in `src/services/reconciliationEngine.ts`). Conflicts with Business B1. | Code |
 | "152 = 152" on 22 Oct | **Not proven to be computed.** `271b9f2` sets `totalMined: 152` and edits `purchased` by hand, with orders loaded from `src/data/liveOrdersSnapshot.json`. | git show |
 | Commenter names from Facebook | Hidden in Graph reads until Meta App Review; the webhook gives names | Observed 24 Oct |
 | `META_APP_SECRET` (webhook signature check) | Not set when last checked on 24 Oct | Not re-checked |

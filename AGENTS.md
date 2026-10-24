@@ -1,7 +1,7 @@
 # Rules for every agent (Claude, Antigravity, Codex, Grok)
 
-1. **Before any work,** read `kos/00-START-HERE.md`, then `kos/01-Project/Live-Selling-Bible.md`.
-2. **The Live Selling Bible is a HARD RULE.**
+1. **Before any work,** read `kos/00-START-HERE.md`, then `kos/01-Project/Live-Selling-Business.md`.
+2. **The Live Selling Business is a HARD RULE.**
    - Item codes, prices, colours and sizes come from the host's Item Events, never from the live chat.
    - Orders are matched inside the window between events (Job 1).
    - Each one is then reviewed across the whole chat and Messenger (Job 2).

@@ -12,7 +12,7 @@ Bangkok Plus Size OOTD sells Bangkok fashion in XL to 5XL to buyers in the Phili
 - **The host gives each item its code, price, colours and sizes on the live itself.** Every live is different.
 - **Buyers claim items in the comments**: "mine", "mine T1", "T1", "T1 2XL". They often change their minds later: a different size, another piece, a swap.
 
-The hard part: **a comment like "mine" carries no item.** Its meaning depends on which item the host had just called. The host's words aren't in anything Facebook lets the portal read. See [[Live-Selling-Bible]].
+The hard part: **a comment like "mine" carries no item.** Its meaning depends on which item the host had just called. The host's words aren't in anything Facebook lets the portal read. See [[Live-Selling-Business]].
 
 ## Chapter 2: Every attempt, in order
 
@@ -40,7 +40,7 @@ The hard part: **a comment like "mine" carries no item.** Its meaning depends on
 - The LINEN SHOP live, 24 Oct: its orders did not reach the portal (1 order in the database).
 
 ### The owner, 24 Oct
-- Wrote down the real method: the Bible. Codes come from the host's Item Events. Orders are matched inside the window between events (Job 1), then every claim is reviewed across the chat and Messenger (Job 2).
+- Wrote down the real method: the Live Selling Business. Codes come from the host's Item Events. Orders are matched inside the window between events (Job 1), then every claim is reviewed across the chat and Messenger (Job 2).
 - Correction recorded as L-007.
 
 ## Chapter 3: Root causes
