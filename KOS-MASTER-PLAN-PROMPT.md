@@ -56,6 +56,40 @@ The launch wipe is part of G7 and runs in this order:
 
 The release note shows the final row counts as evidence.
 
+### Obsidian updates itself (non-negotiable)
+
+- **The pipe is git.** Agents can't write onto the owner's device. They write to `kos/` in the repo. The owner's Obsidian opens that folder, with the **Obsidian Git** plugin set to auto-pull every 5 minutes, so the vault updates without anyone touching it.
+- **No merge without a KOS update.** A required CI check, `kos-check`, fails any PR that changes code without also updating that ticket's Handoff Packet and `04-State/Current-State.md`. Branch protection on `main` makes that check mandatory.
+- **Automatic timeline.** A GitHub Action runs on every merge and every deployment and appends to `kos/07-Releases/Timeline.md`:
+  - Manila time;
+  - PR, commit and deploy URL;
+  - test and acceptance results;
+  - gate verdicts.
+  No person or agent has to remember to do it.
+- **Checkpoints.** Every agent writes its 2-minute checkpoints into its ticket file in `kos/05-Work/Tickets/`.
+
+### The Story, from problem to gold solution (non-negotiable)
+
+`kos/07-Releases/Story.md` is one continuous story. Claude adds to it at every gate verdict, and it is never rewritten to look better. Chapters:
+1. **The business and the problem:** how a live works and why counting orders is hard.
+2. **Every attempt, in order:** the agent, what it tried, why it looked right, what broke, and the commits as evidence. This covers:
+   - Antigravity, 21–23 Oct;
+   - Claude, 24 Oct (PRs #1–#6, Lessons L-001 to L-006);
+   - the four-agent loop.
+3. **Root causes,** with proof.
+4. **The gold solution,** and Claude's reasoning for why it is the real one.
+5. **Proof:**
+   - golden tests on real data;
+   - the acceptance run (≥95% overall, 100% critical);
+   - the numbers, with their queries.
+6. **Launch:**
+   - shipped fresh with 0 data;
+   - final row counts;
+   - owner GO.
+7. **What remains,** and who owns each item.
+
+"Gold" is earned only by passing all three: golden tests, the acceptance rule and owner GO. Until then the story says "not yet".
+
 ## 2. Non-negotiable rules (apply to every agent)
 
 1. **Real data only.** Every number needs a source: a query, a Facebook comment ID or time, the host's words on the replay, or an owner record.
