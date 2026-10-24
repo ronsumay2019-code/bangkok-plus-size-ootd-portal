@@ -1904,6 +1904,38 @@ app.post('/api/live/toggle', (req, res) => {
   res.json({ success: true, live, lives, summary: latestSummary });
 });
 
+/** The video id in a Facebook live link ("…/videos/123…", "watch/?v=123…") or a bare id */
+function videoIdFromLink(link: unknown): string {
+  const text = String(link || '').trim();
+  const m = /(?:videos\/|[?&]v=|^)(\d{8,25})(?!\d)/.exec(text) || /(\d{12,25})(?!.*\d{12,25})/.exec(text);
+  return m ? m[1] : '';
+}
+
+// Owner: clear every order and live and start again from one Facebook live. The next live sync pulls that
+// live's comments fresh (title and start time come from Facebook). Messenger chats and staff are kept.
+app.post('/api/admin/start-fresh', (req, res) => {
+  if (!requireRole(req, res, ['owner'])) return;
+  const { confirm, fbVideo } = req.body || {};
+  if (confirm !== 'START FRESH') {
+    return res.status(400).json({ error: 'Type START FRESH to confirm.' });
+  }
+  const videoId = videoIdFromLink(fbVideo);
+  if (fbVideo && !videoId) {
+    return res.status(400).json({ error: 'That does not look like a Facebook live link or video ID.' });
+  }
+  orders = [];
+  amendments = [];
+  preOrders = [];
+  inventory = [];
+  lives = [];
+  latestSummary = null;
+  seenCommentIds.clear();
+  webhookEventsLog = [];
+  const live = createLiveSession(undefined, videoId || undefined);
+  saveRuntimeState();
+  res.json({ success: true, live, lives, orders, inventory, amendments, preOrders, summary: null });
+});
+
 // 8. Generate Official Final Invoices (Strictly Gated to Reconciled Items Only!)
 app.post('/api/invoices/generate', async (req, res) => {
   const { buyerNames, messageText, liveId } = req.body;
