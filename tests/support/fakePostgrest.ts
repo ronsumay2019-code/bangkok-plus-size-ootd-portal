@@ -104,6 +104,11 @@ export async function startFakePostgrest(seed: Partial<Record<string, Row[]>> = 
         }
         if (req.method === 'POST') {
           const incoming: Row[] = JSON.parse(body || '[]');
+          // Same rule as the real table: portal_kv.value is NOT NULL
+          if (table === 'portal_kv' && incoming.some((r) => r.value === null)) {
+            res.writeHead(400).end(JSON.stringify({ message: 'null value in column "value" violates not-null constraint' }));
+            return;
+          }
           const keys = KEYS[table];
           const merge = String(req.headers.prefer || '').includes('merge-duplicates');
           for (const r of incoming) {
