@@ -106,7 +106,8 @@ The owner's PC clock showed 3:34 PM on 24 Oct when it was 04:34 Sunday in Manila
 | Business answers arrive late | Medium | Blocks W2 | The questions are small and specific; Claude collects the answers Saturday night |
 | No golden fixture by Sunday noon | Medium | No proof, so NO-GO | Use the shorter live; Claude prepares the sheet so staff only fill it in |
 | **Automatic host capture doesn't work** (the video can't be fetched, or transcription is inaccurate on Taglish) | **Unknown until T-031** | **The core can't follow the host, so NO-GO for W2** | Run T-031 first. If it fails, report at once with the options; the owner decides (B17 says no people during the live). |
-| The replay plus transcription takes too long for the store match at the store (S8). The old doc notes the free plan's hourly audio limit. | Unknown | The store match waits | T-031 measures the ready and processing times; if they're too long, report the options to the owner |
+| The replay plus transcription takes longer than the **1-hour target** after the live (B24; the team has 1–2 hours at the store). The old doc notes the free plan's hourly audio limit. | Unknown | The store match waits | T-031 measures the ready and processing times against the 1-hour target; if over, report the options (for example a paid tier, with the exact cost) |
+| Two buyers with the same Facebook name are merged | Low | Wrong bag or invoice | Flag same-name cases, never merge them (B25) |
 | Comment delay puts a "mine" in the wrong window | High | Wrong item | Business Q3 grace period; Job 2 review |
 | Webhook names missing for some buyers | Medium | Can't invoice | "Name needed" queue; Messenger match |
 | Vercel access for agents (403 today) | Known | Can't audit deploys | Owner checks the Vercel team permissions for the connected account |
