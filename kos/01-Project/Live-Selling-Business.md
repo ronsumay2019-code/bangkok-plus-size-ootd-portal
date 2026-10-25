@@ -111,6 +111,13 @@ changed_by: owner only
   - **Pass 1, confirmed orders.** An order that was placed once, with no requests, no other conversation and no Messenger side chat, is **confirmed** and set aside as final.
   - **Pass 2, followed threads.** An order that was acknowledged when placed and then **mentioned again**, once or many times, in any event or in Messenger: follow that thread to the end and decide whether it is a **change request** or **just a question**. A change request that was **acknowledged and approved** becomes the **final order**. The previous one is dropped from the total but kept in the item's story (S4). A question changes nothing.
 
+### Price and the store match (voice note, 25 Oct 2026, verbatim transcript)
+
+> "Well, of course, we will record of the item price. That's no brainer. I probably just missed mentioning it, but that's the most important thing. That's no brainer. We should know the price. So again, if I were to like say it again, all right. When we're writing an order, captured order in the live, right? We get the item immediately. Write the name of the person who ordered it, the size of that item, the color, and the price, and another what do you call this? Yeah, the price, because the staff owner is taking. I mean, the staff owner is keeping track of the number of items that we like that has been ordered. So by the end of the live session, it's not us tracking how much we how much are we paying. It's the staff owner. So by the end of the live session, we will do the matching. Is the staff owner's what do you call this? Total. Same as ours is an as a track is the staff owner's total number of items that will be purchased same as ours. So there,"
+
+- **B16, every captured order has:** the item (taken immediately), the buyer's name, size, colour and **price**. Price is always recorded.
+- **S8, the store match at the end of the live.** During the live, the **store owner** keeps their own count of the items ordered, and tracks what the team will pay; the team doesn't. At the end of the live, the team's **total number of items must equal the store owner's total**. If it doesn't, the difference is found before leaving the store.
+
 ## 5. Still open
 
 1. **When is the host captured?** The portal can't hear the live by itself today. Options:
@@ -119,3 +126,4 @@ changed_by: owner only
    - (c) both: (b) during the live, checked by (a) afterwards.
 
    Option (a) needs a paid transcription service, so it needs the owner's approval of the cost, and a test on a real replay first.
+2. **The store match (S8):** is only the total number of items compared with the store owner's total, or also item by item (code, size, colour)? This decides how the portal shows where a difference is.

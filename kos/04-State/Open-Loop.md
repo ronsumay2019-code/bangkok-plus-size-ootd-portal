@@ -38,3 +38,4 @@ Platform sweep, 24 Oct (Claude):
 | OL-18 | Follow-ups: rule B5 reading, price source, who uses the portal during the live | Claude, 25 Oct | **1 and 2 answered** by the owner's "follow the host" note; **3 replaced by OL-19** | [[Live-Selling-Business]] §4: an event is where the agent looks, and price comes from the host |
 | OL-19 | When is the host captured: replay, admin during the live, or both? | Claude, 25 Oct | **Waiting on owner** | [[Live-Selling-Business]] §5 |
 | OL-20 | Approve a small paid test of replay transcription (T-031) | Claude, 25 Oct | **Waiting on owner** | Exact cost to be given before anything runs |
+| OL-21 | Store match: total count only, or item by item? | Claude, 25 Oct | **Waiting on owner** | [[Live-Selling-Business]] §5 Q2 |
