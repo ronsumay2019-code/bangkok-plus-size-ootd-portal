@@ -41,3 +41,4 @@ Platform sweep, 24 Oct (Claude):
 | OL-21 | Store match: total count only, or item by item? | Claude, 25 Oct | **Answered** 25 Oct | Total count only (S8) |
 | OL-22 | Webhook subscriptions in Meta (feed, live_videos, messages) for automatic live start and end (T-032) | Claude, 25 Oct | **Waiting on owner** | Owner checks Meta for Developers → Webhooks → Page, or grants an agent access |
 | OL-23 | A photo of the paper order list for LINEN SHOP (golden test and T-031 accuracy) | Claude, 25 Oct | **Waiting on owner** | — |
+| OL-24 | Evidence card: is the replay frame plus the comment data (name, text, time, Facebook link) enough, or is a real Facebook screenshot of the comment needed? | Claude, 25 Oct | **Waiting on owner** | [[Live-Selling-Business]] §5 Q3 |

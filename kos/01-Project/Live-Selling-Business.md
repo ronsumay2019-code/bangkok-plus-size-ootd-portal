@@ -144,7 +144,22 @@ changed_by: owner only
 
   It clears from this section only (owner, 24 Oct). The live's data moves on to the Replay section and the order pipeline; nothing is deleted.
 
+### Evidence over accuracy (voice note, 25 Oct 2026, verbatim transcript)
+
+> "Well, I'm not that concerned about, you know, Croc's transcription accuracy, whether it's 100%, 90%, or, you know, 70, 80. Well, for us, it does not matter. Great if they have like a really high accuracy, but as long as we can create, right, a story, we can follow, right, a thread, and if, you know, a storyline that would tell us or justifying that this is really the customer's or the buyer's final order. Look at this. Here's that's why, right? Every order confirmed, right? Reconciliated should be backed by an evidence. Whenever we send, whenever we have an order for review, there should be, you know, a backup, right? Captured, what do you call this? Proof or evidence, right? Of the actual live, right? Or like actual live that that buyer or miner ordered that item, because there's like a screen, just like a timestamp. That timestamping with a screenshot of what was what was commented final."
+
+- **B22, transcription accuracy is not the bar; the story is.** Transcription (Groq Whisper) only has to be good enough to build each order's story and follow its thread to the final order.
+- **B23, every confirmed or reconciled order carries evidence.** Every order, and every order sent for review, has a proof pack:
+  - **the timestamp;**
+  - **a screenshot from the actual live at that moment;**
+  - **the comment or message that made it final;**
+  - the host's words from the transcript, with the replay time;
+  - the earlier steps of its story.
+
+  An order without evidence is not confirmed.
+
 ## 5. Still open
 
 1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.
 2. ~~The store match (S8)~~ **Answered: total count only.**
+3. **What the screenshot shows.** A frame taken from the replay at the comment's time shows what the host was holding. It does **not** show the comments, because Facebook doesn't burn comments into the video. The comment itself comes from Facebook's data: name, text, time and a link that opens it on Facebook. Our plan is to show both side by side as the evidence card. A real screenshot of the comment as it looked on Facebook would need a browser logged in to Facebook, which is fragile. Is the evidence card enough?
