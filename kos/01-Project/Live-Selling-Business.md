@@ -125,7 +125,26 @@ changed_by: owner only
 - **B17, automatic during the live.** No person uses the portal during the live. Host capture, order capture and reconciliation are done automatically.
 - **B18, people come in at the invoice.** A person uses the portal only once the orders are final and reconciled. They prepare the invoice, take a photo of it, and send it to the buyer in Messenger. Anything the agents could not decide is shown to that person, marked unclear, at that point. It is never guessed.
 
+### Store match, replay and the live section (voice note, 25 Oct 2026, verbatim transcript)
+
+> "Do you compare only the total number of items with the store owner? Yeah, that's how the only way we have to compare it. And how the portal hears the host after live? Well, all right. With this one, I need you to be aligned with me. All right. The reason why we are doing the meta API graph is, you know, is for us to broadcast the live session during live. All right. Now, about the replay, the previous agent who sent us the, what do you call this, handover sheet, was able to produce like a broadcasted session. And then the portal that we previously used, right, that we previously used, they were able, the previous agent was able to download a copy of the live session and then get an agent who has a skill in transcribing, and then from the transcription they do the reconciliation. But that's from the old portal that I don't like. But it's up to you. If you're going to put these strategies together, it's up to you. But we need a replay section where the portal, I mean, the live session is just there for us to review. And for us to, for us to review. And then we also have a section where it dedicated for the live session. And I think we have an agreement already with that that session should be clean, live ready, no data, no everything. But when the live starts, the live session should automatically shows up there. And when the live ends, the live session will automatically shuts down the video and then clears all data."
+
+- **S8, updated: the store match compares the total number of items only.** It is the only comparison the store owner's tally allows.
+- **B19, host capture uses the method that worked before.**
+  - After the live, download the replay through the Graph API (`<videoId>?fields=source,length`, Page token on the server).
+  - Transcribe the host's speech.
+  - Take the item codes, prices, sizes and colours from the transcript.
+
+  The steps were proven in the old portal; see `bangkokplussizeootd/docs/REPLAY-ORDERS-PROCEDURE.md` step 3 (Whisper large-v3, language tl) and step 4 (lining up the comment clock with the replay clock). The old portal itself is not reused.
+- **B20, Replay section.** A page where each past live can be reviewed: the video, the transcript, the host's item calls on a timeline, the orders found in each event, and each item's story.
+- **B21, Live Session section.**
+  - Clean and live-ready, with no data, before a live.
+  - **When the live starts, it appears there automatically.**
+  - **When the live ends, the video closes and the section clears automatically.**
+
+  It clears from this section only (owner, 24 Oct). The live's data moves on to the Replay section and the order pipeline; nothing is deleted.
+
 ## 5. Still open
 
 1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.
-2. **The store match (S8):** is only the total number of items compared with the store owner's total, or also item by item (code, size, colour)? This decides how the portal shows where a difference is.
+2. ~~The store match (S8)~~ **Answered: total count only.**
