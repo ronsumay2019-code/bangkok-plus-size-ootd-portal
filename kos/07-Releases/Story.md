@@ -43,6 +43,17 @@ The hard part: **a comment like "mine" carries no item.** Its meaning depends on
 - Wrote down the real method: the Live Selling Business. Codes come from the host's Item Events. Orders are matched inside the window between events (Job 1), then every claim is reviewed across the chat and Messenger (Job 2).
 - Correction recorded as L-007.
 
+### The owner and Claude, 25 Oct
+- The owner answered every question by voice. The rules were rewritten from the owner's own words (B1–B30, S1–S8):
+  - follow the host;
+  - events are a search filter;
+  - one reconciliation agent after the live;
+  - no people during the live;
+  - evidence on every order;
+  - the store match on total count.
+- Claude's first redesign followed the buyers and was corrected (L-009).
+- The owner approved the screens: the evidence card, orders review, and the all-in-one invoice generator with the shop's own template ([[Screens]]).
+
 ## Chapter 3: Root causes
 
 *To be written after the gate G1 analysis.*

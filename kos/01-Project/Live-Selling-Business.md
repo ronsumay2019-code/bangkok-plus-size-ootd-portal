@@ -171,8 +171,34 @@ changed_by: owner only
 
 - **B26, the paper list is the admin's personal scratch note.** It is written as fast as possible, as his own reference, not the team's. **It is not used as the source of truth for testing.**
 
+### Invoices, Messenger and the trial weeks (owner, 25 Oct 2026; key words verbatim)
+
+> "We don't send evidence and any photo to our miners and our buyers in Messenger. The only photo we are sending is a photo of their order inside a plastic bag."
+
+> "if a miner, right, makes an adjustment request inside the messenger during live … we respond and acknowledge on that in messenger, because the host doesn't have any visibility or any idea on what's going on inside the messenger … if a silent watcher … places an order in messenger, then he will get acknowledgement in messenger as well."
+
+> "Owner … will not look at the total … of what we have inside the portal for the first couple of weeks or first week maybe … We will do the traditional way until we like convince or show that this one is accurate."
+
+> "we don't want to send an invoice like in plain text." (sample invoice provided; sent inside Messenger "with no issue")
+
+> "one item code with 100 pieces … do not complicate things."
+
+- **B27, what a buyer receives:**
+  - **the invoice as a picture in the shop's template**, never plain text;
+  - **a photo of their order inside its plastic bag**, taken in the invoice generator;
+  - the shop's own message.
+
+  Sent inside Messenger. **Evidence is internal only and never sent.**
+- **B28, one invoice line per item** (code + size + colour), with a quantity. Invoices stay short.
+- **B29, Messenger during the live.** The team replies in Messenger. The host can't see Messenger. **A Page reply that acknowledges a Messenger change or order counts as its approval**, the same as the host's "noted" on the live.
+- **B30, trial weeks.**
+  - For the first week or weeks, the team keeps its traditional way and the portal runs alongside.
+  - After each live, a **match report** compares the portal's final orders with the invoices actually sent in Messenger and with the store owner's total.
+  - The owner switches over once the reports prove the portal accurate.
+
 ## 5. Still open
 
 1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.
 2. ~~The store match (S8)~~ **Answered: total count only.**
-3. **What the screenshot shows.** A frame taken from the replay at the comment's time shows what the host was holding. It does **not** show the comments, because Facebook doesn't burn comments into the video. The comment itself comes from Facebook's data: name, text, time and a link that opens it on Facebook. Our plan is to show both side by side as the evidence card. A real screenshot of the comment as it looked on Facebook would need a browser logged in to Facebook, which is fragile. Is the evidence card enough?
+3. ~~What the screenshot shows.~~ **Answered 25 Oct:** the side-by-side card is approved ("I really like it"); see [[Screens]].
+   *Original question:* A frame taken from the replay at the comment's time shows what the host was holding. It does **not** show the comments, because Facebook doesn't burn comments into the video. The comment itself comes from Facebook's data: name, text, time and a link that opens it on Facebook. Our plan is to show both side by side as the evidence card. A real screenshot of the comment as it looked on Facebook would need a browser logged in to Facebook, which is fragile. Is the evidence card enough?
