@@ -118,12 +118,14 @@ changed_by: owner only
 - **B16, every captured order has:** the item (taken immediately), the buyer's name, size, colour and **price**. Price is always recorded.
 - **S8, the store match at the end of the live.** During the live, the **store owner** keeps their own count of the items ordered, and tracks what the team will pay; the team doesn't. At the end of the live, the team's **total number of items must equal the store owner's total**. If it doesn't, the difference is found before leaving the store.
 
+### No people during the live (voice note, 25 Oct 2026, verbatim transcript)
+
+> "as much as possible, there should be no human, no person, right, using this portal during live session. Everything should be done automatically. The only time a human, right, a human will use this portal is when an order is final, when everything is reconciliated already, confirmed. Then a human will will prepare an invoice, take a photo, and then send that to the buyer or seller in Messenger."
+
+- **B17, automatic during the live.** No person uses the portal during the live. Host capture, order capture and reconciliation are done automatically.
+- **B18, people come in at the invoice.** A person uses the portal only once the orders are final and reconciled. They prepare the invoice, take a photo of it, and send it to the buyer in Messenger. Anything the agents could not decide is shown to that person, marked unclear, at that point. It is never guessed.
+
 ## 5. Still open
 
-1. **When is the host captured?** The portal can't hear the live by itself today. Options:
-   - (a) after the live, from the replay video, by an agent (transcription);
-   - (b) during the live, by the off-camera admin tapping in the code, price, sizes and colours as the host calls them;
-   - (c) both: (b) during the live, checked by (a) afterwards.
-
-   Option (a) needs a paid transcription service, so it needs the owner's approval of the cost, and a test on a real replay first.
+1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.
 2. **The store match (S8):** is only the total number of items compared with the store owner's total, or also item by item (code, size, colour)? This decides how the portal shows where a difference is.

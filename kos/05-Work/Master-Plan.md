@@ -28,11 +28,11 @@ GO requires:
 
 | Step | What it does | Rule |
 |---|---|---|
-| **1. Host Event capture** | ItemEvent = `{live, seq, code, price, sizes[], colours[], description?, available?, calledAt, source: replay \| admin, evidence}`. **This is the first and only source of codes and prices.** The source is waiting on §5 Q1 (replay, admin, or both). | S1, B3, L-009 |
+| **1. Host Event capture** | ItemEvent = `{live, seq, code, price, sizes[], colours[], description?, available?, calledAt, source: replay \| admin, evidence}`. **This is the first and only source of codes and prices.** **Automatic, from the live's video and audio (B17).** No admin entry. Feasibility is being tested in T-031. | S1, B3, L-009 |
 | **2. Raw capture** | Every live comment, and every Messenger message during the live, is saved raw (id, time, name, text). Nothing is filtered when it is saved. | B7 |
 | **3. Segments** | Event N = [calledAt N, calledAt N+1). The last segment runs to the end of the live. **A search filter for where an order was placed, not a limit:** later changes in any event or in Messenger still count. | S2, S6 |
 | **4. Job 1, per segment** | Find the orders placed in the segment's chat and Messenger: MINE+code, code only, code+size/colour, against **codes from host events only**. MINE with no code is matched by its clarifying reply (B6). "+1", "one more" or a number means extra pieces. A repeated "mine" stays 1 order. | S3, B6, B9 |
-| **5. Job 2: one reconciliation agent after the live** | **Pass 1:** an order placed once, with no requests, no other conversation and no Messenger side chat, is **confirmed**. **Pass 2:** an order mentioned again, in any later event or in Messenger: follow the thread to the end and type it as a change request (item/size/colour), extra piece, swap, question, or denied (out of stock only). An acknowledged and approved change is the final order; the previous one is dropped and kept in the story. A person confirms anything unclear. | S4, S6, S7, B7 |
+| **5. Job 2: one reconciliation agent after the live** | **Pass 1:** an order placed once, with no requests, no other conversation and no Messenger side chat, is **confirmed**. **Pass 2:** an order mentioned again, in any later event or in Messenger: follow the thread to the end and type it as a change request (item/size/colour), extra piece, swap, question, or denied (out of stock only). An acknowledged and approved change is the final order; the previous one is dropped and kept in the story. Anything the agent can't decide is shown at invoice time, marked unclear, and never guessed (B18). | S4, S6, S7, B7, B18 |
 | **6. Item story** | For each code: every capture, change and denial, with its comment or message link and time. The final order points back into its story. | S4 |
 | **8. Store match** | At the end of the live: the team's total number of items is shown next to the store owner's total. If they differ, the portal lists the orders per code so the difference can be found before leaving the store. | S8 |
 | **7. First miner and bag list** | When pieces run short, the earliest confirmed order keeps the piece. The bag list per buyer matches the bag labels. | B10, B14 |
@@ -49,8 +49,8 @@ GO requires:
 | T-004 | **W7:** a Supabase branch (or schema copy) holding the backup data, for the preview | Codex | Claude | Owner approves the branch's cost, if any |
 | T-005 | **W5 security:** RLS lockdown (remove `temp_dev_all`; service role only); move the Page token out of `portal_kv` into env only | Codex | Grok, Claude | **Owner approves the migration** |
 | T-010 | **W1:** save the raw chat for every comment (no filtering at save time); reset seen-IDs together with the data | Antigravity | Grok, Claude | — |
-| T-011 | **W2:** Host Event capture: data model, admin quick entry (phone), and replay import | Antigravity | Grok, Claude | §5 Q1 |
-| T-031 | **Spike:** can the portal fetch the LINEN SHOP replay video through the Graph API, and can a transcription service pull out the codes, prices, sizes and colours from Taglish speech? Report accuracy and exact cost. No spending without owner approval. | Codex | Claude | Owner approves a test cost |
+| T-011 | **W2:** Host Event capture, automatic: data model, plus extracting code, price, sizes and colours from the transcript, with the evidence time for each | Antigravity | Grok, Claude | T-031 result |
+| T-031 | **Spike (TOP PRIORITY, critical path):** (1) can the portal fetch the LINEN SHOP replay video through the Graph API, without the token leaving the server? (2) Can a transcription service pull out the codes, prices, sizes and colours from Taglish speech with store noise? Report accuracy against the paper list and the exact cost. No spending without owner approval. | Codex (Claude evaluates) | Grok, Claude | Owner approves the test cost |
 | T-012 | **W2:** Segments and Job 1 per segment as pure functions (codes from host events only; extra pieces; repeated mine), with unit tests built from real comment text | Codex | Grok, Claude | — |
 | T-013 | **W2:** Job 2 per order (count mentions, type them, latest granted change is final), item story, first miner, bag list | Antigravity | Grok, Claude | — |
 | T-014 | **W2:** golden test harness: fixture in, final orders out, diff against the owner's list | Codex | Claude | T-002 |
@@ -102,7 +102,8 @@ The owner's PC clock showed 3:34 PM on 24 Oct when it was 04:34 Sunday in Manila
 |---|---|---|---|
 | Business answers arrive late | Medium | Blocks W2 | The questions are small and specific; Claude collects the answers Saturday night |
 | No golden fixture by Sunday noon | Medium | No proof, so NO-GO | Use the shorter live; Claude prepares the sheet so staff only fill it in |
-| Staff miss an event call during a live | Medium | Wrong windows | Events stay editable; the replay check after the live; an "unassigned comments" list |
+| **Automatic host capture doesn't work** (the video can't be fetched, or transcription is inaccurate on Taglish) | **Unknown until T-031** | **The core can't follow the host, so NO-GO for W2** | Run T-031 first. If it fails, report at once with the options; the owner decides (B17 says no people during the live). |
+| The replay isn't ready right after the live, so the store match (S8) is late | Unknown | The store match waits | Measure the replay's ready time in T-031 |
 | Comment delay puts a "mine" in the wrong window | High | Wrong item | Business Q3 grace period; Job 2 review |
 | Webhook names missing for some buyers | Medium | Can't invoice | "Name needed" queue; Messenger match |
 | Vercel access for agents (403 today) | Known | Can't audit deploys | Owner checks the Vercel team permissions for the connected account |
