@@ -5,51 +5,52 @@ Built on: [[Live-Selling-Business]] (HARD RULE), [[Current-State]], [[Known-Issu
 
 ## 1. What "done" means
 
-Production goes live **empty (0 data)**. The owner can then run one real live from start to finish in the portal:
+Production goes live **empty (0 data)**. On a real live, the portal does what the team does on paper today ([[Live-Selling-Business]] B14), with nothing missed and nothing counted twice:
 
-1. **Item Events** are captured from the host.
-2. **Job 1** finds 1st captures inside each event window.
-3. **Job 2** reviews each capture against the whole chat and Messenger, and people decide every change.
-4. The orders are final.
-5. The owner approves.
-6. One invoice per buyer is copied or sent in Messenger and marked sent, which starts the buyer's 24h.
-7. The payment proof is recorded.
-8. Paid orders go to Shipping; unpaid orders go to Payments.
+1. The off-camera admin records each order as it is confirmed. The portal **suggests** them from the live chat and Messenger.
+2. Unclear "mine" comments are tracked until they are clarified.
+3. Out-of-stock denials are recorded, and the first miner wins (B10).
+4. After the live, the chat and Messenger are reconciled per buyer. Double entries, extra pieces, replacements and swaps are each flagged, and a person decides.
+5. A bag list shows each buyer's labelled bag.
+6. The review at home gives the final orders.
+7. The owner approves one invoice per buyer for the live.
+8. The invoice is sent or copied in Messenger and marked sent, which starts the buyer's 24h.
+9. The payment proof is recorded.
+10. Paid orders go to Shipping; unpaid orders go to Payments.
 
 GO requires:
 - the acceptance suite passes ≥95% overall and 100% of its critical scenarios;
-- the golden tests pass;
+- the golden test passes;
 - the owner says GO.
 
-## 2. The design of the core (W2), from the Live Selling Business
+## 2. The design of the core (W2), from the Live Selling Business (rewritten 25 Oct after the owner's answers)
 
-| Piece | What it is | Business rule |
+| Piece | What it is | Rule |
 |---|---|---|
-| **ItemEvent** | `{live, seq, code, price, description, colours[], sizes[], calledAt, source: staff \| replay, note}` | B3 |
-| **Event capture panel** (live screen) | One tap, "Host called an item", stamps the time. Staff then type the code, price, colours and sizes. Details can be edited until the next event, because hosts say them before or after the code. Nothing else happens on this screen. | B3, B4 |
-| **Raw chat store** | **Every** comment on the live video is saved: id, time, buyer name or id, text. Job 2 needs the whole chat; today only order-like comments are kept. | B7 |
-| **Job 1** (pure function) | `windowOf(comment.time)` gives event N. A match is any of MINE+code, MINE only, code only, or code+size/colour, loosely matched. A buyer's first match is their **1st capture**. | B5, B6 |
-| **Job 2** (review queue) | For each 1st capture, list every later mention by that buyer in the chat and in Messenger. Each mention gets a type (replacement / additional / swap / chatter). An agent may *propose* the type; **a person sets the type and granted / denied**. The final order count follows the outcomes table. | B7 |
-| **Golden test** | Real comments plus the real Item Events of one past live go through Job 1. The owner-approved Job 2 decisions are applied. The result must equal the **owner-confirmed final order list**. Expected values are never typed into code (L-008). | — |
-| **Rack-based engine and Inventory board** | Taken off the critical path (Business B1). Whether the store-purchase check stays depends on owner answer Q8. | B1, B2 |
-
-**Proposal for Business Q1, waiting for the owner:**
-- During the live, staff capture the events (the panel above). This is the only source that exists in real time.
-- After the live, the replay is the check. Replay transcription is a paid service, so it needs the owner's approval of the cost, and it is **not** on the Monday critical path.
+| **Live Order Sheet** | The admin's paper, in the portal, built for a phone. One row per order: buyer's FB name, code, description, size, colour, quantity, price (source waiting on §4 Q2), channel (live chat / Messenger / admin), comment or message id and time, status (confirmed / out of stock). The live's code list builds itself from the codes the admin types as the host calls them by ear. Nothing is pre-defined. | B1, B3, B13, B14 |
+| **Raw capture** | Every live comment, and every Messenger message during the live, is saved raw (id, time, name, text). Nothing is filtered when it is saved. | B7 |
+| **Job 1: suggestions** | A pure function. A comment matching MINE+code, code only, or code+size/colour for a code already called in this live becomes a suggested order. The admin confirms it with one tap. There is no window: any called code is valid for the whole live. | B5, B6 |
+| **Unclear list** | "MINE" with no code, or "mine + size/colour" with no code, stays here until the buyer's clarifying reply is linked to it. It is never dropped and never guessed. | B6 |
+| **Extra pieces** | "+1", "one more", "two more", or a number after the code: suggested as extra pieces, and the admin confirms. A repeated "mine" with no new request does **not** add a piece. | B6, B9 |
+| **Out of stock and first miner** | "sorry, wala na po", "out of stock" or "sold out" marks the request denied. When pieces run short, the earliest confirmed order keeps the piece. | B7, B10 |
+| **Job 2: reconciliation** | After the live, everything is merged per buyer across chat and Messenger. A Messenger change to a chat order is the same order adjusted; possible double entries are flagged. Each item gets a type (replacement / additional / swap / chatter / denied), and **a person decides**. | B7 |
+| **Bag list** | Per buyer: FB name, then each piece (code, description, size, colour), matching the bag labels. | B14 |
+| **Golden test** | A past live's real comments and Messenger messages go through Job 1. The owner's Job 2 decisions are applied. The result must equal **the team's paper order list for that live**, from a photo the owner provides. It is computed, never typed in (L-008). | — |
+| **Rack, inventory board and 90% buying-list rule** | **Retired from the critical path.** A buying list never exists (B12). | B1, B12 |
 
 ## 3. Tickets on the critical path (each 15 min or less; split further at G1)
 
 | Ticket | Work | Builder | Review | Needs |
 |---|---|---|---|---|
-| T-001 | Owner answers Business Q1–Q9 | Owner | — | **Blocks T-010 to T-016** |
-| T-002 | **Golden fixture.** Record the Item Events of one past live from its replay (NEW SHOP 22 Oct, video `1126219396590785`, or LINEN SHOP) and get the owner-confirmed final order list | Owner or staff, with Claude preparing the sheet | Claude | **Owner time on Sunday morning** |
+| T-001 | Owner answers Business Q1–Q9 | Owner | — | **Done 25 Oct.** Three short follow-ups are in [[Live-Selling-Business]] §4 |
+| T-002 | **Golden fixture:** a photo of the team's **paper order list** for one past live (LINEN SHOP 24 Oct or NEW SHOP 22 Oct), plus that live's video id. Claude fetches the comments and Messenger messages. | Owner provides the photo; Claude transcribes it, and the owner confirms the transcription | Claude | **Photo from the owner** |
 | T-003 | **W7 infrastructure:** CI on PRs (`typecheck`, `test`, `build`, `kos-check`), branch protection on `main`, the Timeline Action | Codex | Grok, Claude | Owner allows branch protection on GitHub |
 | T-004 | **W7:** a Supabase branch (or schema copy) holding the backup data, for the preview | Codex | Claude | Owner approves the branch's cost, if any |
 | T-005 | **W5 security:** RLS lockdown (remove `temp_dev_all`; service role only); move the Page token out of `portal_kv` into env only | Codex | Grok, Claude | **Owner approves the migration** |
 | T-010 | **W1:** save the raw chat for every comment (no filtering at save time); reset seen-IDs together with the data | Antigravity | Grok, Claude | — |
-| T-011 | **W2:** ItemEvent model, API and capture panel | Antigravity | Grok, Claude | T-001 (Q1, Q2, Q6) |
-| T-012 | **W2:** Job 1 as a pure function, with unit tests built from real comment text | Codex | Grok, Claude | T-001 (Q2, Q3) |
-| T-013 | **W2:** Job 2 review queue and decision recording (types, granted / denied, Messenger mentions) | Antigravity | Grok, Claude | T-001 (Q4, Q7, Q9) |
+| T-011 | **W2:** Live Order Sheet (phone-first): rows, one-tap confirm, out of stock, unclear list | Antigravity | Grok, Claude | §4 Q2, Q3 |
+| T-012 | **W2:** Job 1 suggestions as a pure function (no window; extra pieces; repeated mine), with unit tests built from real comment text | Codex | Grok, Claude | — |
+| T-013 | **W2:** Job 2 reconciliation: merge chat and Messenger per buyer, flag double entries, decide each type, first miner, bag list | Antigravity | Grok, Claude | — |
 | T-014 | **W2:** golden test harness: fixture in, final orders out, diff against the owner's list | Codex | Claude | T-002 |
 | T-015 | **W3:** invoices built from final orders; one invoice per live per buyer; owner approval; mark-sent starts the 24h; fix the wording in KI-011 | Antigravity | Grok, Claude | T-013 |
 | T-016 | **W4:** payment proof, then Payments or Shipping (exists; re-test it on the new orders) | Codex | Claude | T-015 |

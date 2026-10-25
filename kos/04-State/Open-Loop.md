@@ -25,13 +25,14 @@ Platform sweep, 24 Oct (Claude):
 | OL-05 | What makes this portal hard; ranking among builds | Owner, 24 Oct | **Answered** | In chat, 24 Oct; summarised in [[Story]] chapter 1 |
 | OL-06 | Where Codex fits; team of Claude, Antigravity, Grok | Owner, 24 Oct | **Answered** | [[Master-Plan]] and `00-START-HERE` model routing |
 | OL-07 | Obsidian connection (browser, MCP, links, file?) | Owner, 24 Oct | **Done** (auto-pull interval **waiting on owner**) | The vault `kos` opened; Git plugin installed; *Git: Pull* returned "Everything is up-to-date" (owner, 24 Oct). Still to do: Settings → search "interval" → Auto pull interval 5. |
-| OL-08 | Live Selling Business questions Q1–Q9 | Claude, 24 Oct | **Waiting on owner** | [[Live-Selling-Business]] §3 |
-| OL-09 | Golden fixture: Item Events plus the confirmed final order list for one past live | Claude, 24 Oct | **Waiting on owner/staff** | Needed by Sun 12 PM. Claude prepares the sheet. |
+| OL-08 | Live Selling Business questions Q1–Q9 | Claude, 24 Oct | **Answered** 25 Oct (voice notes) | Verbatim in [[Live-Selling-Business]] §3; rules B5–B7 updated, B9–B15 added |
+| OL-09 | Golden fixture for one past live | Claude, 24 Oct | **Waiting on owner** | Changed 25 Oct: what's needed now is **a photo of the paper order list** for LINEN SHOP or NEW SHOP |
 | OL-10 | Approve the RLS lockdown migration (KI-004, KI-005) | Claude, 24 Oct | **Waiting on owner** | Approval of the migration in Supabase |
 | OL-11 | `META_APP_SECRET` in Vercel (KI-008) | Claude, 24 Oct | **Waiting on owner** | Enter it in Vercel → Environment Variables (never in chat) |
 | OL-12 | Branch protection on `main` | Claude, 24 Oct | **Waiting on owner** | Allow it on GitHub (T-003) |
 | OL-13 | Vercel listing refused (403) (KI-012) | Claude, 24 Oct | **Waiting on owner** | Check the connected Vercel account's team permissions |
 | OL-14 | Grok independent review of the Master Plan (G3) | Claude, 24 Oct | **Waiting on owner** | Claude can't reach Grok, Antigravity or Codex from this session. The owner gives Grok the repo or the plan file, and Grok's report is saved to `06-Loop/Reviews/`. |
 | OL-15 | Logins for the platforms | Owner, 24 Oct | **Answered** | Noted. They go into each platform's own settings, never chat or the vault. |
-| OL-16 | Main repo docs conflict with the Live Selling Business (KI-010) | Claude, 24 Oct | **Waiting on owner** (Q8) | — |
+| OL-16 | Main repo docs conflict with the Live Selling Business (KI-010) | Claude, 24 Oct | **Answered** 25 Oct | A8: a buying list never exists. The rack, run sheet, inventory board and 90% rule don't apply to live selling. The Live Selling Business wins. |
 | OL-17 | **First milestone missed:** "Sat 24 Oct, 11 PM Manila: plan reviewed by Grok, owner has the questions" | Claude, Sun 25 Oct 04:44 Manila | **Waiting on owner** | Done by then: G0 and the Master Plan draft. Not done: the Grok review (OL-14) and the Q1–Q9 answers (OL-08). Re-plan in [[Master-Plan]] §4. |
+| OL-18 | Follow-ups: rule B5 reading, price source, who uses the portal during the live | Claude, 25 Oct | **Waiting on owner** | [[Live-Selling-Business]] §4 |
