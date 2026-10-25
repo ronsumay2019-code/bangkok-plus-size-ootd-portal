@@ -14,3 +14,4 @@ The automatic part (merges and deploys) is added by the Timeline Action once tic
 | Sun 25 Oct, 04:44 | First milestone (Sat 11 PM) missed; schedule re-planned | [[Master-Plan]] §4, OL-17 |
 | Sun 25 Oct | Owner answered Q1–Q9 by voice. No item window, Messenger orders count as live orders, out of stock is the only denial, first miner wins, no buying list. W2 redesigned as the Live Order Sheet. | [[Live-Selling-Business]] §3, [[Master-Plan]] §2 |
 | Sun 25 Oct | Owner restated the strategy: **follow the host**. Claude's buyer-first redesign was corrected (L-009); W2 redesigned to v3, host events first. | [[Live-Selling-Business]] §4, [[Master-Plan]] §2 |
+| Sun 25 Oct | Owner clarified: events are only a search filter for where orders were placed; changes can come in any later event or in Messenger. One reconciliation agent after the live: pass 1 confirmed orders, pass 2 followed threads. | [[Live-Selling-Business]] §4 (S6, S7) |
