@@ -2,13 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { LiveSessionCommand } from './components/LiveSessionCommand';
 import { AutoReconciliationSummary } from './components/AutoReconciliationSummary';
-import { InventoryStoreBoard } from './components/InventoryStoreBoard';
 import { MessengerAdjustmentManager } from './components/MessengerAdjustmentManager';
 import { ReplayReviewStudio } from './components/ReplayReviewStudio';
-import { PolaAICopilot } from './components/PolaAICopilot';
-import { StrategicAnalysisModal } from './components/StrategicAnalysisModal';
 import { OrderReviewApprovalWorkspace } from './components/OrderReviewApprovalWorkspace';
-import { BuyingBehaviorDashboard } from './components/BuyingBehaviorDashboard';
 import { PreOrdersLane } from './components/PreOrdersLane';
 import { OwnerOverrideModal } from './components/OwnerOverrideModal';
 import { MobileAccessQRModal } from './components/MobileAccessQRModal';
@@ -80,7 +76,6 @@ function mergeThreads(incoming: MessengerThread[], existing: MessengerThread[]):
 
 export default function App({ authEnabled = false, portalUser = null, signOut }: Partial<PortalAuthContext> = {}) {
   const [activeTab, setActiveTab] = useState<string>('live_command');
-  const [showAnalysisModal, setShowAnalysisModal] = useState<boolean>(false);
   const [isMobileAccessModalOpen, setIsMobileAccessModalOpen] = useState<boolean>(false);
   const [isMetaTokenModalOpen, setIsMetaTokenModalOpen] = useState<boolean>(false);
   const [lives, setLives] = useState<LiveSession[]>(SEED_LIVE_SESSIONS);
@@ -1151,7 +1146,6 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
         activeLive={activeLive}
         summary={summary}
         phpRate={phpRate}
-        onOpenAnalysis={() => setShowAnalysisModal(true)}
         onOpenMobileAccessModal={() => setIsMobileAccessModalOpen(true)}
         onOpenMetaTokenModal={() => setIsMetaTokenModalOpen(true)}
         preOrdersCount={preOrders.length}
@@ -1291,27 +1285,6 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
           />
         )}
 
-        {activeTab === 'buying_analytics' && (
-          <BuyingBehaviorDashboard
-            orders={orders}
-            amendments={amendments}
-            inventory={inventory}
-            summary={summary}
-          />
-        )}
-
-        {activeTab === 'inventory_board' && (
-          <InventoryStoreBoard
-            inventory={inventory.filter((i) => i.liveId === activeLive.id)}
-            summary={summary}
-            phpRate={phpRate}
-            onUpdateItem={handleUpdateInventoryItem}
-            onAddItem={handleAddInventoryItem}
-            onSyncInventory={handleSyncInventory}
-            activeLive={activeLive}
-          />
-        )}
-
         {activeTab === 'messenger_adjustments' && (
           <MessengerAdjustmentManager
             amendments={amendments}
@@ -1356,9 +1329,6 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
           />
         )}
 
-        {activeTab === 'pola_ai' && (
-          <PolaAICopilot summary={summary} />
-        )}
         </ErrorBoundary>
       </main>
 
@@ -1370,12 +1340,6 @@ export default function App({ authEnabled = false, portalUser = null, signOut }:
         isPreOrder={overrideModal.isPreOrder}
         userRole={userRole}
         onApplyOverride={handleApplyOverride}
-      />
-
-      {/* Executive Gap Analysis Modal */}
-      <StrategicAnalysisModal
-        isOpen={showAnalysisModal}
-        onClose={() => setShowAnalysisModal(false)}
       />
 
       {/* Mobile Phone App Access & Multi-Login QR Code Modal */}

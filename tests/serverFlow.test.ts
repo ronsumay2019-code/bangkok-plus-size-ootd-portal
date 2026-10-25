@@ -239,6 +239,8 @@ test('owner creates admin and co-owner links; admins cannot create links or see 
   assert.equal((await call(A, '/api/auth/invite', { token: coLogin.data.token, body: { staffId: 'admin3' } })).status, 200, 'the co-owner can create admin links');
   const override = await call(B, '/api/owner/order-override', { token: adminToken, body: { orderId: 'ord_live_2', role: 'staff', reason: 'size fix', overrides: { size: '3XL' } } });
   assert.equal(override.status, 200, 'the role comes from the sign-in, not from the request body');
+  const noReason = await call(B, '/api/owner/order-override', { token: ownerToken, body: { orderId: 'ord_live_2', overrides: { size: '4XL' } } });
+  assert.equal(noReason.status, 200, 'the owner overrides without giving a reason');
 });
 
 test('reset is disabled once data lives in the database', async () => {

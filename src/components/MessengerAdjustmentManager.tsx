@@ -126,7 +126,7 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
       if (onReplyMessenger) {
         await onReplyMessenger(
           thread.id,
-          `Hi Sis ${thread.buyerName}! Confirmed & routed your ${intent.suggestedSpec.itemCode} (${intent.suggestedSpec.size} ${intent.suggestedSpec.colour}) to our Dedicated Pre-Orders Lane so it stays separate from today's live rack.`
+          `Hi Sis ${thread.buyerName}! Noted po your ${intent.suggestedSpec.itemCode} (${intent.suggestedSpec.size} ${intent.suggestedSpec.colour}) as a pre-order po. Salamat sis! 💕`
         );
       }
       return;
@@ -402,7 +402,7 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
                       <Zap className="w-3.5 h-3.5" />
                       <span>
                         {activeThread.detectedIntent.type === 'pre_order'
-                          ? 'Route to Pre-Orders Lane'
+                          ? 'Move to Pre-orders'
                           : activeThread.detectedIntent.type === 'invoice_inquiry'
                           ? 'Draft Reconciled Invoice Reply'
                           : '1-Click Apply Spec Swap & Reply'}
@@ -519,7 +519,7 @@ export const MessengerAdjustmentManager: React.FC<MessengerAdjustmentManagerProp
               <MessageSquare className="w-8 h-8 text-neutral-700 mb-2" />
               <p className="font-semibold text-neutral-300">Business Messenger Inbox Ready</p>
               <p className="mt-1 max-w-md">
-                Connect your Facebook Page Access Token in <strong>Live Session Command</strong> to pull real buyer messages from this morning&apos;s live broadcast, or incoming messages will appear automatically via <code className="text-neutral-400">/api/meta/webhook</code>.
+                Connect your Facebook Page Access Token in <strong>Live</strong> to pull real buyer messages from this morning&apos;s live broadcast, or incoming messages will appear automatically via <code className="text-neutral-400">/api/meta/webhook</code>.
               </p>
             </div>
           )}

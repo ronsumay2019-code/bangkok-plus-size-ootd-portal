@@ -3092,11 +3092,8 @@ app.post('/api/owner/order-override', (req, res) => {
     });
   }
 
-  if (!reason || !reason.trim()) {
-    return res.status(400).json({
-      error: 'Override reason is mandatory for operational audit compliance.',
-    });
-  }
+  // The owner overrides without giving a reason (owner, 25 Oct); a note is kept only if one was typed.
+  const note = typeof reason === 'string' ? reason.trim() : '';
 
   const nowIso = new Date().toISOString();
 
@@ -3134,7 +3131,7 @@ app.post('/api/owner/order-override', (req, res) => {
       version: currentVersion,
       by: author || `${role.toUpperCase()} (Authorized)`,
       at: nowIso,
-      reason: reason.trim(),
+      reason: note,
       before: beforeState,
       after: {
         itemCode: preOrder.itemCode,
@@ -3189,7 +3186,7 @@ app.post('/api/owner/order-override', (req, res) => {
     version: currentVersion,
     by: author || `${role.toUpperCase()} (Authorized)`,
     at: nowIso,
-    reason: reason.trim(),
+    reason: note,
     before: beforeState,
     after: {
       itemCode: order.itemCode,

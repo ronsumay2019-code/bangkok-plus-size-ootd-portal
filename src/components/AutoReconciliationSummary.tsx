@@ -691,7 +691,7 @@ PAYMENT OPTIONS:
               <ShoppingBag className="w-8 h-8 text-neutral-600 mx-auto" />
               <p className="text-sm font-semibold text-neutral-300">No Approved Buyer Invoices Yet</p>
               <p className="text-xs text-neutral-500 max-w-md mx-auto">
-                Customer claims are currently in <strong>Order Review & Verification</strong>. Verify prices and codes, then click <strong>Approve</strong> to release approved items into final customer invoice bags here.
+                Customer claims are currently in <strong>Orders</strong>. Verify prices and codes, then click <strong>Approve</strong> to release approved items into final customer invoice bags here.
               </p>
             </div>
           ) : (

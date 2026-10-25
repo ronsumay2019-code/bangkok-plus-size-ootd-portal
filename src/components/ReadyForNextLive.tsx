@@ -110,13 +110,13 @@ export const ReadyForNextLive: React.FC<ReadyForNextLiveProps> = ({
             <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800"><b className="block text-lg text-sky-300">{invoiced}</b>invoiced</div>
             <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800"><b className="block text-lg text-rose-300">{unpaid}</b>waiting for payment</div>
           </div>
-          <p className="text-[11px] text-neutral-500">Invoice and collect payment within 24 hours of the live.</p>
+          <p className="text-[11px] text-neutral-500">Buyers have 24 hours to pay from the moment their invoice is sent.</p>
           <div className="flex flex-wrap gap-2 text-xs">
             <button type="button" onClick={onOpenReview} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white font-semibold flex items-center gap-1.5">
               <ClipboardCheck className="w-4 h-4" /> Review orders
             </button>
             <button type="button" onClick={onOpenReconciliation} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white font-semibold flex items-center gap-1.5">
-              <FileCheck className="w-4 h-4" /> Reconcile &amp; invoice
+              <FileCheck className="w-4 h-4" /> Invoices
             </button>
             <button type="button" onClick={onOpenPayments} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white font-semibold flex items-center gap-1.5">
               <Wallet className="w-4 h-4" /> Payments &amp; shipping

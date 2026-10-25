@@ -41,7 +41,6 @@ export const OwnerOverrideModal: React.FC<OwnerOverrideModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<'override' | 'history'>('override');
   const [authorName, setAuthorName] = useState('Pola (Shop Owner)');
-  const [overrideReason, setOverrideReason] = useState('');
   const [selectedRole, setSelectedRole] = useState<'owner' | 'admin'>('owner');
 
   // Override fields initialized from order
@@ -61,10 +60,6 @@ export const OwnerOverrideModal: React.FC<OwnerOverrideModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!overrideReason.trim()) {
-      setErrorMessage('A mandatory override justification reason is required for audit compliance.');
-      return;
-    }
     if (userRole === 'staff' && selectedRole !== 'owner' && selectedRole !== 'admin') {
       setErrorMessage('Unauthorized: Only an Owner or Admin can execute order overrides.');
       return;
@@ -79,7 +74,7 @@ export const OwnerOverrideModal: React.FC<OwnerOverrideModalProps> = ({
         isPreOrder,
         role: selectedRole,
         author: authorName.trim() || `${selectedRole.toUpperCase()} (Authorized)`,
-        reason: overrideReason.trim(),
+        reason: '',
         overrides: {
           itemCode: itemCode.trim().toUpperCase(),
           itemName: itemName.trim().toUpperCase(),
@@ -314,25 +309,6 @@ export const OwnerOverrideModal: React.FC<OwnerOverrideModalProps> = ({
                 />
               </div>
 
-              {/* Mandatory Reason Box */}
-              <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="font-semibold text-rose-300 flex items-center gap-1.5 text-[11px]">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-                    Mandatory Audit Override Reason *
-                  </label>
-                  <span className="text-[10px] text-neutral-400">Strictly recorded in immutable audit log</span>
-                </div>
-                <textarea
-                  rows={2}
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  placeholder="Explain why this live order or pre-order is being overridden (e.g. VIP client requested size adjustment, extra stock discovered on wholesale rack, price exception authorized by owner)..."
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2.5 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs"
-                  required
-                />
-              </div>
-
               {/* Action Buttons */}
               <div className="pt-2 flex items-center justify-end gap-3">
                 <button
@@ -344,7 +320,7 @@ export const OwnerOverrideModal: React.FC<OwnerOverrideModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !overrideReason.trim()}
+                  disabled={isSubmitting}
                   className="px-5 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white rounded-xl font-bold shadow-lg shadow-rose-950/40 disabled:opacity-50 transition flex items-center gap-2"
                 >
                   <ShieldAlert className="w-4 h-4" />
@@ -380,12 +356,12 @@ export const OwnerOverrideModal: React.FC<OwnerOverrideModalProps> = ({
                         </span>
                       </div>
 
-                      <div className="bg-neutral-900/60 p-2.5 rounded-lg border border-neutral-800/80">
-                        <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider block mb-1">
-                          Justification Reason:
-                        </span>
-                        <p className="text-neutral-200 italic">{item.reason}</p>
-                      </div>
+                      {item.reason && (
+                        <div className="bg-neutral-900/60 p-2.5 rounded-lg border border-neutral-800/80">
+                          <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider block mb-1">Note</span>
+                          <p className="text-neutral-200 italic">{item.reason}</p>
+                        </div>
+                      )}
 
                       {/* Before / After Diff */}
                       <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">

@@ -14,5 +14,6 @@ Severity: **C** = critical (blocks GO), **H** = high, **M** = medium.
 | KI-008 | H | **`META_APP_SECRET` is not set,** so webhooks are not signature-checked. | Session 24 Oct | W1, needs owner |
 | KI-009 | H | **Names in Graph reads are hidden** until Meta App Review. | Observed | Owner (Meta) |
 | KI-010 | M | **The main repo docs conflict with the Live Selling Business.** `bangkokplussizeootd/CLAUDE.md` and LIVE-SELLING-ARCHITECTURE describe a rack, a run sheet, an Inventory board and the 90% purchase rule. The Live Selling Business wins. Confirmed by the owner 25 Oct (A8). | Docs | Mark the main repo docs as outdated for live selling |
-| KI-011 | M | **Wrong 24h wording on screen.** The "Ready for the next live" card says "within 24 hours of the live"; the rule is 24h from when the invoice is marked sent. | `src/components/ReadyForNextLive.tsx:113` | W3 |
+| KI-011 | M | **FIXED on the branch 25 Oct.** **Wrong 24h wording on screen.** The "Ready for the next live" card says "within 24 hours of the live"; the rule is 24h from when the invoice is marked sent. | `src/components/ReadyForNextLive.tsx:113` | W3 |
 | KI-012 | M | **Vercel deployment listing was refused (403)** for this session, so the production deployment can't be audited. | Tool error | W7 |
+| KI-013 | M | **23 TypeScript errors exist in the code** (`npm run lint`: seed data, reconciliation engine, vite config). They were there before 25 Oct; the build and tests still pass. | `npm run lint` | W7: fix before CI makes lint required |
