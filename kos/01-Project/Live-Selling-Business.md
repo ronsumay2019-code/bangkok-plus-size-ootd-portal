@@ -165,6 +165,12 @@ changed_by: owner only
 - **B24, the store match happens within 1–2 hours after the live.** The team stays at the store for an hour or two after the live to sort, group orders, and tally against the store owner's invoice. **Target: the final orders and the item total are ready within 1 hour after the live ends.**
 - **B25, the buyer's name is the name of the person who chatted** (owner, 25 Oct). It is the name Facebook shows on their comment or message. Invoices and bags use that name. Real names don't matter, so don't overthink it. A buyer's chat order and Messenger message are linked by that name, as the old portal did.
 
+### The paper list (voice note, 25 Oct 2026, verbatim transcript)
+
+> "And as far as the paper order list, all right, there's nothing special about it, right? You just see like a scratch paper, just like a reference, right, of the person who ordered, what that person ordered, size, color. So just imagine, right, a person, right, a person or an admin who needs to write an information as quick as possible, right, on a sheet of paper, on a sheet of paper. And there's nothing special. It's just a reference for himself, not a reference for the team."
+
+- **B26, the paper list is the admin's personal scratch note.** It is written as fast as possible, as his own reference, not the team's. **It is not used as the source of truth for testing.**
+
 ## 5. Still open
 
 1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.

@@ -26,7 +26,7 @@ Platform sweep, 24 Oct (Claude):
 | OL-06 | Where Codex fits; team of Claude, Antigravity, Grok | Owner, 24 Oct | **Answered** | [[Master-Plan]] and `00-START-HERE` model routing |
 | OL-07 | Obsidian connection (browser, MCP, links, file?) | Owner, 24 Oct | **Done** (auto-pull interval **waiting on owner**) | The vault `kos` opened; Git plugin installed; *Git: Pull* returned "Everything is up-to-date" (owner, 24 Oct). Still to do: Settings → search "interval" → Auto pull interval 5. |
 | OL-08 | Live Selling Business questions Q1–Q9 | Claude, 24 Oct | **Answered** 25 Oct (voice notes) | Verbatim in [[Live-Selling-Business]] §3; rules B5–B7 updated, B9–B15 added |
-| OL-09 | Golden fixture for one past live | Claude, 24 Oct | **Waiting on owner** | Changed 25 Oct: what's needed now is **a photo of the paper order list** for LINEN SHOP or NEW SHOP |
+| OL-09 | Golden fixture for one past live | Claude, 24 Oct | **Waiting on owner** | Now OL-25 (sent invoices plus the store owner's total) |
 | OL-10 | Approve the RLS lockdown migration (KI-004, KI-005) | Claude, 24 Oct | **Waiting on owner** | Approval of the migration in Supabase |
 | OL-11 | `META_APP_SECRET` in Vercel (KI-008) | Claude, 24 Oct | **Waiting on owner** | Enter it in Vercel → Environment Variables (never in chat) |
 | OL-12 | Branch protection on `main` | Claude, 24 Oct | **Waiting on owner** | Allow it on GitHub (T-003) |
@@ -40,5 +40,6 @@ Platform sweep, 24 Oct (Claude):
 | OL-20 | Approve the replay transcription test (T-031) | Claude, 25 Oct | **Waiting on owner** | The old procedure used Groq Whisper's free plan. Whether it is still free must be checked; if any cost applies, the exact amount comes before anything runs. Needs a transcription API key entered in settings (never in chat). |
 | OL-21 | Store match: total count only, or item by item? | Claude, 25 Oct | **Answered** 25 Oct | Total count only (S8) |
 | OL-22 | Webhook subscriptions in Meta (feed, live_videos, messages) for automatic live start and end (T-032) | Claude, 25 Oct | **Waiting on owner** | Owner checks Meta for Developers → Webhooks → Page, or grants an agent access |
-| OL-23 | A photo of the paper order list for LINEN SHOP (golden test and T-031 accuracy) | Claude, 25 Oct | **Waiting on owner** | — |
+| OL-23 | A photo of the paper order list for LINEN SHOP | Claude, 25 Oct | **Withdrawn** 25 Oct | The paper list is a personal scratch note (B26). Replaced by OL-25. |
+| OL-25 | Golden reference: use the invoices actually sent for NEW SHOP (22 Oct) plus the store owner's total? | Claude, 25 Oct | **Waiting on owner** | The portal's Messenger copy holds 16 invoice-like Page messages to 15 buyers on 23 Oct (SQL). It may be incomplete; the owner confirms whether every NEW SHOP invoice was sent through Messenger. |
 | OL-24 | Evidence card: is the replay frame plus the comment data (name, text, time, Facebook link) enough, or is a real Facebook screenshot of the comment needed? | Claude, 25 Oct | **Waiting on owner** | [[Live-Selling-Business]] §5 Q3 |

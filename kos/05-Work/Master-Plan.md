@@ -36,7 +36,7 @@ GO requires:
 | **6. Item story and evidence** | For each code: every capture, change and denial, with its comment or message link and time. The final order points back into its story. **Every confirmed order has an evidence card (B23):** timestamp, replay frame at that moment, the final comment or message (name, text, time, Facebook link), the host's transcript line, and the earlier steps of its story. No evidence means not confirmed. | S4, B23 |
 | **8. Store match** | At the end of the live: the team's total number of items is shown next to the store owner's total. If they differ, the portal lists the orders per code so the difference can be found before leaving the store. | S8 |
 | **7. First miner and bag list** | When pieces run short, the earliest confirmed order keeps the piece. The bag list per buyer matches the bag labels. | B10, B14 |
-| **Golden test** | A past live's replay events, comments and Messenger messages go through steps 1–7, plus the owner's decisions on anything unclear. The result must equal **the team's paper order list** for that live (from a photo), **and its total items must equal the store owner's total** for that live (owner-held). It is computed, never typed in (L-008). | — |
+| **Golden test** | A past live's replay events, comments and Messenger messages go through steps 1–7, plus the owner's decisions on anything unclear. The result must equal **the invoices actually sent to buyers** for that live (in Messenger; proposed 25 Oct, waiting on owner), **and its total items must equal the store owner's total** for that live (owner-held). The paper list is not the truth (B26). It is computed, never typed in (L-008). | — |
 | **Retired** | The rack, inventory board and 90% buying-list rule (B12). The "Live Order Sheet" built from orders (L-009). | B12 |
 
 ## 3. Tickets on the critical path (each 15 min or less; split further at G1)
@@ -44,7 +44,7 @@ GO requires:
 | Ticket | Work | Builder | Review | Needs |
 |---|---|---|---|---|
 | T-001 | Owner answers Business Q1–Q9 | Owner | — | **Done 25 Oct.** Three short follow-ups are in [[Live-Selling-Business]] §4 |
-| T-002 | **Golden fixture:** a photo of the team's **paper order list** for one past live (LINEN SHOP 24 Oct or NEW SHOP 22 Oct), plus that live's video id. Claude fetches the comments and Messenger messages. | Owner provides the photo; Claude transcribes it, and the owner confirms the transcription | Claude | **Photo from the owner** |
+| T-002 | **Golden fixture:** the invoices actually sent for one past live (NEW SHOP 22 Oct: the portal's Messenger copy holds 16 invoice-like Page messages to 15 buyers on 23 Oct, possibly incomplete), plus the store owner's total for that live, plus its video id, comments and Messenger messages | Claude gathers; owner confirms the invoice list is complete | Claude | Owner confirmation |
 | T-003 | **W7 infrastructure:** CI on PRs (`typecheck`, `test`, `build`, `kos-check`), branch protection on `main`, the Timeline Action | Codex | Grok, Claude | Owner allows branch protection on GitHub |
 | T-004 | **W7:** a Supabase branch (or schema copy) holding the backup data, for the preview | Codex | Claude | Owner approves the branch's cost, if any |
 | T-005 | **W5 security:** RLS lockdown (remove `temp_dev_all`; service role only); move the Page token out of `portal_kv` into env only | Codex | Grok, Claude | **Owner approves the migration** |
