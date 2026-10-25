@@ -196,6 +196,18 @@ changed_by: owner only
   - After each live, a **match report** compares the portal's final orders with the invoices actually sent in Messenger and with the store owner's total.
   - The owner switches over once the reports prove the portal accurate.
 
+### Pre-orders and the portal clean-up (voice note, 25 Oct 2026; key words verbatim)
+
+> "the pre-orders lane, it's definitely we will be keeping. It's another what do you call this revenue stream of the business … pre-orders, these are purchases made after live selling … once they get home, they will like re-watch the live session on our Facebook page, and they will place orders in Messenger … invoice during live session should be named and presented as live invoice, and orders made before or after live selling, these are pre-orders invoice. And but at the end of the day, if a miner or a buyer has invoice, live invoice, and pre-order invoice, then definitely it will just add up."
+
+> "Owner doesn't need any reason to override something … just like a tick box next to it inside inside the invoice generator."
+
+- **B31, two kinds of invoice.**
+  - An order placed **during** the live, in the chat or Messenger, gets a **Live invoice**.
+  - An order placed **before or after** the live, usually in Messenger after re-watching the replay, gets a **Pre-order invoice**.
+  - A buyer who has both: **the amounts add up** to what the buyer owes in total. The shop's template already titles them "LIVE ORDER INVOICE" and "PRE-ORDER INVOICE" (`invoice-artwork.ts`).
+- **B32, the owner overrides without giving a reason:** a tick box next to the line in the invoice generator.
+
 ## 5. Still open
 
 1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.

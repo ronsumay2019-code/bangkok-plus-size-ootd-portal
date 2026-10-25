@@ -45,4 +45,4 @@ Platform sweep, 24 Oct (Claude):
 | OL-24 | Evidence card: is the replay frame plus the comment data enough? | Claude, 25 Oct | **Answered** 25 Oct | Approved ("I really like it"); [[Screens]] |
 | OL-26 | Invoice delivery: text or picture; long invoices | Claude, 25 Oct | **Answered** 25 Oct | Picture in the shop's template (B27), one line per item with quantity (B28), bag photo only |
 | OL-27 | Review pages and invoice generator layout | Owner, 25 Oct | **Answered** 25 Oct | Approved direction in [[Screens]]; no reason field on edits |
-| OL-28 | Simple tab names, and which old features to hide or remove | Owner, 25 Oct | **Waiting on owner** | Proposal in [[Screens]] → "Tab names and clean-up" |
+| OL-28 | Simple tab names, and which old features to hide or remove | Owner, 25 Oct | **Answered** 25 Oct | 7 tabs; Pre-orders and Messages kept; Analytics, Pola, Strategic and the rack board removed; owner override is a tick box with no reason. [[Screens]], B31–B32 |

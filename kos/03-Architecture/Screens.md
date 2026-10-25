@@ -43,24 +43,30 @@ The pictures below are **samples with made-up data**, showing layout only.
 - **Item line:** comes from the host's call (code, description, colour, size), never the buyer's comment text. The old sample showed "Teal po mine / Not specified" (L-007).
 - **One line per item** (code + size + colour) with a quantity, e.g. "T7 Linen set · Black / 3XL × 100" (B28).
 
-## Tab names and clean-up (proposed 25 Oct, waiting on owner)
+## Tab names and clean-up (decided by the owner, 25 Oct)
 
-The owner asked for simple names, and for features that aren't needed now to come off. The rule: **keep what works, add the approved screens, then remove only what the owner picks.** Hidden features are kept in the code so they can come back.
+**Seven simple tabs:**
 
-| Today (9 tabs) | Proposed | Why |
+| Tab | Was | Notes |
 |---|---|---|
-| Live Session Command | **Live** | Appears and clears by itself (B21) |
-| Replay Review Studio | **Replay** | Review each past live (B20) |
-| Order Review & Verification, Page Messenger Orders | **Orders** | The new review page with buyers, evidence and the store match. Messenger orders during a live are live orders (B7), so they belong here |
-| Reconciliation & Invoices | **Invoices** | The all-in-one invoice generator |
-| Payments & Shipping | **Payments & Shipping** | Unchanged |
-| (inside Page Messenger Orders) the Messenger inbox for replying to buyers in the portal | **Messages**, or drop: *owner decides* | Sending from the portal was verified 24 Oct, but the team replies in the Messenger app during lives |
-| Pre-Orders Lane | *owner decides* | Not part of live selling |
-| Sales & Demand Analytics | *hide (proposed)* | Not needed now |
-| Pola AI Co-Pilot | *hide (proposed)* | Not needed now |
+| **Live** | Live Session Command | Appears and clears by itself (B21) |
+| **Replay** | Replay Review Studio | Review each past live (B20) |
+| **Orders** | Order Review & Verification, plus live-time Messenger orders | Buyers, evidence, store match ([[Screens]] §3–5) |
+| **Pre-orders** | Pre-Orders Lane | **Kept**: a separate revenue stream (B31) |
+| **Invoices** | Reconciliation & Invoices | All-in-one invoice generator; live invoices and pre-order invoices |
+| **Payments & Shipping** | same | Unchanged |
+| **Messages** | the Messenger inbox in Page Messenger Orders | **Kept as is** |
 
-Other features:
-- **Owner override form** (order correction that requires a reason): *replace* with tap-to-edit in the invoice generator (no reason field).
-- **Strategic analysis pop-up** (AI): *hide (proposed)*.
-- **Inventory / rack board:** already unreachable from the menu, and conflicts with B1. *Remove.*
-- **Kept as they are:** staff sign-in links (5 seats), the owner's Facebook token form, the owner's Start fresh, and the READY / ON AIR status.
+**Removed:**
+- Sales & Demand Analytics;
+- Pola AI Co-Pilot;
+- the Strategic analysis pop-up;
+- the old inventory / rack board.
+
+**Owner override: kept, with no reason asked.** In the invoice generator it is a **tick box next to a line**; ticking it lets the owner override that line.
+
+**Kept as they are:**
+- staff sign-in links (5 seats);
+- the owner's Facebook token form;
+- the owner's Start fresh;
+- the READY / ON AIR status.

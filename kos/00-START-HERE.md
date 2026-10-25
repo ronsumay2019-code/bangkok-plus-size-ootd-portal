@@ -44,7 +44,6 @@ Updated: 25 Oct 2026, Claude.
 7. **Open owner blockers:** see [[Open-Loop]]:
    - transcription key and cost approval;
    - Meta webhook check;
-   - LINEN SHOP paper list photo;
    - RLS migration approval;
    - `META_APP_SECRET`;
    - branch protection;
