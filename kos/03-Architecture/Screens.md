@@ -54,6 +54,7 @@ The owner asked for simple names, and for features that aren't needed now to com
 | Order Review & Verification, Page Messenger Orders | **Orders** | The new review page with buyers, evidence and the store match. Messenger orders during a live are live orders (B7), so they belong here |
 | Reconciliation & Invoices | **Invoices** | The all-in-one invoice generator |
 | Payments & Shipping | **Payments & Shipping** | Unchanged |
+| (inside Page Messenger Orders) the Messenger inbox for replying to buyers in the portal | **Messages**, or drop: *owner decides* | Sending from the portal was verified 24 Oct, but the team replies in the Messenger app during lives |
 | Pre-Orders Lane | *owner decides* | Not part of live selling |
 | Sales & Demand Analytics | *hide (proposed)* | Not needed now |
 | Pola AI Co-Pilot | *hide (proposed)* | Not needed now |
