@@ -3,40 +3,40 @@
 Author: Claude (lead). Status: **G1 draft, waiting on Grok's independent review (G3) and the owner's answers to the Live Selling Business questions.**
 Built on: [[Live-Selling-Business]] (HARD RULE), [[Current-State]], [[Known-Issues]], [[Lessons]].
 
-## 1. What "done" means
+## 1. What "done" means (v3, 25 Oct: follow the host)
 
-Production goes live **empty (0 data)**. On a real live, the portal does what the team does on paper today ([[Live-Selling-Business]] B14), with nothing missed and nothing counted twice:
+Production goes live **empty (0 data)**. After a real live, the portal produces the final orders the way the owner's strategy says ([[Live-Selling-Business]] §4):
 
-1. The off-camera admin records each order as it is confirmed. The portal **suggests** them from the live chat and Messenger.
-2. Unclear "mine" comments are tracked until they are clarified.
-3. Out-of-stock denials are recorded, and the first miner wins (B10).
-4. After the live, the chat and Messenger are reconciled per buyer. Double entries, extra pieces, replacements and swaps are each flagged, and a person decides.
-5. A bag list shows each buyer's labelled bag.
-6. The review at home gives the final orders.
-7. The owner approves one invoice per buyer for the live.
-8. The invoice is sent or copied in Messenger and marked sent, which starts the buyer's 24h.
-9. The payment proof is recorded.
-10. Paid orders go to Shipping; unpaid orders go to Payments.
+1. **Host events first:** each item code with its price, size and colour, and its time.
+2. **Then, inside each event:** the orders from the live chat and Messenger.
+3. **Then the review:** every mention counted and typed, and the latest granted change is final.
+4. **The item story keeps everything.** Nothing is deleted.
+5. A person reviews.
+6. The owner approves one invoice per buyer for the live.
+7. The invoice is sent or copied in Messenger and marked sent, which starts the buyer's 24h.
+8. The payment proof is recorded.
+9. Paid orders go to Shipping; unpaid orders go to Payments.
+
+The team keeps its paper list during the first lives, so both results can be compared.
 
 GO requires:
 - the acceptance suite passes ≥95% overall and 100% of its critical scenarios;
 - the golden test passes;
 - the owner says GO.
 
-## 2. The design of the core (W2), from the Live Selling Business (rewritten 25 Oct after the owner's answers)
+## 2. The design of the core (W2), v3
 
-| Piece | What it is | Rule |
+| Step | What it does | Rule |
 |---|---|---|
-| **Live Order Sheet** | The admin's paper, in the portal, built for a phone. One row per order: buyer's FB name, code, description, size, colour, quantity, price (source waiting on §4 Q2), channel (live chat / Messenger / admin), comment or message id and time, status (confirmed / out of stock). The live's code list builds itself from the codes the admin types as the host calls them by ear. Nothing is pre-defined. | B1, B3, B13, B14 |
-| **Raw capture** | Every live comment, and every Messenger message during the live, is saved raw (id, time, name, text). Nothing is filtered when it is saved. | B7 |
-| **Job 1: suggestions** | A pure function. A comment matching MINE+code, code only, or code+size/colour for a code already called in this live becomes a suggested order. The admin confirms it with one tap. There is no window: any called code is valid for the whole live. | B5, B6 |
-| **Unclear list** | "MINE" with no code, or "mine + size/colour" with no code, stays here until the buyer's clarifying reply is linked to it. It is never dropped and never guessed. | B6 |
-| **Extra pieces** | "+1", "one more", "two more", or a number after the code: suggested as extra pieces, and the admin confirms. A repeated "mine" with no new request does **not** add a piece. | B6, B9 |
-| **Out of stock and first miner** | "sorry, wala na po", "out of stock" or "sold out" marks the request denied. When pieces run short, the earliest confirmed order keeps the piece. | B7, B10 |
-| **Job 2: reconciliation** | After the live, everything is merged per buyer across chat and Messenger. A Messenger change to a chat order is the same order adjusted; possible double entries are flagged. Each item gets a type (replacement / additional / swap / chatter / denied), and **a person decides**. | B7 |
-| **Bag list** | Per buyer: FB name, then each piece (code, description, size, colour), matching the bag labels. | B14 |
-| **Golden test** | A past live's real comments and Messenger messages go through Job 1. The owner's Job 2 decisions are applied. The result must equal **the team's paper order list for that live**, from a photo the owner provides. It is computed, never typed in (L-008). | — |
-| **Rack, inventory board and 90% buying-list rule** | **Retired from the critical path.** A buying list never exists (B12). | B1, B12 |
+| **1. Host Event capture** | ItemEvent = `{live, seq, code, price, sizes[], colours[], description?, available?, calledAt, source: replay \| admin, evidence}`. **This is the first and only source of codes and prices.** The source is waiting on §5 Q1 (replay, admin, or both). | S1, B3, L-009 |
+| **2. Raw capture** | Every live comment, and every Messenger message during the live, is saved raw (id, time, name, text). Nothing is filtered when it is saved. | B7 |
+| **3. Segments** | Event N = [calledAt N, calledAt N+1). The last segment runs to the end of the live. | S2 |
+| **4. Job 1, per segment** | Find the orders placed in the segment's chat and Messenger: MINE+code, code only, code+size/colour, against **codes from host events only**. MINE with no code is matched by its clarifying reply (B6). "+1", "one more" or a number means extra pieces. A repeated "mine" stays 1 order. | S3, B6, B9 |
+| **5. Job 2, per order** | Count the order's mentions in the whole chat and Messenger, and type each one: change (item/size/colour), extra piece, swap, question, recommendation, denied (out of stock only). The latest granted change is final. A person confirms anything unclear. | S3, S4, B7 |
+| **6. Item story** | For each code: every capture, change and denial, with its comment or message link and time. The final order points back into its story. | S4 |
+| **7. First miner and bag list** | When pieces run short, the earliest confirmed order keeps the piece. The bag list per buyer matches the bag labels. | B10, B14 |
+| **Golden test** | A past live's replay events, comments and Messenger messages go through steps 1–7, plus the owner's decisions on anything unclear. The result must equal **the team's paper order list** for that live (from a photo). It is computed, never typed in (L-008). | — |
+| **Retired** | The rack, inventory board and 90% buying-list rule (B12). The "Live Order Sheet" built from orders (L-009). | B12 |
 
 ## 3. Tickets on the critical path (each 15 min or less; split further at G1)
 
@@ -48,9 +48,10 @@ GO requires:
 | T-004 | **W7:** a Supabase branch (or schema copy) holding the backup data, for the preview | Codex | Claude | Owner approves the branch's cost, if any |
 | T-005 | **W5 security:** RLS lockdown (remove `temp_dev_all`; service role only); move the Page token out of `portal_kv` into env only | Codex | Grok, Claude | **Owner approves the migration** |
 | T-010 | **W1:** save the raw chat for every comment (no filtering at save time); reset seen-IDs together with the data | Antigravity | Grok, Claude | — |
-| T-011 | **W2:** Live Order Sheet (phone-first): rows, one-tap confirm, out of stock, unclear list | Antigravity | Grok, Claude | §4 Q2, Q3 |
-| T-012 | **W2:** Job 1 suggestions as a pure function (no window; extra pieces; repeated mine), with unit tests built from real comment text | Codex | Grok, Claude | — |
-| T-013 | **W2:** Job 2 reconciliation: merge chat and Messenger per buyer, flag double entries, decide each type, first miner, bag list | Antigravity | Grok, Claude | — |
+| T-011 | **W2:** Host Event capture: data model, admin quick entry (phone), and replay import | Antigravity | Grok, Claude | §5 Q1 |
+| T-031 | **Spike:** can the portal fetch the LINEN SHOP replay video through the Graph API, and can a transcription service pull out the codes, prices, sizes and colours from Taglish speech? Report accuracy and exact cost. No spending without owner approval. | Codex | Claude | Owner approves a test cost |
+| T-012 | **W2:** Segments and Job 1 per segment as pure functions (codes from host events only; extra pieces; repeated mine), with unit tests built from real comment text | Codex | Grok, Claude | — |
+| T-013 | **W2:** Job 2 per order (count mentions, type them, latest granted change is final), item story, first miner, bag list | Antigravity | Grok, Claude | — |
 | T-014 | **W2:** golden test harness: fixture in, final orders out, diff against the owner's list | Codex | Claude | T-002 |
 | T-015 | **W3:** invoices built from final orders; one invoice per live per buyer; owner approval; mark-sent starts the 24h; fix the wording in KI-011 | Antigravity | Grok, Claude | T-013 |
 | T-016 | **W4:** payment proof, then Payments or Shipping (exists; re-test it on the new orders) | Codex | Claude | T-015 |

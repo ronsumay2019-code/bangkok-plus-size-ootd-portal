@@ -3,7 +3,7 @@
 1. **Before any work,** read `kos/00-START-HERE.md`, then `kos/01-Project/Live-Selling-Business.md`.
 2. **The Live Selling Business is a HARD RULE.**
    - Item codes, prices, colours and sizes come from the host's Item Events, never from the live chat.
-   - Orders are matched inside the window between events (Job 1).
+   - **Follow the host, not the buyers.** Capture each item code the host calls (price, size, colour) first. Then look for orders inside each event, the time from one code call to the next, in the live chat and Messenger (Job 1).
    - Each one is then reviewed across the whole chat and Messenger (Job 2).
    - There is no catalogue, rack, stock inventory or pre-defined item code.
 3. **Work only inside the Engineering Loop** in `KOS-MASTER-PLAN-PROMPT.md`, gates G0 to G8.
