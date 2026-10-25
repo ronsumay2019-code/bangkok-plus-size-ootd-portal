@@ -38,7 +38,7 @@ Updated: 25 Oct 2026, Claude.
    | Claude | Lead, evaluator, KOS keeper, story |
    | Antigravity | Builder of the Replay and Live Session sections, the Job 2 reconciliation and the UI |
    | Codex | Host-capture pipeline (T-031), segments and Job 1, tests, golden harness, CI, migrations |
-   | Grok | Independent adversarial reviewer; Meta policy watch |
+   | Grok | Independent adversarial reviewer, manual: Claude prepares a review packet in `06-Loop/Review-Packets/`, the owner runs it in Grok chat and pastes the answer back |
 
    The builder never reviews their own work.
 7. **Open owner blockers:** see [[Open-Loop]]:
