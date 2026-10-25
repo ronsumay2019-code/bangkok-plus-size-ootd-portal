@@ -42,3 +42,24 @@ The pictures below are **samples with made-up data**, showing layout only.
 - **Contents:** pink header ("Bangkok Plus Size OOTD · Since 2021 | Bangkok to Philippines"); "LIVE ORDER INVOICE"; the invoice number and status; Bill to (the chat name); live, invoice date, payment due and 24-hour window; ITEM / SIZE, QTY, UNIT PRICE, AMOUNT; subtotal, shipping, total and balance; shop-approved payment QRs (GCash / Maya / Bank from settings); payment notes; QR warning; "Page x of y".
 - **Item line:** comes from the host's call (code, description, colour, size), never the buyer's comment text. The old sample showed "Teal po mine / Not specified" (L-007).
 - **One line per item** (code + size + colour) with a quantity, e.g. "T7 Linen set · Black / 3XL × 100" (B28).
+
+## Tab names and clean-up (proposed 25 Oct, waiting on owner)
+
+The owner asked for simple names, and for features that aren't needed now to come off. The rule: **keep what works, add the approved screens, then remove only what the owner picks.** Hidden features are kept in the code so they can come back.
+
+| Today (9 tabs) | Proposed | Why |
+|---|---|---|
+| Live Session Command | **Live** | Appears and clears by itself (B21) |
+| Replay Review Studio | **Replay** | Review each past live (B20) |
+| Order Review & Verification, Page Messenger Orders | **Orders** | The new review page with buyers, evidence and the store match. Messenger orders during a live are live orders (B7), so they belong here |
+| Reconciliation & Invoices | **Invoices** | The all-in-one invoice generator |
+| Payments & Shipping | **Payments & Shipping** | Unchanged |
+| Pre-Orders Lane | *owner decides* | Not part of live selling |
+| Sales & Demand Analytics | *hide (proposed)* | Not needed now |
+| Pola AI Co-Pilot | *hide (proposed)* | Not needed now |
+
+Other features:
+- **Owner override form** (order correction that requires a reason): *replace* with tap-to-edit in the invoice generator (no reason field).
+- **Strategic analysis pop-up** (AI): *hide (proposed)*.
+- **Inventory / rack board:** already unreachable from the menu, and conflicts with B1. *Remove.*
+- **Kept as they are:** staff sign-in links (5 seats), the owner's Facebook token form, the owner's Start fresh, and the READY / ON AIR status.
