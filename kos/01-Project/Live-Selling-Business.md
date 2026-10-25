@@ -163,10 +163,7 @@ changed_by: owner only
 > "And for the store match timing, it doesn't literally mean that after the live ends, we should store owner would hand us the total invoice and we need to make that payment immediately and leave. No, after the live session, we can stay there like for an hour, 2 hours, you know. And these stores that we're doing this live selling, I mean, we have a good relationship with them, and even the new stores that we will be visiting, they do know how live selling works. That after live session, the team stays there for like an hour or two, you know, just to sort, right, and group orders together, right, just to make an accurate tally of how much, right, how much they would be paying against the staff owner's invoice. Linking the same buyer across the chat and messenger. Again, we never had an issue with this, your point is makes sense. But every time someone, Facebook gives a buyer different IDs in comments, but do Facebook know that they're really a buyer? It's just a live selling session. I mean, we never had this issue before, but again, I'm not sure what was on the back end, but previous agents was able to do it, so I know you can, you know, do better in that sense."
 
 - **B24, the store match happens within 1–2 hours after the live.** The team stays at the store for an hour or two after the live to sort, group orders, and tally against the store owner's invoice. **Target: the final orders and the item total are ready within 1 hour after the live ends.**
-- **B25, linking a buyer across the chat and Messenger.**
-  - Facebook doesn't know who is a buyer. It gives the same person one ID on comments and a different ID in Messenger.
-  - The old portal linked them by the buyer's Facebook name (REPLAY-ORDERS-PROCEDURE step 2: a "Messenger buyer ####" takes the name when she comments).
-  - The new portal does the same, and does better: two different people with the same name are flagged, never merged.
+- **B25, the buyer's name is the name of the person who chatted** (owner, 25 Oct). It is the name Facebook shows on their comment or message. Invoices and bags use that name. Real names don't matter, so don't overthink it. A buyer's chat order and Messenger message are linked by that name, as the old portal did.
 
 ## 5. Still open
 
