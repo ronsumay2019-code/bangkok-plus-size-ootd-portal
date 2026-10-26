@@ -14,6 +14,6 @@ At a real live, with no person and no agent touching it:
 2. Every comment is kept exactly as written.
 3. The host's item calls (code, price, size, colour) are captured from the host's words.
 4. Orders are found inside each host event (Job 1) and reviewed across chat and Messenger (Job 2).
-5. The portal makes its own match report against Facebook's comments.
+5. The portal makes its own match report against Facebook's comments. *(26 Oct: built on the work branch: Replay tab → "Check orders against Facebook"; automatic test passes; not yet run on a real live, not in production.)*
 
 Then, for Production-ready: the invoice, payment and shipping steps run on real orders, and the story is documented end to end.

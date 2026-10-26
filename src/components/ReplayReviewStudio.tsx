@@ -29,6 +29,7 @@ import {
 import { LiveSession, BuyerOrder } from '../types/reconciliation';
 import { FacebookTranscriptCheck } from './FacebookTranscriptCheck';
 import { FacebookNoticesCheck } from './FacebookNoticesCheck';
+import { LiveMatchReport } from './LiveMatchReport';
 
 interface ReplayReviewStudioProps {
   live: LiveSession;
@@ -306,6 +307,7 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
   return (
     <div className="space-y-6">
       <FacebookTranscriptCheck defaultVideoId={live.fbVideoId || ''} />
+      <LiveMatchReport liveId={live.id} />
       <FacebookNoticesCheck />
 
       {/* Replay Studio Header & Lag Calibration Bar */}

@@ -389,9 +389,11 @@ test('owner can start fresh from one Facebook live; admins cannot; Messenger cha
 test('26 Oct lesson: with no screen open and no "live started" notice, a comment on a LIVE video starts the session and its end closes it', async () => {
   const http = await import('http');
   const statuses: Record<string, string> = { '8800001': 'LIVE' };
+  const fbComments: any[] = [];
   const graph = http.createServer((req, res) => {
     const id = decodeURIComponent((req.url || '').split('?')[0].slice(1));
     res.setHeader('Content-Type', 'application/json');
+    if (id.endsWith('/comments')) { res.end(JSON.stringify({ data: fbComments, paging: {} })); return; }
     if (statuses[id]) res.end(JSON.stringify({ id, live_status: statuses[id] }));
     else { res.statusCode = 400; res.end(JSON.stringify({ error: { message: 'Unsupported get request' } })); }
   });
@@ -413,6 +415,20 @@ test('26 Oct lesson: with no screen open and no "live started" notice, a comment
     const made = s.data.orders.filter((o: any) => o.sourceCommentId === '8800001_c1');
     assert.equal(made.length, 1, 'the comment that started it is captured too');
     assert.equal(made[0].liveId, live.id);
+
+    // The self-check: every order line must come from a real comment on the live; "mine" comments without an order are listed
+    fbComments.push({ id: '8800001_c1', message: 'Mine bilog yellow', created_time: '2026-10-26T10:54:19+0000', from: { name: 'Aleni Alarilla' } });
+    fbComments.push({ id: '8800001_c2', message: 'ganda po', created_time: '2026-10-26T10:55:00+0000' });
+    fbComments.push({ id: '8800001_c3', message: 'Mine KD Brown', created_time: '2026-10-26T10:55:34+0000', from: { name: 'Gold Asetre' } });
+    const report = await call(C, `/api/live/match-report?live=${live.id}`, { token: ownerToken });
+    assert.equal(report.status, 200);
+    assert.equal(report.data.facebookComments, 3);
+    assert.equal(report.data.commentsSayingMine, 2);
+    assert.equal(report.data.captured, 1);
+    assert.equal(report.data.missing, 1, 'the "mine" comment that never reached the portal is listed');
+    assert.equal(report.data.missingList[0].id, '8800001_c3');
+    assert.equal(report.data.orderLinesNotOnFacebook, 0, 'no order line exists without its Facebook comment');
+    assert.ok(!JSON.stringify(report.data).includes('test-page-token'));
 
     statuses['8800001'] = 'VOD';
     await new Promise((r) => setTimeout(r, 61_000)); // Facebook's answer is re-read at most once a minute

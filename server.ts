@@ -2623,6 +2623,43 @@ app.get('/api/live/transcript-check', async (req, res) => {
   res.type('application/json').send(safe);
 });
 
+// Live acceptance test 5: the portal checks its own orders against Facebook's comments on the live, so nobody has to take
+// an agent's word for a count (26 Oct). "Not on Facebook" must be 0: an order whose comment Facebook doesn't have was not
+// captured from the live. "Missing" lists "mine" comments with no order.
+const ORDER_WORD = /\b(mine|pa-?mine|namine|minine)\b/i;
+app.get('/api/live/match-report', async (req, res) => {
+  if (!requireRole(req, res, ['owner', 'admin'])) return;
+  const live = lives.find((l) => l.id === String(req.query.live || '')) || lives.find((l) => l.status === 'live') || lives[0];
+  if (!live?.fbVideoId) return res.status(400).json({ error: 'This live has no Facebook video linked.' });
+  const token = getMetaPageAccessToken();
+  if (!token) return res.status(503).json({ error: 'The Facebook Page token is not set on the server.' });
+  const comments: Array<{ id: string; at: string; name: string | null; text: string }> = [];
+  let after = '';
+  for (let page = 0; page < 60; page++) {
+    const r = await fetch(`${GRAPH_BASE}/${encodeURIComponent(live.fbVideoId)}/comments?filter=stream&order=chronological&fields=id,message,created_time,from&limit=100${after ? `&after=${encodeURIComponent(after)}` : ''}&access_token=${encodeURIComponent(token)}`, { signal: AbortSignal.timeout(15000) }).catch(() => null);
+    const j: any = r ? await r.json().catch(() => null) : null;
+    if (!r?.ok || !Array.isArray(j?.data)) return res.status(502).json({ error: `Facebook did not return the live's comments: ${j?.error?.message || `HTTP ${r?.status ?? 'no answer'}`}`, read: comments.length });
+    for (const c of j.data) comments.push({ id: String(c.id), at: String(c.created_time || ''), name: c.from?.name || null, text: String(c.message || '') });
+    after = j.paging?.next ? String(j.paging?.cursors?.after || '') : '';
+    if (!after) break;
+  }
+  const onFacebook = new Set(comments.map((c) => c.id));
+  const liveOrders = orders.filter((o) => o.liveId === live.id);
+  const ordered = new Set(liveOrders.map((o) => String(o.sourceCommentId || '')));
+  const withOrderWord = comments.filter((c) => ORDER_WORD.test(c.text));
+  const missing = withOrderWord.filter((c) => !ordered.has(c.id));
+  const notOnFacebook = liveOrders.filter((o) => !o.sourceCommentId || !onFacebook.has(String(o.sourceCommentId)));
+  const report = {
+    id: `${live.id}@${new Date().toISOString()}`, liveId: live.id, videoId: live.fbVideoId, checkedAt: new Date().toISOString(),
+    facebookComments: comments.length, commentsSayingMine: withOrderWord.length,
+    captured: withOrderWord.length - missing.length, missing: missing.length,
+    orderLines: liveOrders.length, orderLinesFromFacebookComments: liveOrders.length - notOnFacebook.length, orderLinesNotOnFacebook: notOnFacebook.length,
+    missingList: missing.slice(0, 200), notOnFacebookList: notOnFacebook.slice(0, 200).map((o) => ({ id: o.id, buyer: o.buyerName, comment: o.sourceCommentId || null })),
+  };
+  if (portalBackend) await portalBackend.upsertRecords([{ collection: 'match_reports', id: report.id, data: report }]).catch(() => {});
+  res.type('application/json').send(JSON.stringify(report).split(token).join('[token]'));
+});
+
 // Which Facebook notices the Page sends this app (OL-22). "live_videos" is what turns the live session on and off
 // with no screen open (B35). GET only reads; POST (owner only) adds live_videos while keeping every field already on.
 const PAGE_NOTICES_NEEDED = ['feed', 'messages', 'live_videos'];
