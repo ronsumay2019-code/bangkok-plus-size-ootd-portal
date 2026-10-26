@@ -208,6 +208,16 @@ changed_by: owner only
   - A buyer who has both: **the amounts add up** to what the buyer owes in total. The shop's template already titles them "LIVE ORDER INVOICE" and "PRE-ORDER INVOICE" (`invoice-artwork.ts`).
 - **B32, the owner overrides without giving a reason:** a tick box next to the line in the invoice generator.
 
+### Transcription works; use Facebook's own transcript first (voice note, 26 Oct 2026; key words verbatim)
+
+> "I know it will work because I saw it in my eyes that it worked, right? The previous agent who did the hand off recently made that work … I was even playing at it, scrolling it live … that live feed or live broadcast, it has a transcript. Okay, there's like an option, like a three dots at the very corner of the video screen where you can turn on the transcription … it doesn't matter if the accuracy is not that good, as long as we can create a story from order to invoice. And then another option in the first portal, but this is gonna be our last option."
+
+- **B33, where the host's words come from:**
+  1. **First choice: the live video's own Facebook transcript.** It's the one viewers turn on from the ⋯ menu on the video.
+  2. **Last resort only:** the old portal's method (download the replay, then transcribe).
+
+  Transcription is proven by the owner's own use; it isn't a risk to debate. Accuracy is not the bar (B22).
+
 ## 5. Still open
 
 1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.
