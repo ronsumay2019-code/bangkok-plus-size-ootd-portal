@@ -1,7 +1,8 @@
 // Replay transcription (T-031 path B, B33/B34): download a live's replay, cut the audio into
 // 10-minute mono pieces and transcribe each with Groq Whisper (Tagalog). This is the first portal's
 // proven method. Runs in GitHub Actions (enough time and disk for a 5-hour video).
-// Input: jobs/replay-request.json { videoId, sourceUrl }. Output: out/<videoId>.json and .srt; a summary in the log.
+// Input: jobs/replay-request.json { videoId } (the download link is asked from Facebook with the Page token secret),
+// or { videoId, sourceUrl } with a link already in hand. Output: out/<videoId>.json and .srt; a summary in the log.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, createWriteStream } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { Readable } from 'node:stream';
@@ -10,9 +11,18 @@ import { pipeline } from 'node:stream/promises';
 const key = process.env.GROQ_API_KEY;
 if (!key) { console.error('GROQ_API_KEY is missing: add it under repo Settings → Secrets and variables → Actions.'); process.exit(1); }
 const req = JSON.parse(readFileSync('jobs/replay-request.json', 'utf8'));
-if (!/^\d{5,25}$/.test(String(req.videoId)) || !/^https:\/\/[^\s]+fbcdn\.net\//.test(String(req.sourceUrl))) {
-  console.error('jobs/replay-request.json needs a numeric videoId and a Facebook (fbcdn.net) sourceUrl.'); process.exit(1);
+if (!/^\d{5,25}$/.test(String(req.videoId))) { console.error('jobs/replay-request.json needs a numeric videoId.'); process.exit(1); }
+// No link given: ask Facebook for this replay's download link, so nobody has to copy it by hand (26 Oct)
+if (!req.sourceUrl) {
+  const pageToken = process.env.META_PAGE_ACCESS_TOKEN;
+  if (!pageToken) { console.error('No sourceUrl and no META_PAGE_ACCESS_TOKEN secret: add the Page token under repo Settings → Secrets and variables → Actions.'); process.exit(1); }
+  const g = await fetch(`https://graph.facebook.com/v22.0/${req.videoId}?fields=id,source,length,live_status&access_token=${encodeURIComponent(pageToken)}`);
+  const j = await g.json().catch(() => ({}));
+  if (!g.ok || !j.source) { console.error(`Facebook gave no download link for ${req.videoId}: ${j?.error?.message || `HTTP ${g.status}`}`); process.exit(1); }
+  req.sourceUrl = j.source;
+  console.log(`replay link received from Facebook (length ${j.length ?? 'unknown'} s, status ${j.live_status ?? 'unknown'})`);
 }
+if (!/^https:\/\/[^\s]+fbcdn\.net\//.test(String(req.sourceUrl))) { console.error('The download link is not a Facebook (fbcdn.net) link.'); process.exit(1); }
 const PIECE = 600; // seconds per piece
 mkdirSync('work/pieces', { recursive: true });
 mkdirSync('out', { recursive: true });

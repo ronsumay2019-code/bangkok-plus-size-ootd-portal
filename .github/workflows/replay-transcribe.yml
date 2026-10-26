@@ -23,6 +23,7 @@ jobs:
       - name: Download and transcribe
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          META_PAGE_ACCESS_TOKEN: ${{ secrets.META_PAGE_ACCESS_TOKEN }}
         run: node scripts/replay-transcribe.mjs
       - name: Keep the transcript
         if: always()
