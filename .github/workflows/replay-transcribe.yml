@@ -1,0 +1,33 @@
+name: Replay transcription
+
+# Runs when a replay request is committed (T-031 path B). Downloads the live's replay and transcribes it with Groq.
+on:
+  push:
+    paths:
+      - jobs/replay-request.json
+
+permissions:
+  contents: read
+
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check ffmpeg
+        run: ffmpeg -version | head -1
+      - name: Download and transcribe
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: node scripts/replay-transcribe.mjs
+      - name: Keep the transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-transcript
+          path: out/
+          if-no-files-found: ignore

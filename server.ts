@@ -2462,7 +2462,7 @@ app.get('/api/live/transcript-check', async (req, res) => {
   };
   const [captions, video] = await Promise.all([
     read(`${videoId}/captions`),
-    read(`${videoId}?fields=id,title,length,live_status,created_time`),
+    read(`${videoId}?fields=id,title,length,live_status,created_time,source`),
   ]);
   // With save=1 the caption file is fetched here (the server can reach Facebook's file host) and kept as
   // collection "transcripts", which the state sync never loads or deletes.
