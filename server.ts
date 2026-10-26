@@ -2480,6 +2480,13 @@ app.post('/api/meta/webhook', async (req, res) => {
   };
 
   await keepRawComments(rawFromWebhook).catch((err) => console.error('Raw comments not kept:', err?.message));
+  // Comments arrive every few seconds during a live, so they also keep Facebook's captions read (at most every ~3 min),
+  // with no portal screen open (B35: lives start at any time).
+  for (const liveId of new Set(rawFromWebhook.map((r) => r.liveId))) {
+    const live = lives.find((l) => l.id === liveId);
+    const token = getMetaPageAccessToken();
+    if (live?.status === 'live' && live.fbVideoId && token) await keepLiveCaptions(live.fbVideoId, live.id, token);
+  }
   webhookEventsLog.unshift(logEntry);
   if (webhookEventsLog.length > 50) {
     webhookEventsLog.pop();
