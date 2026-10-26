@@ -14,9 +14,11 @@ Updated: 25 Oct 2026, Claude.
    - **T-031** (top priority): automatic host capture from the replay (download, transcribe, extract), tested on LINEN SHOP.
    - **T-032:** automatic detection of when a live starts and ends.
    - **Grok:** independent review of [[Master-Plan]].
+3b. **Every request starts as a query:** Reuse, Extend, Fork or New? Answer it from [[Catalogue]] using [[Reuse-Loop]], and write the answer in the ticket.
 4. **Files to read, in this order:**
    1. [[Live-Selling-Business]] (HARD RULE)
    1b. [[Meta-Compliance]] (HARD RULE)
+   1c. [[Reuse-Loop]] (HARD RULE) and [[Catalogue]]
    2. [[Open-Loop]] (nothing left unanswered)
    3. [[Lessons]]
    4. [[Current-State]]
