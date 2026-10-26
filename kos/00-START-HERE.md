@@ -15,7 +15,7 @@ Updated: 25 Oct 2026, Claude.
    - **T-032:** automatic detection of when a live starts and ends.
    - **Grok:** independent review of [[Master-Plan]].
 3b. **Every request starts as a query:** Reuse, Extend, Fork or New? Answer it from [[Releases]] using [[Reuse-Loop]], and write the answer in the ticket.
-3c. **What works today is answered only from [[Current-State]]** (Working / Built / Failed / Not built, each with evidence). If reality contradicts it, change the line to Failed the same day and fix the system.
+3c. **What works today is answered only from [[Current-State]]** (a hook, `.claude/settings.json` → `scripts/kos-context.sh`, puts Current-State, the open loops and the open known issues in front of every message to Claude) (Working / Built / Failed / Not built, each with evidence). If reality contradicts it, change the line to Failed the same day and fix the system.
 4. **Files to read, in this order:**
    1. [[Live-Selling-Business]] (HARD RULE)
    1b. [[Meta-Compliance]] (HARD RULE)
