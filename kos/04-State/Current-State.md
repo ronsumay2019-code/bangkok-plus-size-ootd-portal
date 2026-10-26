@@ -1,4 +1,50 @@
-# Current State: truth audit
+# Current State: what works, what is only built, what failed
+
+**This page is the answer.** Any question about the portal ("does the live start by itself?", "can we invoice from it?") is answered from this page, not from memory. If reality ever contradicts a line here, that line is wrong: change it to **Failed** with the evidence, the same day, and fix the system (owner, 26 Oct: "that's going to be your own self-check, your own self-correct logic").
+
+Statuses (only these four):
+- **Working**: proven at a real live or real use, with evidence checked against the source.
+- **Built**: code exists and its automatic tests pass; **not yet proven** at a real live. Never called working.
+- **Failed**: a real live or real use showed it does not work. Evidence linked.
+- **Not built**.
+
+Where it runs: **production** (`main`, last merge `22581a1`, PR #6) or **work branch** only (`claude/clever-noether-tta7o2`).
+
+Updated: Tue 27 Oct 2026, ~00:30 Manila, by Claude.
+
+## Facebook Live Selling: from the host's call to the shipped order
+
+| # | Step | Status | Runs where | Evidence |
+|---|---|---|---|---|
+| 1 | Facebook sends each live comment to the portal, with the buyer's name | **Working** | production | 26 Oct live: comment notices 18:45–21:11 Manila, names included (notice log query 10:51Z, 11:24Z) |
+| 2 | Facebook sends each Messenger message to the portal | **Working** | production | 2,779 messages / 479 conversations saved, newest seconds old (query 11:01Z, 26 Oct) |
+| 3 | Facebook's "live started / ended" notice reaches the portal | **Failed** | production | Page set to send `live_videos` at 11:30 (owner screenshot); at the 26 Oct live none arrived (KI-015) |
+| 4 | Live session turns on and off by itself, no screen and no person | **Built** | work branch | Regression test "26 Oct lesson…" passes; fails on the old code (`7c1a0c9`). **Failed in production 26 Oct**: Claude had to add the session by hand at 19:24 with the owner's OK |
+| 5 | Portal page opens for staff | **Failed** | production + preview | 26 Oct ~19:00–19:20: page kept loading on main and preview; database answered normally; cause unknown (no Vercel log access) (KI-014) |
+| 6 | Every comment kept exactly as written | **Built** | work branch | Tests (`raw_comments`, unlinked comments kept, names never blanked). Production does **not** keep them: `raw_comments` last write 04:46Z 26 Oct |
+| 7 | Comments turned into pending lines (buyer-first, old method) | **Built, not trusted** | production | 26 Oct: 113 lines / 29 buyers written by the portal's capture (`ord_wh_` ids). **Not verified against Facebook** (OL-59). Follows the buyers, not the host, so it is not the approved method |
+| 8 | Host's words kept during the live (Facebook captions) | **Built** | work branch | Tests pass; never ran at a live (not in production). Facebook keeps only ~1 minute of captions after the live (LINEN SHOP: 17 lines) |
+| 9 | Replay transcribed after the live (Groq) | **Built** | GitHub Action | Never completed on a real replay. Since 27 Oct needs only the video id + the `META_PAGE_ACCESS_TOKEN` secret (not yet added). Free plan: ≥2.5 h for a 5 h replay |
+| 10 | Host's item calls (code, price, size, colour) taken from the host's words | **Not built** | — | No extractor yet: Job 1 needs these as input |
+| 11 | Orders found inside each host item call (Job 1) | **Built** | work branch | Unit tests incl. 6 R-003 regressions; never run on real host calls (step 10 missing) |
+| 12 | Review across the whole chat and Messenger (Job 2) | **Not built** | — | — |
+| 13 | Portal checks its own orders against Facebook's comments | **Built** | work branch | Test passes (`faf9c9d`): lists "mine" comments with no order; order lines with no Facebook comment must be 0. Never run on a real live |
+| 14 | Invoice picture in the shop's template | **Built** | work branch | Unit tests (Codex, PR #10); never used for a real invoice |
+| 15 | Invoice sent in Messenger, 24 hours from mark-sent, payments with proof | **Built** | production | Tests; a Messenger reply from the portal was verified 24 Oct; a real invoice end to end: not yet |
+| 16 | Messenger sends only within Meta's 24-hour window | **Built** | work branch | Unit test; production has no such check |
+| 17 | Shipping | **Not built** in this build | — | — |
+
+## Platform
+
+| What | Status | Evidence |
+|---|---|---|
+| Anonymous database access removed | **Working** | `pg_policies` empty; server requests 200/201 (26 Oct ~10:05) |
+| Page key copy in the database (KI-005) | **Open** | Portal reads the Vercel copy ("vercel settings", 26 Oct 12:29); delete needs owner OK (OL-47) |
+| Webhook signature check (`META_APP_SECRET`) | **Not set** | KI-008 |
+| Supabase free-plan limits | **Over** last cycle; restriction from 24 Nov | Owner screenshot 26 Oct (KI-016) |
+| Claude's access to Vercel logs and deployments | **Refused (403)** | 26 Oct (OL-61) |
+
+## History: truth audit of 24 Oct
 
 As of Sun 25 Oct 2026, about 04:20 Manila (24 Oct, about 20:20 UTC). Corrected: an earlier draft said "22:xx". Every line is either **Verified**, with its evidence, or **Not verified**. Claims don't count.
 
