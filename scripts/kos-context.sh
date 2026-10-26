@@ -11,5 +11,5 @@ awk '/^## History/{exit} /^\| [0-9]+ \||^\| [A-Z]/' kos/04-State/Current-State.m
 echo "## Open known issues"
 grep '^| KI-' kos/04-State/Known-Issues.md | grep -v 'FIXED' | cut_to 110
 echo "## Open loops"
-grep '^| OL-' kos/04-State/Open-Loop.md | grep -v '\*\*Done\*\*\|\*\*Answered\*\*' | cut_to 95
+grep '^| OL-' kos/04-State/Open-Loop.md | grep -v '\*\*Done\*\*\|\*\*Answered\*\*\|\*\*Withdrawn' | cut_to 95
 } | head -c 8800
