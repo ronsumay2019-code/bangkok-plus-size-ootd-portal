@@ -8,7 +8,7 @@ Evidence: SQL row counts run by Claude on 24 Oct.
 
 | What | Count | Status |
 |---|---|---|
-| Lives | 2. "LINEN SHOP😍" (FB video `3310662652470857`, 05:35Z to 13:34Z) and an empty "Live · 2026-10-24" (13:43Z, 7 seconds long) | Verified |
+| Lives | 2. "LINEN SHOP😍" (FB video `3310662652470857`; the portal record runs from 05:35Z to 13:34Z, but **13:34Z is when Start fresh closed it, not when the broadcast ended**. The real broadcast length is unknown and T-031 measures it) and an empty "Live · 2026-10-24" (13:43Z, 7 seconds long) | Verified |
 | Orders | **1** (LINEN SHOP orders were not captured) | Verified |
 | Messenger threads / messages | 182 / 1,365 | Verified |
 | Backup `portal_backup.records_20261024_before_reset` | orders 1,352 · lives 2 (NEW SHOP 22 Oct, video `1126219396590785`; NEW SHOP 24 Oct) · inventory 11 · threads 134 · messages 830 | Verified |
