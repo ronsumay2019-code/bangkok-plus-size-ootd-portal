@@ -218,6 +218,13 @@ changed_by: owner only
 
   Transcription is proven by the owner's own use; it isn't a risk to debate. Accuracy is not the bar (B22).
 
+### How it worked before (owner, 26 Oct 2026; key words verbatim)
+
+> "In the first version of the portal, we used Croc because we were like trying to downloaded the video and put it on the portal for a replay … because the agent couldn't get the Facebook Live activated or turned on like automatically. So we downloaded the video … and we ended up using Croc, and then it worked. But the most recent agent was able to do it. He was able to turn on the live broadcast, live session as it started, and it automatically ends as the host turned it off."
+
+- **"Croc" is Groq,** the transcription service named in the old procedure (Groq Whisper). It worked in the first portal: download the replay, then transcribe with Groq. This is the proven last resort (B33).
+- **Automatic live start and end worked in Antigravity's portal.** The code is still here: commit `89b82c8` finds the broadcast in the Page's video list by `live_status` (it works without Meta App Review), in `server.ts` live-sync. **Caveat (verified 26 Oct):** it runs from the browser every 30 seconds (`src/App.tsx`), so only while the portal is open on some screen. To be fully automatic with nobody using the portal (B17), the same check must also run from the server by itself (T-032).
+
 ## 5. Still open
 
 1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.
