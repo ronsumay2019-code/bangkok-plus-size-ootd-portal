@@ -21,6 +21,6 @@
    - Official Graph API only; no scraping, no personal logins, no working around Meta's limits.
    - Messenger sends only within 24 hours of the buyer's last message; buyer data never goes to an outside AI.
 8. **Document, govern, learn, reuse (HARD RULE).** Read `kos/02-Method/Reuse-Loop.md`.
-   - Every request starts with Reuse, Extend, Fork or New, answered from `kos/08-Catalogue/Catalogue.md`.
+   - Every request starts with Reuse, Extend, Fork or New, answered from `kos/07-Releases/Releases.md`.
    - Nothing is called working without evidence checked against the source; only Production-ready entries are reused.
    - A lesson is closed only when it names the guard that catches it next time.

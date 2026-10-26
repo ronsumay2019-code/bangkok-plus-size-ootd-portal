@@ -1,4 +1,4 @@
-# Catalogue (what we can reuse)
+# Releases (what we can reuse)
 
 Rules: [[Reuse-Loop]]. Only **Production-ready** entries may be reused or run on autopilot.
 

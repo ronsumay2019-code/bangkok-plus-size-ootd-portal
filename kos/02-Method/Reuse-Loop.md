@@ -6,7 +6,7 @@ Owner, 26 Oct 2026, in their words:
 
 ## 1. Every request starts as a query (Intake)
 
-Before any work, the agent answers from the [[Catalogue]]:
+Before any work, the agent answers from [[Releases]]:
 
 | Answer | When | What happens |
 |---|---|---|
@@ -19,7 +19,7 @@ The answer and its reason are written in the ticket (G0).
 
 ## 2. Govern: versions and status
 
-Every capability in the [[Catalogue]] has a version and one status:
+Every release in [[Releases]] has a version and one status:
 
 - **Draft**: being built; nothing about it may be called "working".
 - **Verified**: passed its acceptance tests at real events, with evidence links, reviewed by an agent that did not build it.
