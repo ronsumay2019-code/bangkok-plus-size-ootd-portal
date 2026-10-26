@@ -13,7 +13,7 @@ Before any work, the agent answers from [[Releases]]:
 | **Reuse** | A **production-ready** entry already does it (same or another business) | Apply it as released, with that business's settings only. No code change. |
 | **Extend** | An entry does most of it; something new is needed | A new version of that entry, through gates G0–G8. |
 | **Fork** | Another business needs a different variant | A new entry that starts from a released version and records what differs. |
-| **New** | Nothing in the Catalogue fits | A new entry, version 0.1, status Draft. |
+| **New** | Nothing in [[Releases]] fits | A new entry, version 0.1, status Draft. |
 
 The answer and its reason are written in the ticket (G0).
 
