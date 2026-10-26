@@ -154,3 +154,31 @@ Conditions before G1 passes:
 - a fixture for the golden test.
 
 | T-003b | **DONE 26 Oct (PR #10):** knowledge-base PR check; implementation and local git-fixture validation complete | Codex | Grok, Claude | Owner enables branch protection later |
+
+## Tonight release: Mon 26 Oct, live at 7–8 PM Manila (owner, 09:40 Manila)
+
+**Goal for tonight: capture everything from the live, automatically and safely.** The team runs its usual way in parallel (trial weeks, B30). After the live, the agents rebuild the orders from what was captured and produce the first match report against the invoices the team actually sends.
+
+**In tonight's release:**
+1. **Security lock-down (T-005, GO gate):** anonymous database access removed. Owner approval needed.
+2. **Raw capture:** every comment on tonight's live video and every Messenger message during it, saved as-is (`raw_comments`, `messenger_messages`).
+3. **Live transcript capture (T-031 path A):** while the video is LIVE, Facebook's captions are read every ~3 minutes and every new line is kept (`transcripts`).
+4. **Automatic live start and end:** the existing detection (`89b82c8`). Tonight it runs while the portal is open on one device; server-only scheduling comes later (T-032).
+5. Tab clean-up (T-039), the transcript check, and Start fresh to 0 data just before the live.
+
+**Not in tonight's release** (the team uses its usual way for these):
+- the automatic orders list, evidence cards and invoice generator;
+- Job 2 reconciliation.
+
+**After the live:** the replay job (T-031 path B, Groq) runs on tonight's video; Job 1 builds the orders; a match report goes to the owner.
+
+| Manila | Milestone |
+|---|---|
+| 10:30 | Security migration ready for owner approval |
+| 13:00 | Raw capture and live transcript capture built and tested; Grok packet RP-004 |
+| 15:00 | Grok review back; fixes done |
+| 16:30 | Owner checks the preview |
+| 17:00 | Owner GO; merge to `main` (production deploy); smoke test; Start fresh (0 data) |
+| 19:00–20:00 | Live; the portal is open on one device |
+
+Each milestone is reported "met" or "missed" when its time comes (L-010).

@@ -4,7 +4,7 @@ Updated: 25 Oct 2026, Claude.
 
 1. **Current project:**
    - The Bangkok Plus Size OOTD live-selling portal (`bangkok-plus-size-ootd-portal.vercel.app`).
-   - Goal: production-ready, 95% error-free, 100% of critical scenarios passing, by **Mon 26 Oct, 4:00 PM Manila**.
+   - **Tonight (Mon 26 Oct), live at 7–8 PM Manila:** the capture release (see [[Master-Plan]] → Tonight release). The full automatic portal follows after the trial lives.
    - It ships empty (0 data).
 2. **Last completed (25 Oct):**
    - The owner's answers and the "follow the host" strategy are recorded in [[Live-Selling-Business]] (B1–B21, S1–S8).
