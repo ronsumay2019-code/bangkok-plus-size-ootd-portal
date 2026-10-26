@@ -76,3 +76,4 @@ Platform sweep, 24 Oct (Claude):
 | OL-56 | Why didn't the "live started" notice arrive? Check the app-level webhook fields | Claude, 26 Oct | **Open** (after the live) | KI-015 |
 | OL-57 | Why won't the portal page open? Needs Vercel log access or the owner's screenshot of the browser error | Claude, 26 Oct | **Open** | KI-014 |
 | OL-58 | May Claude add a neutral line to Known Issues: "the page key depends on the profile that created it; replace it after the admin change"? | Claude, 26 Oct | **Waiting on owner** | — |
+| OL-59 | Prove tonight's orders are real: owner checks 5 sample comments on the live (buyer, words, time) against the portal; Claude finds how the pre-19:24 comments were captured | Owner challenge, 26 Oct 22:15 | **Open** | Count stays "unverified" until both are done |
