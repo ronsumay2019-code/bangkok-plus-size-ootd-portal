@@ -231,6 +231,12 @@ changed_by: owner only
 
 - **B34 (owner's understanding; being confirmed).** Facebook's full transcript is there **during** the live. For the **replay**, the video must be **downloaded and transcribed** (the proven Groq method). Evidence so far: after the live, Facebook's caption file for LINEN SHOP gave only 0:02–1:00 of a 5-hour video.
 
+### Lives have no fixed time (owner, 26 Oct 2026; verbatim)
+
+> "we don't have like a specific time. We start our live anytime we want, so it doesn't have like a specific time."
+
+- **B35, a live can start at any moment.** The portal must notice a live whenever it starts, with no schedule and no time set in advance. A "scheduler" in this build only ever means a **heartbeat**: a check every minute, all day, asking Facebook "is a live on air right now?". It never means a planned live time.
+
 ## 5. Still open
 
 1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.
