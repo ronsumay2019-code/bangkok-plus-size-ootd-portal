@@ -36,3 +36,21 @@ Evidence: SQL row counts run by Claude on 24 Oct.
 - **Video length: 18,218.9 seconds (5 h 3 min 39 s).** Status VOD. Created 2026-10-24 05:35:46Z.
 - The file is on Facebook's CDN. Claude's sandbox can't reach that host, so the portal fetches it server-side ("Fetch & keep transcript") and stores it as collection `transcripts`, which Claude then reads from the database.
 - **First fetch (26 Oct 01:27Z): 17 caption lines, covering only 0:02 to 1:00 of a 5 h 3 min video.** The text is good Taglish with prices, colours and buyer names, e.g. "sky for three thousand ninety pesos", "Ah green lang po", "Yeah cream". It isn't yet known whether Facebook's file stops at 1 minute or the reading stops early. The fetch now records the file's size, its number of time lines and its ending, to tell the two apart.
+
+## Issues #7, #8, #9 · builder evidence (26 Oct UTC)
+
+- T-012: pure host-event segments and Job 1 implemented; tests in `tests/liveEngine.test.ts`. No routes/UI wired. Messages must be scoped to the live by the caller (job1 has no live-end parameter).
+- T-037: shop invoice canvas renderer ported with pure grouping/pagination tests and SAMPLE artwork. No generator UI or sending changes.
+- T-003b: `kos-check` workflow added and validated with disposable git histories; hosted Actions execution not yet verified. Existing CI unchanged.
+- Local `npm test`: 53 Node tests passed, 0 failed, plus the reconciliation integration suite passed. `npm run build`: passed. Lint baseline: 23 existing diagnostics; no new diagnostics. These are local implementation checks, not production verification.
+- Status: in review; Grok review and Claude evaluator verdict pending. No deployment or production data changes.
+
+## PR #10 · R-003 fixes ready for re-check
+
+All six requested review fixes implemented on the existing PR. Local `npm test`:
+60 Node tests passed, 0 failed, plus all 3 existing reconciliation integration
+scenarios passed. `npm run build` passed; lint retains the same 23 diagnostics
+as the original baseline (captured outputs identical). All six numbered review
+regressions fail against 01beb80 and pass after fixes; re-called host metadata
+passes both. KOS handoffs, lessons and issue notes updated. PR still targets
+`claude/clever-noether-tta7o2`; owner/Claude re-check required before merge.

@@ -55,11 +55,11 @@ GO requires:
 | T-033 | **Replay section (B20):** video, transcript, host-call timeline (tap to jump), orders per event, item stories | Antigravity | Grok, Claude | T-031 |
 | T-035 | **Orders review page and buyer view** ([[Screens]] §3–5): grouped by buyer, counts, store match box, filters, order lines plus evidence | Antigravity | Grok, Claude | T-013 |
 | T-036 | **Invoice generator, all in one screen** ([[Screens]] §6): preview with a proof panel, tap-to-edit (no reason field; original kept in the story), take photo (existing camera feature), message field, send the invoice picture plus the bag photo in Messenger | Antigravity | Grok, Claude | T-035, T-037 |
-| T-037 | **Port the shop's invoice template renderer** (`bangkokplussizeootd/lib/invoice-artwork.ts`): picture pages, "Page x of y", QRs from settings, one line per item with quantity, item text from the host's call | Codex | Grok, Claude | — |
+| T-037 | **DONE 26 Oct (PR #10 merged into the work branch).** **Port the shop's invoice template renderer** (`bangkokplussizeootd/lib/invoice-artwork.ts`): picture pages, "Page x of y", QRs from settings, one line per item with quantity, item text from the host's call | Codex | Grok, Claude | — |
 | T-038 | **Match report for the trial weeks (B30):** after each live, the portal's final orders against the invoices actually sent in Messenger and the store owner's total, listing matched / extra / missed | Codex | Claude | T-013 |
 | T-039 | **DONE on the branch 25 Oct (not deployed; Grok review pending).** **Tabs and clean-up** ([[Screens]], decided 25 Oct): 7 tabs (Live, Replay, Orders, Pre-orders, Invoices, Payments & Shipping, Messages). Remove Analytics, Pola AI, Strategic analysis and the rack board. Owner override becomes a tick box with no reason field. | Antigravity | Grok, Claude | — |
 | T-034 | **Live Session section (B21):** clean when idle; appears automatically on live start; closes and clears automatically on live end (data moves on, nothing deleted) | Antigravity | Grok, Claude | T-032 |
-| T-012 | **W2:** Segments and Job 1 per segment as pure functions (codes from host events only; extra pieces; repeated mine), with unit tests built from real comment text | Codex | Grok, Claude | — |
+| T-012 | **DONE 26 Oct (PR #10 merged into the work branch after the R-003 fixes).** **W2:** Segments and Job 1 per segment as pure functions (codes from host events only; extra pieces; repeated mine), with unit tests built from real comment text | Codex | Grok, Claude | — |
 | T-013 | **W2:** Job 2 per order (count mentions, type them, latest granted change is final), item story, first miner, bag list. **Messenger matching (R-001 #2):** one tested function. Same buyer name + Messenger message during the live + (code match, or change/swap words) + an acknowledging Page reply (Page replies are stored as sender `page_agent`) means the existing order is adjusted. Ambiguous goes to unclear, never merged. **Evidence card from the final capture only (R-001 #4).** | Antigravity | Grok, Claude | — |
 | T-014 | **W2:** golden test harness: fixture in, final orders out, diff against the owner's list | Codex | Claude | T-002 |
 | T-015 | **W3:** invoices built from final orders; one invoice per live per buyer; owner approval; mark-sent starts the 24h; fix the wording in KI-011 | Antigravity | Grok, Claude | T-013 |
@@ -152,3 +152,5 @@ Self-check reasoning:
 Conditions before G1 passes:
 - the owner's answers to Q1–Q9;
 - a fixture for the golden test.
+
+| T-003b | **DONE 26 Oct (PR #10):** knowledge-base PR check; implementation and local git-fixture validation complete | Codex | Grok, Claude | Owner enables branch protection later |
