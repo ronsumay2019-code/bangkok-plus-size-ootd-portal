@@ -165,6 +165,10 @@ test('the same live comment delivered to two copies at once creates one order', 
   const made = s.data.orders.filter((o: any) => o.sourceCommentId === 'cmt_dup_1');
   assert.equal(made.length, 1);
   assert.equal(made[0].buyerName, 'Joy Tuazon', 'name kept as written');
+  const raw = db.tables.portal_records.filter((r: any) => r.collection === 'raw_comments' && r.id === 'cmt_dup_1');
+  assert.equal(raw.length, 1, 'the comment is also kept exactly as written, once');
+  assert.equal(raw[0].data.text, 'Mine rustans pink');
+  assert.equal(raw[0].data.name, 'Joy Tuazon');
 });
 
 test('only real order comments on the live become orders, pending and with no made-up price', async () => {

@@ -14,3 +14,11 @@ test('an empty or malformed file gives no lines instead of guesses', () => {
   assert.deepEqual(parseSrt(''), []);
   assert.deepEqual(parseSrt('1\n00:00:xx --> 00:00:02,000\nhello'), []);
 });
+
+test('caption reads during a live add new lines and never duplicate old ones', async () => {
+  const { mergeCues } = await import('../server/liveEngine/srt');
+  const first = [{ start: 1, end: 2, text: 'T7 po' }, { start: 3, end: 4, text: '650' }];
+  const second = [{ start: 3, end: 4, text: '650' }, { start: 5, end: 6, text: 'black at beige' }];
+  assert.deepEqual(mergeCues(first, second).map((c) => c.text), ['T7 po', '650', 'black at beige']);
+  assert.deepEqual(mergeCues(second, []).length, 2);
+});

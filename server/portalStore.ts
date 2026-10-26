@@ -38,7 +38,9 @@ export interface SessionRow {
 }
 
 export interface PortalBackend {
-  loadRecords(): Promise<StoredRecord[]>;
+  /** Only the named collections when given; side collections (raw comments, transcripts) stay out of every request. */
+  loadRecords(collections?: string[]): Promise<StoredRecord[]>;
+  getRecord(collection: string, id: string): Promise<StoredRecord | null>;
   loadKv(): Promise<StoredKv[]>;
   upsertRecords(rows: StoredRecord[]): Promise<void>;
   deleteRecords(collection: string, ids: string[]): Promise<void>;
@@ -84,10 +86,10 @@ export class SupabaseBackend implements PortalBackend {
     return res;
   }
 
-  private async selectAll<T>(table: string, select: string): Promise<T[]> {
+  private async selectAll<T>(table: string, select: string, filter = ''): Promise<T[]> {
     const out: T[] = [];
     for (let from = 0; ; from += PAGE_SIZE) {
-      const res = await this.request(`${table}?select=${select}&order=updated_at.asc`, {}, {
+      const res = await this.request(`${table}?select=${select}${filter}&order=updated_at.asc`, {}, {
         Range: `${from}-${from + PAGE_SIZE - 1}`,
         'Range-Unit': 'items',
       });
@@ -97,8 +99,15 @@ export class SupabaseBackend implements PortalBackend {
     }
   }
 
-  loadRecords() {
-    return this.selectAll<StoredRecord>('portal_records', 'collection,id,data');
+  loadRecords(collections?: string[]) {
+    const filter = collections?.length ? `&collection=in.(${collections.map(encodeURIComponent).join(',')})` : '';
+    return this.selectAll<StoredRecord>('portal_records', 'collection,id,data', filter);
+  }
+
+  async getRecord(collection: string, id: string) {
+    const res = await this.request(`portal_records?select=collection,id,data&collection=eq.${encodeURIComponent(collection)}&id=eq.${encodeURIComponent(id)}`);
+    const rows = (await res.json()) as StoredRecord[];
+    return rows[0] || null;
   }
 
   loadKv() {
@@ -192,12 +201,17 @@ export class MemoryBackend implements PortalBackend {
     return JSON.parse(JSON.stringify(v));
   }
 
-  async loadRecords() {
+  async loadRecords(collections?: string[]) {
     if (this.failNextLoad) {
       this.failNextLoad = false;
       throw new Error('Simulated database outage');
     }
-    return this.clone([...this.records.values()]);
+    const all = [...this.records.values()];
+    return this.clone(collections?.length ? all.filter((r) => collections.includes(r.collection)) : all);
+  }
+  async getRecord(collection: string, id: string) {
+    const hit = [...this.records.values()].find((r) => r.collection === collection && r.id === id);
+    return hit ? this.clone(hit) : null;
   }
   async loadKv() {
     return [...this.kv.entries()].map(([key, value]) => this.clone({ key, value }));
@@ -264,7 +278,7 @@ export class StateSync {
   }
 
   async load() {
-    const [records, kv] = await Promise.all([this.backend.loadRecords(), this.backend.loadKv()]);
+    const [records, kv] = await Promise.all([this.backend.loadRecords(Object.keys(this.bindings.collections)), this.backend.loadKv()]);
     const byCollection = new Map<string, any[]>();
     for (const name of Object.keys(this.bindings.collections)) byCollection.set(name, []);
     this.recordSnapshot.clear();

@@ -27,3 +27,10 @@ export function parseSrt(srt: string): Cue[] {
   }
   return cues;
 }
+
+/** Adds new caption lines to the ones already kept: same start time and text means the same line. Sorted by time. */
+export function mergeCues(kept: readonly Cue[], incoming: readonly Cue[]): Cue[] {
+  const byKey = new Map<string, Cue>();
+  for (const c of [...kept, ...incoming]) byKey.set(`${c.start.toFixed(2)}|${c.text}`, c);
+  return [...byKey.values()].sort((a, b) => a.start - b.start || a.end - b.end);
+}
