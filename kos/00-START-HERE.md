@@ -16,6 +16,7 @@ Updated: 25 Oct 2026, Claude.
    - **Grok:** independent review of [[Master-Plan]].
 4. **Files to read, in this order:**
    1. [[Live-Selling-Business]] (HARD RULE)
+   1b. [[Meta-Compliance]] (HARD RULE)
    2. [[Open-Loop]] (nothing left unanswered)
    3. [[Lessons]]
    4. [[Current-State]]

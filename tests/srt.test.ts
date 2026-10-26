@@ -32,3 +32,14 @@ test('a later read without a name never blanks the name a webhook kept (R-004 #3
   assert.equal(fillBlanks({ id: 'c2', name: '' } as any, { id: 'c2', name: 'Ana' }).name, 'Ana', 'an empty name is filled by a later read');
   assert.deepEqual(fillBlanks(null, graph), graph, 'nothing kept yet: the new read is kept as is');
 });
+
+import { insideMessengerWindow } from '../server/messengerWindow';
+
+test("the portal sends in Messenger only within 24 hours of the buyer's last message", () => {
+  const now = Date.parse('2026-10-26T12:00:00Z');
+  const at = (h: number) => new Date(now - h * 3600 * 1000).toISOString();
+  assert.equal(insideMessengerWindow([{ sender: 'buyer', timestamp: at(23) }], now), true);
+  assert.equal(insideMessengerWindow([{ sender: 'buyer', timestamp: at(25) }], now), false);
+  assert.equal(insideMessengerWindow([{ sender: 'buyer', timestamp: at(30) }, { sender: 'page_agent', timestamp: at(1) }], now), false, "the Page's own replies don't reopen the window");
+  assert.equal(insideMessengerWindow([], now), false, 'no buyer message: never send');
+});

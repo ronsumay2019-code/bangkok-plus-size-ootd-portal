@@ -17,3 +17,6 @@
    - No question, request or task is left unanswered or untouched, in chat or on any platform in this build, before moving to the next topic.
    - Track every item in `kos/04-State/Open-Loop.md`.
    - A topic closes only when its rows are Answered, Done or Parked by the owner.
+7. **Meta compliance (HARD RULE).** Read `kos/01-Project/Meta-Compliance.md` before any change that touches Facebook, Messenger or buyer data.
+   - Official Graph API only; no scraping, no personal logins, no working around Meta's limits.
+   - Messenger sends only within 24 hours of the buyer's last message; buyer data never goes to an outside AI.

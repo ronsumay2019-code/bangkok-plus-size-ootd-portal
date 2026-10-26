@@ -22,9 +22,7 @@ import {
 import { runIntegrationTestSuite } from './src/services/reconciliationEngine.test';
 import {
   ai,
-  chatWithGemini,
   generateSpeechAudio,
-  analyzeLiveVideoContent,
   transcribeHostSpeech,
   CHATBOT_ROLES,
 } from './src/services/geminiService';
@@ -44,6 +42,7 @@ import { DEFAULT_STAFF, PortalAuth, PortalUser, SESSION_HEADER } from './server/
 import { orderComment } from './server/orderIntent';
 import { mergeCues, parseSrt } from './server/liveEngine/srt';
 import { fillBlanks } from './server/fillBlanks';
+import { insideMessengerWindow, OUTSIDE_WINDOW_DETAIL } from './server/messengerWindow';
 import { cleanBuyerName } from './src/utils/buyerName';
 
 dotenv.config();
@@ -480,9 +479,9 @@ type DeliveryStatus = 'sent' | 'failed' | 'not_sent';
  * Sends a Messenger text through the Graph API and reports what happened. Never throws.
  * 'not_sent' means it was saved in the portal only (no token, or the buyer has no real Page-scoped ID).
  */
-async function sendMessengerText(psid: string, text: string, timeoutMs = 20000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
+async function sendMessengerText(thread: { psid: string; messages?: Array<{ sender: string; timestamp?: string }> }, text: string, timeoutMs = 20000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
   const fbToken = getMetaPageAccessToken();
-  const cleanPsid = String(psid || '').trim();
+  const cleanPsid = String(thread.psid || '').trim();
   if (!fbToken) {
     return { status: 'not_sent', detail: 'No Meta Page Access Token configured. Add META_PAGE_ACCESS_TOKEN in Vercel or connect via the header.' };
   }
@@ -492,6 +491,7 @@ async function sendMessengerText(psid: string, text: string, timeoutMs = 20000):
       detail: `This buyer has no real Messenger ID yet (${cleanPsid || 'none'}). They must message the Page first — use 'Open in Messenger' instead.`,
     };
   }
+  if (!insideMessengerWindow(thread.messages)) return { status: 'not_sent', detail: OUTSIDE_WINDOW_DETAIL };
   try {
     const metaRes = await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
       method: 'POST',
@@ -512,13 +512,14 @@ async function sendMessengerText(psid: string, text: string, timeoutMs = 20000):
 }
 
 /** Sends one photo (a data: URL from the phone camera, already shrunk in the browser) to a buyer in Messenger. */
-async function sendMessengerImage(psid: string, imageDataUrl: string, timeoutMs = 30000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
+async function sendMessengerImage(thread: { psid: string; messages?: Array<{ sender: string; timestamp?: string }> }, imageDataUrl: string, timeoutMs = 30000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
   const fbToken = getMetaPageAccessToken();
-  const cleanPsid = String(psid || '').trim();
+  const cleanPsid = String(thread.psid || '').trim();
   if (!fbToken) return { status: 'not_sent', detail: 'No Meta Page Access Token configured.' };
   if (!/^\d{10,25}$/.test(cleanPsid)) {
     return { status: 'not_sent', detail: "This buyer has no real Messenger ID yet. They must message the Page first — use 'Open in Messenger' instead." };
   }
+  if (!insideMessengerWindow(thread.messages)) return { status: 'not_sent', detail: OUTSIDE_WINDOW_DETAIL };
   const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(imageDataUrl || ''));
   if (!match) return { status: 'not_sent', detail: 'The photo could not be read. Take it again.' };
   const bytes = Buffer.from(match[2], 'base64');
@@ -2121,7 +2122,7 @@ app.post('/api/invoices/generate', async (req, res) => {
   for (let i = 0; i < pendingSends.length; i += 5) {
     await Promise.all(
       pendingSends.slice(i, i + 5).map(async ({ thread, text, idx, invoice }) => {
-        const delivery = await sendMessengerText(thread.psid, text, 8000);
+        const delivery = await sendMessengerText(thread, text, 8000);
         thread.messages.push({
           id: `m_inv_${Date.now()}_${idx}`,
           sender: 'page_agent',
@@ -3110,7 +3111,7 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
   }
 
   // The token comes only from the server (Vercel setting or the owner's saved token), never from the browser
-  const delivery = await sendMessengerText(thread.psid, String(text));
+  const delivery = await sendMessengerText(thread, String(text));
 
   // Reuse the browser's id so its instant "sending…" bubble is replaced, not duplicated
   const safeClientId = typeof clientMessageId === 'string' && /^[\w-]{6,80}$/.test(clientMessageId) ? clientMessageId : '';
@@ -3149,7 +3150,7 @@ app.post('/api/meta/messenger/send-photo', async (req, res) => {
   if (!thread) return res.status(404).json({ error: 'Messenger conversation not found' });
   if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl is required' });
 
-  const delivery = await sendMessengerImage(thread.psid, String(imageDataUrl));
+  const delivery = await sendMessengerImage(thread, String(imageDataUrl));
   const safeClientId = typeof clientMessageId === 'string' && /^[\w-]{6,80}$/.test(clientMessageId) ? clientMessageId : '';
   // The photo itself is not stored in the portal; the conversation shows that one was sent
   const newMsg = {
@@ -3450,42 +3451,9 @@ app.post('/api/pre-orders/update-status', (req, res) => {
 });
 
 // 9. Gemini Multi-Turn AI Chat (Roles: Reconciler, Auditor, Sourcing, Triage; Models: gemini-4-argon, gemini-3.8-flash, gemini-3.1-flash-lite)
-app.post('/api/ai/chat', async (req, res) => {
-  const { messages, context, model, role, customInstruction } = req.body;
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: 'messages array is required' });
-  }
-
-  try {
-    const contextData = context || JSON.stringify({
-      activeLive: lives[0],
-      reconciliation: latestSummary ? {
-        accuracy: latestSummary.accuracy,
-        totalPurchasedCostThb: latestSummary.totalPurchasedCostThb,
-        projectedRevenuePhp: latestSummary.projectedRevenuePhp,
-        extraStockCostThb: latestSummary.extraStockCostThb,
-        lostSalesPhp: latestSummary.projectedLostSalesPhp,
-        affectedShortageBuyers: latestSummary.affectedShortageBuyers,
-        readyToLeaveStore: latestSummary.checklist.readyToLeaveStore,
-      } : null,
-    });
-
-    const result = await chatWithGemini(messages, {
-      model,
-      role,
-      contextData,
-      customInstruction,
-    });
-
-    res.json({
-      success: true,
-      reply: result.reply,
-      usedModel: result.usedModel,
-      role: result.role,
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+// Pola AI was removed by the owner (25 Oct). Buyer names and live data are never sent to an outside AI (Meta-Compliance C4).
+app.post('/api/ai/chat', (_req, res) => {
+  res.status(410).json({ error: 'Removed: Pola AI is no longer part of the portal.' });
 });
 
 // 9b. Get available Chatbot Roles with system instructions
@@ -3509,18 +3477,9 @@ app.post('/api/ai/speak', async (req, res) => {
 });
 
 // 10. Gemini Video Analysis (Video Understanding for Live Selling Replay)
-app.post('/api/ai/video-analysis', async (req, res) => {
-  const { prompt, videoBase64, mimeType } = req.body;
-  try {
-    const analysis = await analyzeLiveVideoContent(
-      prompt || 'Inspect this live selling segment, identify garment item codes, host verbal prices and confirmations.',
-      videoBase64,
-      mimeType
-    );
-    res.json({ success: true, analysis });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+// Pola AI was removed by the owner (25 Oct). Buyer names and live data are never sent to an outside AI (Meta-Compliance C4).
+app.post('/api/ai/video-analysis', (_req, res) => {
+  res.status(410).json({ error: 'Removed: Pola AI is no longer part of the portal.' });
 });
 
 // 11. Gemini Audio Transcription (Speech-to-Text for Host Calls)
