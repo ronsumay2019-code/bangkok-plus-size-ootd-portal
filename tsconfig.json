@@ -26,5 +26,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["dist", "extracted"]
+  "exclude": ["dist", "extracted", "reference"]
 }
