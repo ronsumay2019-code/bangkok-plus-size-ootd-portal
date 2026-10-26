@@ -2274,6 +2274,53 @@ function captureLiveComment(c: {
   return { captured, detail: captured ? `Order comment saved for review: "${message}" by ${who}` : `Not an order: "${message}" by ${who}` };
 }
 
+/**
+ * 26 Oct live: Facebook's "live started" notice never came and the portal page would not open, so comments were
+ * logged but not captured for ~35 minutes. Now the comments themselves start and end the live session: a comment on a
+ * video Facebook reports LIVE opens a session for that video, and a later notice that finds it no longer LIVE closes it.
+ * No screen, no notice and no person needed (live acceptance test 1).
+ */
+const GRAPH_BASE = process.env.META_GRAPH_BASE || 'https://graph.facebook.com/v22.0';
+const liveStatusSeen = new Map<string, { at: number; status: string }>();
+async function videoLiveStatus(videoId: string, token: string): Promise<string> {
+  const seen = liveStatusSeen.get(videoId);
+  if (seen && Date.now() - seen.at < 60_000) return seen.status;
+  let status = 'ERROR';
+  try {
+    const r = await fetch(`${GRAPH_BASE}/${encodeURIComponent(videoId)}?fields=id,live_status&access_token=${encodeURIComponent(token)}`, { signal: AbortSignal.timeout(8000) });
+    const j: any = await r.json().catch(() => ({}));
+    status = r.ok ? String(j?.live_status || 'NONE') : 'ERROR';
+  } catch {}
+  liveStatusSeen.set(videoId, { at: Date.now(), status });
+  return status;
+}
+
+async function startLiveFromComment(postId?: string, commentId?: string): Promise<LiveSession | null> {
+  const token = getMetaPageAccessToken();
+  if (!token || lives.some((l) => l.status === 'live')) return null;
+  const post = String(postId || '');
+  const object = post ? post.split('_').pop() || '' : String(commentId || '').split('_')[0];
+  // A known live's video: comments on its replay stay with that live
+  if (!/^\d{5,25}$/.test(object) || lives.some((l) => l.fbVideoId === object)) return null;
+  if ((await videoLiveStatus(object, token)) !== 'LIVE') return null;
+  const live = createLiveSession(lives[0], object);
+  (live as any).startedBy = 'automatic: a comment arrived on a video Facebook reports LIVE';
+  return live;
+}
+
+async function endLiveIfStopped(nowIso: string): Promise<LiveSession | null> {
+  const token = getMetaPageAccessToken();
+  const onAir = lives.find((l) => l.status === 'live');
+  if (!token || !onAir?.fbVideoId) return null;
+  const status = await videoLiveStatus(onAir.fbVideoId, token);
+  if (status !== 'LIVE_STOPPED' && status !== 'VOD' && status !== 'ENDED') return null;
+  onAir.status = 'ended';
+  onAir.endedAt = nowIso;
+  onAir.autoReconcileTriggeredAt = nowIso;
+  (onAir as any).endedBy = `automatic: Facebook reports the video ${status}`;
+  return onAir;
+}
+
 /** Every comment on a live, kept exactly as written (T-010): the order finder and the evidence need the
  * whole chat, not only order-like comments. Side collection "raw_comments": never loaded by the state sync. */
 const rawKeptIds = new Set<string>();
@@ -2457,6 +2504,7 @@ app.post('/api/meta/webhook', async (req, res) => {
             }
             eventType = 'comment';
             if (String(v.from?.id || '') !== String(entry.id || '')) rememberCommenter(v.comment_id || v.id, v.from?.name);
+            const autoStarted = await startLiveFromComment(v.post_id, v.comment_id || v.id);
             const rawLive = liveForComment(v.post_id, v.comment_id || v.id);
             if (v.comment_id || v.id) rawFromWebhook.push({
               id: String(v.comment_id || v.id), liveId: rawLive?.id ?? null, videoId: rawLive?.fbVideoId, postId: v.post_id ? String(v.post_id) : undefined, text: String(v.message || ''),
@@ -2472,12 +2520,15 @@ app.post('/api/meta/webhook', async (req, res) => {
               createdTime: v.created_time ? new Date(Number(v.created_time) * 1000 || v.created_time).toISOString() : nowIso,
               pageId: entry.id,
             });
-            eventDetails = result.detail;
+            eventDetails = autoStarted ? `Live session started by itself (${autoStarted.id}). ${result.detail}` : result.detail;
           }
         }
       }
     }
   }
+  // Any notice during a live (comments, messages, reactions) also checks whether the live has stopped
+  const autoEnded = await endLiveIfStopped(nowIso);
+  if (autoEnded) eventDetails += ` Live session ended by itself (${autoEnded.id}).`;
 
   const logEntry = {
     id: eventId,

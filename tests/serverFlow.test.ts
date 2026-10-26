@@ -386,6 +386,45 @@ test('owner can start fresh from one Facebook live; admins cannot; Messenger cha
   assert.equal(s.data.messengerThreads.length, threadsBefore, 'Messenger chats are kept');
 });
 
+test('26 Oct lesson: with no screen open and no "live started" notice, a comment on a LIVE video starts the session and its end closes it', async () => {
+  const http = await import('http');
+  const statuses: Record<string, string> = { '8800001': 'LIVE' };
+  const graph = http.createServer((req, res) => {
+    const id = decodeURIComponent((req.url || '').split('?')[0].slice(1));
+    res.setHeader('Content-Type', 'application/json');
+    if (statuses[id]) res.end(JSON.stringify({ id, live_status: statuses[id] }));
+    else { res.statusCode = 400; res.end(JSON.stringify({ error: { message: 'Unsupported get request' } })); }
+  });
+  await new Promise<void>((r) => graph.listen(4399, '127.0.0.1', () => r()));
+  try {
+    for (const r of db.tables.portal_records) if (r.collection === 'lives') r.data = { ...r.data, status: 'ended' };
+    const C = await startCopy(4317, { META_PAGE_ACCESS_TOKEN: 'test-page-token', META_GRAPH_BASE: 'http://127.0.0.1:4399' });
+    const comment = (id: string, post: string, message: string) => ({ object: 'page', entry: [{ id: '109603071381200', changes: [{ field: 'feed', value: { item: 'comment', verb: 'add', comment_id: id, post_id: post, message, from: { id: '77', name: 'Aleni Alarilla' } } }] }] });
+
+    await call(C, '/api/meta/webhook', { body: comment('photo_c1', '109603071381200_5500001', 'hm') });
+    let s = await call(C, '/api/state', { token: ownerToken });
+    assert.ok(!s.data.lives.some((l: any) => l.status === 'live'), 'a comment on a photo post does not start a live');
+
+    await call(C, '/api/meta/webhook', { body: comment('8800001_c1', '109603071381200_8800001', 'Mine bilog yellow') });
+    s = await call(C, '/api/state', { token: ownerToken });
+    const live = s.data.lives.find((l: any) => l.status === 'live');
+    assert.ok(live, 'the session started by itself');
+    assert.equal(live.fbVideoId, '8800001');
+    const made = s.data.orders.filter((o: any) => o.sourceCommentId === '8800001_c1');
+    assert.equal(made.length, 1, 'the comment that started it is captured too');
+    assert.equal(made[0].liveId, live.id);
+
+    statuses['8800001'] = 'VOD';
+    await new Promise((r) => setTimeout(r, 61_000)); // Facebook's answer is re-read at most once a minute
+    await call(C, '/api/meta/webhook', { body: { object: 'page', entry: [{ id: '109603071381200', messaging: [{ sender: { id: '7012345678901234' }, recipient: { id: '109603071381200' }, timestamp: Date.now(), message: { mid: 'm_after_live', text: 'salamat po' } }] }] } });
+    s = await call(C, '/api/state', { token: ownerToken });
+    const ended = s.data.lives.find((l: any) => l.id === live.id);
+    assert.equal(ended.status, 'ended', 'the session closed by itself once Facebook reports the live over');
+  } finally {
+    graph.close();
+  }
+});
+
 test('if the database is down the portal says so and changes nothing', async () => {
   const before = JSON.stringify(db.tables.portal_records);
   const url = db.url;

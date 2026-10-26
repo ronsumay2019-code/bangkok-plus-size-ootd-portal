@@ -10,7 +10,7 @@ Rules: [[Reuse-Loop]]. Only **Production-ready** entries may be reused or run on
 
 At a real live, with no person and no agent touching it:
 
-1. The live session turns on and off by itself.
+1. The live session turns on and off by itself. *(26 Oct: built on the work branch, automatic test passes and fails on the old code; not yet proven at a real live, not in production.)*
 2. Every comment is kept exactly as written.
 3. The host's item calls (code, price, size, colour) are captured from the host's words.
 4. Orders are found inside each host event (Job 1) and reviewed across chat and Messenger (Job 2).
