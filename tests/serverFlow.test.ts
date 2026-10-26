@@ -169,6 +169,12 @@ test('the same live comment delivered to two copies at once creates one order', 
   assert.equal(raw.length, 1, 'the comment is also kept exactly as written, once');
   assert.equal(raw[0].data.text, 'Mine rustans pink');
   assert.equal(raw[0].data.name, 'Joy Tuazon');
+  const other = { object: 'page', entry: [{ changes: [{ field: 'feed', value: { item: 'comment', verb: 'add', comment_id: 'cmt_reel_1', post_id: '109603071381200_reel9', message: 'pa-mine po', from: { id: '9', name: 'Lea' } } }] }] };
+  await call(A, '/api/meta/webhook', { body: other });
+  const unlinked = db.tables.portal_records.find((r: any) => r.collection === 'raw_comments' && r.id === 'cmt_reel_1');
+  assert.ok(unlinked, 'a comment on a post not linked to a live is still kept (R-004 #2)');
+  assert.equal(unlinked.data.liveId, null);
+  assert.equal(unlinked.data.postId, '109603071381200_reel9');
 });
 
 test('only real order comments on the live become orders, pending and with no made-up price', async () => {

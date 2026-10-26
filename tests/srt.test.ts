@@ -22,3 +22,13 @@ test('caption reads during a live add new lines and never duplicate old ones', a
   assert.deepEqual(mergeCues(first, second).map((c) => c.text), ['T7 po', '650', 'black at beige']);
   assert.deepEqual(mergeCues(second, []).length, 2);
 });
+
+import { fillBlanks } from '../server/fillBlanks';
+
+test('a later read without a name never blanks the name a webhook kept (R-004 #3)', () => {
+  const webhook = { id: 'c1', name: 'Joy Tuazon', fromId: '1', text: 'Mine rustans pink', source: 'webhook' };
+  const graph = { id: 'c1', name: undefined, fromId: undefined, text: 'Mine rustans pink', source: 'graph' };
+  assert.deepEqual(fillBlanks(webhook, graph as any), webhook);
+  assert.equal(fillBlanks({ id: 'c2', name: '' } as any, { id: 'c2', name: 'Ana' }).name, 'Ana', 'an empty name is filled by a later read');
+  assert.deepEqual(fillBlanks(null, graph), graph, 'nothing kept yet: the new read is kept as is');
+});

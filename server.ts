@@ -43,6 +43,7 @@ import { AsyncLock, ProofStore, StateSync, SupabaseBackend, storeConfigFromEnv }
 import { DEFAULT_STAFF, PortalAuth, PortalUser, SESSION_HEADER } from './server/auth';
 import { orderComment } from './server/orderIntent';
 import { mergeCues, parseSrt } from './server/liveEngine/srt';
+import { fillBlanks } from './server/fillBlanks';
 import { cleanBuyerName } from './src/utils/buyerName';
 
 dotenv.config();
@@ -2275,12 +2276,16 @@ function captureLiveComment(c: {
 /** Every comment on a live, kept exactly as written (T-010): the order finder and the evidence need the
  * whole chat, not only order-like comments. Side collection "raw_comments": never loaded by the state sync. */
 const rawKeptIds = new Set<string>();
-interface RawComment { id: string; liveId: string; videoId?: string; at: string; name?: string; fromId?: string; text: string; source: 'webhook' | 'graph' }
+// liveId is null when the comment's live (or post) is not linked yet: it is still kept, and linked at review (R-004 #2).
+interface RawComment { id: string; liveId: string | null; videoId?: string; postId?: string; at: string; name?: string; fromId?: string; text: string; source: 'webhook' | 'graph' }
 async function keepRawComments(rows: RawComment[]): Promise<number> {
   if (!portalBackend) return 0;
   const fresh = rows.filter((r) => r.id && !rawKeptIds.has(r.id));
   if (!fresh.length) return 0;
-  await portalBackend.upsertRecords(fresh.map((r) => ({ collection: 'raw_comments', id: r.id, data: r })));
+  // Graph reads hide names (KI-009) while webhooks carry them: a field already kept is never blanked by a later read (R-004 #3).
+  const kept = new Map((await portalBackend.getRecords('raw_comments', fresh.map((r) => r.id))).map((k) => [k.id, k.data || {}]));
+  const merged = fresh.map((r) => fillBlanks(kept.get(r.id) as RawComment | undefined, r));
+  await portalBackend.upsertRecords(merged.map((r) => ({ collection: 'raw_comments', id: r.id, data: r })));
   for (const r of fresh) rawKeptIds.add(r.id);
   return fresh.length;
 }
@@ -2300,6 +2305,9 @@ async function keepLiveCaptions(videoId: string, liveId: string, token: string):
     const file = await fetch(String(pick.uri), { signal: AbortSignal.timeout(20000) });
     if (!file.ok) return null;
     const incoming = parseSrt(await file.text());
+    // Each read is also kept on its own (never overwritten), so two servers reading at once can't lose a line (R-004 #1).
+    const readAt = new Date().toISOString();
+    await portalBackend.upsertRecords([{ collection: 'caption_reads', id: `${videoId}@${readAt}`, data: { videoId, liveId, readAt, cues: incoming } }]);
     const kept = await portalBackend.getRecord('transcripts', videoId);
     const cues = mergeCues(kept?.data?.cues || [], incoming);
     await portalBackend.upsertRecords([{ collection: 'transcripts', id: videoId, data: {
@@ -2449,8 +2457,8 @@ app.post('/api/meta/webhook', async (req, res) => {
             eventType = 'comment';
             if (String(v.from?.id || '') !== String(entry.id || '')) rememberCommenter(v.comment_id || v.id, v.from?.name);
             const rawLive = liveForComment(v.post_id, v.comment_id || v.id);
-            if (rawLive && (v.comment_id || v.id)) rawFromWebhook.push({
-              id: String(v.comment_id || v.id), liveId: rawLive.id, videoId: rawLive.fbVideoId, text: String(v.message || ''),
+            if (v.comment_id || v.id) rawFromWebhook.push({
+              id: String(v.comment_id || v.id), liveId: rawLive?.id ?? null, videoId: rawLive?.fbVideoId, postId: v.post_id ? String(v.post_id) : undefined, text: String(v.message || ''),
               at: v.created_time ? new Date(Number(v.created_time) * 1000 || v.created_time).toISOString() : nowIso,
               name: v.from?.name, fromId: v.from?.id ? String(v.from.id) : undefined, source: 'webhook',
             });
@@ -2482,7 +2490,7 @@ app.post('/api/meta/webhook', async (req, res) => {
   await keepRawComments(rawFromWebhook).catch((err) => console.error('Raw comments not kept:', err?.message));
   // Comments arrive every few seconds during a live, so they also keep Facebook's captions read (at most every ~3 min),
   // with no portal screen open (B35: lives start at any time).
-  for (const liveId of new Set(rawFromWebhook.map((r) => r.liveId))) {
+  for (const liveId of new Set(rawFromWebhook.map((r) => r.liveId).filter(Boolean))) {
     const live = lives.find((l) => l.id === liveId);
     const token = getMetaPageAccessToken();
     if (live?.status === 'live' && live.fbVideoId && token) await keepLiveCaptions(live.fbVideoId, live.id, token);
@@ -2556,7 +2564,8 @@ app.get('/api/live/transcript-check', async (req, res) => {
   const tokenSource = envToken ? 'vercel settings' : 'database copy';
   const safe = JSON.stringify({ videoId, checkedAt: new Date().toISOString(), transcriptionKey, tokenSource, captions, video, saved })
     .split(token).join('[token]')
-    .split(encodeURIComponent(token)).join('[token]');
+    .split(encodeURIComponent(token)).join('[token]')
+    .replace(/access_token=[^&"\\]+/g, 'access_token=[token]');
   res.type('application/json').send(safe);
 });
 

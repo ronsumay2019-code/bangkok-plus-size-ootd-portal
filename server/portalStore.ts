@@ -41,6 +41,8 @@ export interface PortalBackend {
   /** Only the named collections when given; side collections (raw comments, transcripts) stay out of every request. */
   loadRecords(collections?: string[]): Promise<StoredRecord[]>;
   getRecord(collection: string, id: string): Promise<StoredRecord | null>;
+  /** The stored rows among these ids (missing ids are left out). */
+  getRecords(collection: string, ids: string[]): Promise<StoredRecord[]>;
   loadKv(): Promise<StoredKv[]>;
   upsertRecords(rows: StoredRecord[]): Promise<void>;
   deleteRecords(collection: string, ids: string[]): Promise<void>;
@@ -108,6 +110,16 @@ export class SupabaseBackend implements PortalBackend {
     const res = await this.request(`portal_records?select=collection,id,data&collection=eq.${encodeURIComponent(collection)}&id=eq.${encodeURIComponent(id)}`);
     const rows = (await res.json()) as StoredRecord[];
     return rows[0] || null;
+  }
+
+  async getRecords(collection: string, ids: string[]) {
+    const out: StoredRecord[] = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const list = ids.slice(i, i + 100).map((id) => `"${id.replace(/"/g, '\\"')}"`).join(',');
+      const res = await this.request(`portal_records?select=collection,id,data&collection=eq.${encodeURIComponent(collection)}&id=in.(${encodeURIComponent(list)})`);
+      out.push(...((await res.json()) as StoredRecord[]));
+    }
+    return out;
   }
 
   loadKv() {
@@ -212,6 +224,9 @@ export class MemoryBackend implements PortalBackend {
   async getRecord(collection: string, id: string) {
     const hit = [...this.records.values()].find((r) => r.collection === collection && r.id === id);
     return hit ? this.clone(hit) : null;
+  }
+  async getRecords(collection: string, ids: string[]) {
+    return this.clone([...this.records.values()].filter((r) => r.collection === collection && ids.includes(r.id)));
   }
   async loadKv() {
     return [...this.kv.entries()].map(([key, value]) => this.clone({ key, value }));

@@ -54,20 +54,28 @@ async function transcribe(file) {
   throw new Error(`${file}: gave up after 30 attempts`);
 }
 
+const hms = (s) => { const ms = Math.round((s % 1) * 1000); s = Math.floor(s); return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')},${String(ms).padStart(3, '0')}`; };
+// Written after every piece, so a job stopped by the time limit still leaves everything done so far (R-004 #5).
+const save = (done) => {
+  writeFileSync(`out/${req.videoId}.json`, JSON.stringify({ videoId: req.videoId, engine: 'groq whisper-large-v3 (tl)', createdAt: new Date().toISOString(), seconds: done * PIECE, piecesDone: done, piecesTotal: pieces.length, cueCount: cues.length, cues }));
+  writeFileSync(`out/${req.videoId}.srt`, cues.map((c, i) => `${i + 1}\n${hms(c.start)} --> ${hms(c.end)}\n${c.text}\n`).join('\n'));
+};
+
 const cues = [];
 for (const [i, name] of pieces.entries()) {
   const out = await transcribe(`work/pieces/${name}`);
   const offset = i * PIECE;
+  const before = cues.length;
   for (const seg of out.segments || []) {
     const text = String(seg.text || '').trim();
     if (text) cues.push({ start: +(offset + seg.start).toFixed(2), end: +(offset + seg.end).toFixed(2), text });
   }
+  save(i + 1);
   console.log(`[${since()}] piece ${i + 1}/${pieces.length} done, ${cues.length} lines so far`);
+  // Also in the log as each piece finishes, in case the job is stopped before the end
+  for (const c of cues.slice(before)) console.log(`  ${hms(c.start)}  ${c.text}`);
 }
 
-const hms = (s) => { const ms = Math.round((s % 1) * 1000); s = Math.floor(s); return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')},${String(ms).padStart(3, '0')}`; };
-writeFileSync(`out/${req.videoId}.json`, JSON.stringify({ videoId: req.videoId, engine: 'groq whisper-large-v3 (tl)', createdAt: new Date().toISOString(), seconds: pieces.length * PIECE, cueCount: cues.length, cues }));
-writeFileSync(`out/${req.videoId}.srt`, cues.map((c, i) => `${i + 1}\n${hms(c.start)} --> ${hms(c.end)}\n${c.text}\n`).join('\n'));
 console.log(`[${since()}] finished: ${cues.length} lines`);
 console.log('===== TRANSCRIPT START =====');
 for (const c of cues) console.log(`${hms(c.start)}  ${c.text}`);
