@@ -249,6 +249,8 @@ test('owner creates admin and co-owner links; admins cannot create links or see 
   assert.equal(tx.status, 503, 'without a Page token the transcript check says so instead of guessing');
   assert.ok(!JSON.stringify(tx.data).includes('gsk_'), 'no key value is ever returned');
   assert.equal((await call(A, '/api/live/transcript-check?video=abc', { token: ownerToken, method: 'GET' })).status, 400, 'only numeric video IDs');
+  assert.equal((await call(A, '/api/facebook/page-notices', { token: ownerToken, method: 'GET' })).status, 503, 'without a Page token the notices check says so');
+  assert.equal((await call(B, '/api/facebook/page-notices', { token: adminToken, body: {} })).status, 403, 'only an owner changes which notices Facebook sends');
 });
 
 test('reset is disabled once data lives in the database', async () => {

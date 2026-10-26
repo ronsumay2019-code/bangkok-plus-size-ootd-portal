@@ -2560,6 +2560,51 @@ app.get('/api/live/transcript-check', async (req, res) => {
   res.type('application/json').send(safe);
 });
 
+// Which Facebook notices the Page sends this app (OL-22). "live_videos" is what turns the live session on and off
+// with no screen open (B35). GET only reads; POST (owner only) adds live_videos while keeping every field already on.
+const PAGE_NOTICES_NEEDED = ['feed', 'messages', 'live_videos'];
+app.all('/api/facebook/page-notices', async (req, res) => {
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'GET or POST only.' });
+  if (!requireRole(req, res, req.method === 'POST' ? ['owner'] : ['owner', 'admin'])) return;
+  const token = getMetaPageAccessToken();
+  if (!token) return res.status(503).json({ error: 'The Facebook Page token is not set on the server.' });
+  const pageId = getMetaPageId();
+  const graph = async (method: 'GET' | 'POST', query: string) => {
+    try {
+      const r = await fetch(`https://graph.facebook.com/v22.0/${encodeURIComponent(pageId)}/subscribed_apps?${query}${query ? '&' : ''}access_token=${encodeURIComponent(token)}`, {
+        method,
+        signal: AbortSignal.timeout(15000),
+      });
+      return { status: r.status, body: await r.json().catch(() => null) };
+    } catch (err: any) {
+      return { status: 0, body: { error: { message: err?.message || 'network error' } } };
+    }
+  };
+  const fieldsOf = (body: any): string[] => {
+    const apps: any[] = Array.isArray(body?.data) ? body.data : [];
+    return [...new Set(apps.flatMap((a) => (Array.isArray(a?.subscribed_fields) ? a.subscribed_fields : [])).map(String))].sort();
+  };
+  const before = await graph('GET', '');
+  let change: any = null;
+  let after = before;
+  if (req.method === 'POST') {
+    if (before.status !== 200) change = { skipped: 'Facebook did not say which notices are on, so nothing was changed.' };
+    else {
+      // Facebook replaces the whole list on each subscribe, so every field already on is sent again.
+      const wanted = [...new Set([...fieldsOf(before.body), ...PAGE_NOTICES_NEEDED])].sort();
+      change = await graph('POST', `subscribed_fields=${encodeURIComponent(wanted.join(','))}`);
+      after = await graph('GET', '');
+    }
+  }
+  const on = fieldsOf(after.body);
+  const safe = JSON.stringify({
+    pageId, checkedAt: new Date().toISOString(), noticesOn: on,
+    missing: PAGE_NOTICES_NEEDED.filter((f) => !on.includes(f)),
+    liveStartEndOn: on.includes('live_videos'), facebook: { before, change, after: req.method === 'POST' ? after : undefined },
+  }).split(token).join('[token]').split(encodeURIComponent(token)).join('[token]');
+  res.type('application/json').send(safe);
+});
+
 app.post('/api/facebook/live-sync', async (req, res) => {
   const { liveId, forceStatus, fbVideoId, fbPageId, accessToken } = req.body || {};
   let targetLive = lives.find((l) => l.id === (liveId || activeLive.id)) || lives[0];
