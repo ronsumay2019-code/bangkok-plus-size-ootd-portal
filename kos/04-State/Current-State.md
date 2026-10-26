@@ -30,3 +30,11 @@ Evidence: SQL row counts run by Claude on 24 Oct.
 | Commenter names from Facebook | Hidden in Graph reads until Meta App Review; the webhook gives names | Observed 24 Oct |
 | `META_APP_SECRET` (webhook signature check) | Not set when last checked on 24 Oct | Not re-checked |
 | Latest production deployment | **Not checked.** Vercel refused the listing (403 forbidden). | Tool error 24 Oct |
+
+## Issues #7, #8, #9 · builder evidence (26 Oct UTC)
+
+- T-012: pure host-event segments and Job 1 implemented; tests in `tests/liveEngine.test.ts`. No routes/UI wired. Messages must be scoped to the live by the caller (job1 has no live-end parameter).
+- T-037: shop invoice canvas renderer ported with pure grouping/pagination tests and SAMPLE artwork. No generator UI or sending changes.
+- T-003b: `kos-check` workflow added and validated with disposable git histories; hosted Actions execution not yet verified. Existing CI unchanged.
+- Local `npm test`: 53 Node tests passed, 0 failed, plus the reconciliation integration suite passed. `npm run build`: passed. Lint baseline: 23 existing diagnostics; no new diagnostics. These are local implementation checks, not production verification.
+- Status: in review; Grok review and Claude evaluator verdict pending. No deployment or production data changes.

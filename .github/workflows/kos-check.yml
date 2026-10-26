@@ -1,0 +1,41 @@
+name: KOS check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  kos-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a knowledge base update
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          changed_files=$(mktemp)
+          trap 'rm -f "$changed_files"' EXIT
+          git diff --name-only --no-renames -z "$PR_BASE_SHA...HEAD" > "$changed_files"
+
+          has_kos=false
+          has_other=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              kos/*) has_kos=true ;;
+              *) has_other=true ;;
+            esac
+          done < "$changed_files"
+
+          if [[ "$has_other" == true && "$has_kos" == false ]]; then
+            echo "This PR changes code but doesn't update the knowledge base in kos/. Update the ticket's Handoff Packet and kos/04-State/Current-State.md."
+            exit 1
+          fi
+          echo "Knowledge base check passed."
