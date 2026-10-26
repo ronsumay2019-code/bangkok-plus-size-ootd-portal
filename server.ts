@@ -2492,7 +2492,9 @@ app.get('/api/live/transcript-check', async (req, res) => {
     }
   }
   // Facebook's paging links carry the token; never send it to the browser.
-  const safe = JSON.stringify({ videoId, checkedAt: new Date().toISOString(), captions, video, saved })
+  // Whether the replay-transcription key is configured (never its value)
+  const transcriptionKey = process.env.GROQ_API_KEY ? 'set' : 'missing';
+  const safe = JSON.stringify({ videoId, checkedAt: new Date().toISOString(), transcriptionKey, captions, video, saved })
     .split(token).join('[token]')
     .split(encodeURIComponent(token)).join('[token]');
   res.type('application/json').send(safe);
