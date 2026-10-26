@@ -18,7 +18,7 @@ export interface InvoiceArtworkInput {
   invoiceDate: string;
   dueDate: string;
   lines: readonly InvoiceLineInput[];
-  shipping: number;
+  shipping: number | 'pending';
   paymentQRs?: readonly PaymentQRSlot[];
 }
 const cents = (value: number): number => {
@@ -52,10 +52,10 @@ export function groupInvoiceLines(lines: readonly InvoiceLineInput[]): InvoiceLi
   }
   return [...grouped.values()];
 }
-export function invoiceTotals(lines: readonly InvoiceLineInput[], shipping: number) {
+export function invoiceTotals(lines: readonly InvoiceLineInput[], shipping: number | 'pending') {
   const items = groupInvoiceLines(lines);
   const subtotalCents = items.reduce((sum, line) => sum + cents(line.amount), 0);
-  const total = safeMoney(subtotalCents + cents(shipping));
+  const total = safeMoney(subtotalCents + (shipping === 'pending' ? 0 : cents(shipping)));
   return { lines: items, subtotal: safeMoney(subtotalCents), shipping, total, balance: total };
 }
 const dateLabel = (value: string): string => new Intl.DateTimeFormat('en-GB', {
@@ -180,7 +180,7 @@ export function invoiceBlocks(input: InvoiceArtworkInput): PrintBlock[] {
   }
   rows.push(
     { columns: ['Subtotal', php(a.subtotal)] },
-    { columns: ['Shipping', php(a.shipping)] },
+    { columns: ['Shipping', a.shipping === 'pending' ? 'Pending assignment' : php(a.shipping)] },
     { columns: ['INVOICE TOTAL', php(a.total)], bold: true, pink: true },
     { columns: ['THIS INVOICE BALANCE', php(a.balance)], bold: true, pink: true },
     { text: 'MODE OF PAYMENT — SHOP-APPROVED QR CODES', bold: true, pink: true },

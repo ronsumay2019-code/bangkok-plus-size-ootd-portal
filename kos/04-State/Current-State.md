@@ -38,3 +38,13 @@ Evidence: SQL row counts run by Claude on 24 Oct.
 - T-003b: `kos-check` workflow added and validated with disposable git histories; hosted Actions execution not yet verified. Existing CI unchanged.
 - Local `npm test`: 53 Node tests passed, 0 failed, plus the reconciliation integration suite passed. `npm run build`: passed. Lint baseline: 23 existing diagnostics; no new diagnostics. These are local implementation checks, not production verification.
 - Status: in review; Grok review and Claude evaluator verdict pending. No deployment or production data changes.
+
+## PR #10 · R-003 fixes ready for re-check
+
+All six requested review fixes implemented on the existing PR. Local `npm test`:
+60 Node tests passed, 0 failed, plus all 3 existing reconciliation integration
+scenarios passed. `npm run build` passed; lint retains the same 23 diagnostics
+as the original baseline (captured outputs identical). All six numbered review
+regressions fail against 01beb80 and pass after fixes; re-called host metadata
+passes both. KOS handoffs, lessons and issue notes updated. PR still targets
+`claude/clever-noether-tta7o2`; owner/Claude re-check required before merge.

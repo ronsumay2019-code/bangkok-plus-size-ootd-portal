@@ -17,3 +17,10 @@ Severity: **C** = critical (blocks GO), **H** = high, **M** = medium.
 | KI-011 | M | **FIXED on the branch 25 Oct.** **Wrong 24h wording on screen.** The "Ready for the next live" card says "within 24 hours of the live"; the rule is 24h from when the invoice is marked sent. | `src/components/ReadyForNextLive.tsx:113` | W3 |
 | KI-012 | M | **Vercel deployment listing was refused (403)** for this session, so the production deployment can't be audited. | Tool error | W7 |
 | KI-013 | M | **23 TypeScript errors exist in the code** (`npm run lint`: seed data, reconciliation engine, vite config). They were there before 25 Oct; the build and tests still pass. | `npm run lint` | W7: fix before CI makes lint required |
+
+## PR #10 / R-003 corrections (builder status: fixed locally; re-check pending)
+
+Mixed-text orders and pre-call signals could be dropped, stale clarification
+specifications could leak across unrelated events, first quantities were labelled
+extra, and shipping could not be pending. See the six numbered R-003 regression
+tests and T-012/T-037 revision packets. These fixes are not production verified.

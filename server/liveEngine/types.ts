@@ -29,18 +29,22 @@ export interface Capture {
   qty: number;
   messageId: string;
   at: string;
-  eventSeq: number;
+  eventSeq: number | null;
   channel: RawMessage['channel'];
   kind: 'first' | 'extra';
   /** Original no-code evidence, when this message clarified it. */
   clarifiedMessageIds?: string[];
+  /** Per-field source message, only for an inherited buyer specification. */
+  inheritedFrom?: { size?: string; colour?: string };
+  /** A later host call matched this earlier message; review is still required. */
+  preCall?: true;
 }
 export interface Unclear {
   buyer: string;
   messageId: string;
   at: string;
   text: string;
-  eventSeq: number;
+  eventSeq: number | null;
   channel: RawMessage['channel'];
-  reason: 'missing_code' | 'ambiguous_extra';
+  reason: 'missing_code' | 'ambiguous_extra' | 'ambiguous_code' | 'pre_call';
 }

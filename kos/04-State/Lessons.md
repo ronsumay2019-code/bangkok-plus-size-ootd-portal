@@ -13,3 +13,8 @@ Every mistake becomes a rule. Repeating a logged mistake is an automatic REJECT.
 | L-007 | **Agents took item codes from the live chat** (owner correction, 24 Oct). | **Item codes, prices, colours and sizes come from the host's Item Events only** (Business B3). |
 | L-008 | The "152 = 152" was reached by hand-setting values in seed data (`271b9f2`). | A golden test must compute its result from raw comments and events. Expected values are never typed into code. |
 | L-009 | **Claude's 25 Oct redesign followed the buyers:** the "Live Order Sheet" built the live's code list from the codes the admin typed for orders. The owner corrected it: follow the host. | **Item Events from the host come first** (code, price, size, colour). Orders are looked for only inside each host event. Any design whose code list comes from orders is rejected. |
+
+PR #10 / R-003 lesson: classify order signals before surrounding chatter. Keep
+ambiguous and pre-call evidence visible. Bound clarification by event adjacency
+and record each inherited specification's source. Test first quantity separately
+from later additions; test pending money states separately from numeric zero.

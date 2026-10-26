@@ -45,3 +45,12 @@ test('pagination fits exact boundaries, continues rows and numbers all pages', (
   assert.throws(() => splitPages([NaN]), /too tall/);
   assert.deepEqual(splitPages([]), [{ rows: [], label: 'Page 1 of 1' }]);
 });
+
+test('R-003/6: pending shipping prints Pending assignment and excludes unassigned charge', () => {
+  const pending = invoiceTotals(input.lines, 'pending');
+  assert.equal(pending.shipping, 'pending');
+  assert.equal(pending.total, 1950);
+  assert.equal(pending.balance, 1950);
+  assert.ok(invoiceBlocks({ ...input, shipping: 'pending' }).some(b => b.columns?.[0] === 'Shipping' && b.columns[1] === 'Pending assignment'));
+  assert.ok(invoiceBlocks(input).some(b => b.columns?.[0] === 'Shipping' && b.columns[1] === '₱80.00'));
+});

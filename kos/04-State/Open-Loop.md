@@ -50,3 +50,5 @@ Platform sweep, 24 Oct (Claude):
 | OL-30 | Codex connected to GitHub (owner, 26 Oct). First tasks: issues #7 (T-012), #8 (T-037), #9 (T-003b) | Owner/Claude, 26 Oct | **Waiting on owner** to start each in Codex (base branch `claude/clever-noether-tta7o2`) | Codex PRs go into the work branch, then a Grok packet, then Claude's verdict |
 
 | OL-31 | Issues #7 (T-012), #8 (T-037), #9 (T-003b) implementation | Owner, 26 Oct | **Waiting on Grok then Claude** | Builder implementations and local evidence in ticket Handoff Packets; no production changes. Owner has started all three (answers OL-30 for these tasks). |
+
+| PR10-R003 | Six changes requested on PR #10 | Owner / Grok / Claude review | **Waiting on owner / Claude re-check** | Corrected on the same PR; regression evidence in T-012 and T-037. No merge authorized before re-check. Owner quantity/question decisions retain the safe defaults specified in R-003. |
