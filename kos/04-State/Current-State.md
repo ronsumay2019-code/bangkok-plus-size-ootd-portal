@@ -30,3 +30,8 @@ Evidence: SQL row counts run by Claude on 24 Oct.
 | Commenter names from Facebook | Hidden in Graph reads until Meta App Review; the webhook gives names | Observed 24 Oct |
 | `META_APP_SECRET` (webhook signature check) | Not set when last checked on 24 Oct | Not re-checked |
 | Latest production deployment | **Not checked.** Vercel refused the listing (403 forbidden). | Tool error 24 Oct |
+
+## Facebook transcript (T-031 step 1, verified 26 Oct)
+- **LINEN SHOP video `3310662652470857`: Facebook gives the portal an auto-generated caption file** (`.srt`, locale en_US, `is_auto_generated: true`). Read through the Graph API `/{video}/captions` with the Page token. Evidence: the owner ran the Facebook transcript check on the preview, 26 Oct 01:17Z.
+- **Video length: 18,218.9 seconds (5 h 3 min 39 s).** Status VOD. Created 2026-10-24 05:35:46Z.
+- The file is on Facebook's CDN. Claude's sandbox can't reach that host, so the portal fetches it server-side ("Fetch & keep transcript") and stores it as collection `transcripts`, which Claude then reads from the database.

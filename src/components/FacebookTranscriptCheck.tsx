@@ -7,11 +7,11 @@ export const FacebookTranscriptCheck: React.FC<{ defaultVideoId?: string }> = ({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
-  const check = async () => {
+  const check = async (save = false) => {
     setBusy(true);
     setResult(null);
     try {
-      const r = await fetch(`/api/live/transcript-check?video=${encodeURIComponent(videoId.trim())}`);
+      const r = await fetch(`/api/live/transcript-check?video=${encodeURIComponent(videoId.trim())}${save ? '&save=1' : ''}`);
       const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
       setResult(JSON.stringify(j, null, 2));
     } catch (err: any) {
@@ -27,7 +27,7 @@ export const FacebookTranscriptCheck: React.FC<{ defaultVideoId?: string }> = ({
         <FileText className="w-5 h-5 text-sky-400" />
         <h3 className="text-sm font-bold text-white">Facebook transcript check</h3>
       </div>
-      <p className="text-xs text-neutral-400">Asks Facebook for this live video's own transcript, the one viewers turn on from the ⋯ menu. Nothing is changed or saved.</p>
+      <p className="text-xs text-neutral-400">Asks Facebook for this live video's own transcript, the one viewers turn on from the ⋯ menu. "Check" changes nothing. "Fetch & keep transcript" saves the caption lines for the order finder.</p>
       <div className="flex gap-2">
         <input
           type="text"
@@ -40,11 +40,19 @@ export const FacebookTranscriptCheck: React.FC<{ defaultVideoId?: string }> = ({
         />
         <button
           type="button"
-          onClick={check}
+          onClick={() => check(false)}
           disabled={busy || !videoId.trim()}
           className="px-4 py-2 rounded-lg bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white text-sm font-semibold"
         >
           {busy ? 'Checking…' : 'Check'}
+        </button>
+        <button
+          type="button"
+          onClick={() => check(true)}
+          disabled={busy || !videoId.trim()}
+          className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white text-sm font-semibold"
+        >
+          Fetch &amp; keep transcript
         </button>
       </div>
       {result && <pre className="text-[11px] text-neutral-300 bg-neutral-950 border border-neutral-800 rounded-lg p-3 max-h-96 overflow-auto whitespace-pre-wrap">{result}</pre>}
