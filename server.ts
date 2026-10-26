@@ -2441,6 +2441,35 @@ app.post('/api/meta/webhook', async (req, res) => {
 });
 
 // 8d. Periodic Facebook Graph API v22.0 Sync (POST /api/facebook/live-sync)
+// Facebook's own transcript for a live video (B33): read with the Page token on the server; the token never leaves it.
+app.get('/api/live/transcript-check', async (req, res) => {
+  if (!requireRole(req, res, ['owner', 'admin'])) return;
+  const videoId = String(req.query.video || '').trim();
+  if (!/^\d{5,25}$/.test(videoId)) return res.status(400).json({ error: 'Give the Facebook video ID (numbers only).' });
+  const token = getMetaPageAccessToken();
+  if (!token) return res.status(503).json({ error: 'The Facebook Page token is not set on the server.' });
+  const read = async (pathAndQuery: string) => {
+    const sep = pathAndQuery.includes('?') ? '&' : '?';
+    try {
+      const r = await fetch(`https://graph.facebook.com/v22.0/${pathAndQuery}${sep}access_token=${encodeURIComponent(token)}`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      return { status: r.status, body: await r.json().catch(() => null) };
+    } catch (err: any) {
+      return { status: 0, body: { error: { message: err?.message || 'network error' } } };
+    }
+  };
+  const [captions, video] = await Promise.all([
+    read(`${videoId}/captions`),
+    read(`${videoId}?fields=id,title,length,live_status,created_time`),
+  ]);
+  // Facebook's paging links carry the token; never send it to the browser.
+  const safe = JSON.stringify({ videoId, checkedAt: new Date().toISOString(), captions, video })
+    .split(token).join('[token]')
+    .split(encodeURIComponent(token)).join('[token]');
+  res.type('application/json').send(safe);
+});
+
 app.post('/api/facebook/live-sync', async (req, res) => {
   const { liveId, forceStatus, fbVideoId, fbPageId, accessToken } = req.body || {};
   let targetLive = lives.find((l) => l.id === (liveId || activeLive.id)) || lives[0];

@@ -27,6 +27,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { LiveSession, BuyerOrder } from '../types/reconciliation';
+import { FacebookTranscriptCheck } from './FacebookTranscriptCheck';
 
 interface ReplayReviewStudioProps {
   live: LiveSession;
@@ -303,6 +304,8 @@ export const ReplayReviewStudio: React.FC<ReplayReviewStudioProps> = ({
 
   return (
     <div className="space-y-6">
+      <FacebookTranscriptCheck defaultVideoId={live.fbVideoId || ''} />
+
       {/* Replay Studio Header & Lag Calibration Bar */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b border-neutral-800">

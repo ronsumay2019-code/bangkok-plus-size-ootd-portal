@@ -241,6 +241,9 @@ test('owner creates admin and co-owner links; admins cannot create links or see 
   assert.equal(override.status, 200, 'the role comes from the sign-in, not from the request body');
   const noReason = await call(B, '/api/owner/order-override', { token: ownerToken, body: { orderId: 'ord_live_2', overrides: { size: '4XL' } } });
   assert.equal(noReason.status, 200, 'the owner overrides without giving a reason');
+  const tx = await call(A, '/api/live/transcript-check?video=3310662652470857', { token: ownerToken, method: 'GET' });
+  assert.equal(tx.status, 503, 'without a Page token the transcript check says so instead of guessing');
+  assert.equal((await call(A, '/api/live/transcript-check?video=abc', { token: ownerToken, method: 'GET' })).status, 400, 'only numeric video IDs');
 });
 
 test('reset is disabled once data lives in the database', async () => {
