@@ -7,7 +7,9 @@ cut_to() { awk -v n="$1" '{ if (length($0) > n) print substr($0, 1, n) "…"; el
 {
 echo "KOS EVIDENCE RECORD. Answer from this record, not as a new query. If reality contradicts a line, mark it Failed with evidence the same day. Full text: kos/04-State/*.md"
 echo "## Current-State (Working / Built / Failed / Not built)"
-awk '/^## History/{exit} /^\| [0-9]+ \||^\| [A-Z]/' kos/04-State/Current-State.md | grep -v '^| What |\|^| # |' | cut_to 190
+awk '/^## History/{exit} /^\| [0-9]+ \||^\| [A-Z]/' kos/04-State/Current-State.md | grep -v '^| What |\|^| # |' | cut_to 170
+echo "## Releases (entry | version | status | latest evidence)"
+awk -F'|' '/^\| [A-Z]/ && !/^\| Entry/ { e = $7; s = length(e) > 260 ? "…" substr(e, length(e) - 259) : e; print "|" $2 "|" $3 "|" $4 "|" s "|" }' kos/07-Releases/Releases.md
 echo "## Open known issues"
 grep '^| KI-' kos/04-State/Known-Issues.md | grep -v 'FIXED' | cut_to 110
 echo "## Open loops"

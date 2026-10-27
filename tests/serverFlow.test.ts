@@ -430,12 +430,36 @@ test('26 Oct lesson: with no screen open and no "live started" notice, a comment
     assert.equal(report.data.orderLinesNotOnFacebook, 0, 'no order line exists without its Facebook comment');
     assert.ok(!JSON.stringify(report.data).includes('test-page-token'));
 
+    fbComments.push({ id: '8800001_c4', message: 'mine na po sis, check inbox', created_time: '2026-10-26T10:56:00+0000', from: { id: '109603071381200', name: 'Bangkok Plus Size OOTD' } });
     statuses['8800001'] = 'VOD';
     await new Promise((r) => setTimeout(r, 61_000)); // Facebook's answer is re-read at most once a minute
     await call(C, '/api/meta/webhook', { body: { object: 'page', entry: [{ id: '109603071381200', messaging: [{ sender: { id: '7012345678901234' }, recipient: { id: '109603071381200' }, timestamp: Date.now(), message: { mid: 'm_after_live', text: 'salamat po' } }] }] } });
     s = await call(C, '/api/state', { token: ownerToken });
     const ended = s.data.lives.find((l: any) => l.id === live.id);
     assert.equal(ended.status, 'ended', 'the session closed by itself once Facebook reports the live over');
+
+    // 27 Oct lesson: 99 of Facebook's 138 comments reached the portal (late and dropped notices). Once the live has ended,
+    // the portal fills them from Facebook's own list by itself, in the same notice that closed it.
+    assert.ok(ended.filledFromFacebookAt, 'comments were filled from Facebook with no button pressed');
+    const c3Orders = s.data.orders.filter((o: any) => o.sourceCommentId === '8800001_c3');
+    assert.equal(c3Orders.length, 1, 'the "mine" comment that never arrived as a notice became an order');
+    assert.equal(c3Orders[0].liveId, live.id);
+    assert.equal(c3Orders[0].buyerName, 'Gold Asetre');
+    assert.ok(!s.data.orders.some((o: any) => o.sourceCommentId === '8800001_c4'), "the Page's own reply is never an order");
+    assert.equal(ended.startedAt, '2026-10-26T10:54:19.000Z', 'the start moves back to the first comment on Facebook');
+    assert.equal(ended.filledFromFacebook.facebookComments, 4);
+    assert.equal(ended.filledFromFacebook.ordersAdded, 1);
+    assert.equal(ended.filledFromFacebook.missingAfter, 0, 'after the fill no "mine" comment is without an order');
+    assert.ok(db.tables.portal_records.some((r: any) => r.collection === 'raw_comments' && r.id === '8800001_c2' && r.data.text === 'ganda po'), 'non-order comments are kept too');
+    const fillReport = db.tables.portal_records.find((r: any) => r.collection === 'match_reports' && r.id === ended.filledFromFacebook.matchReport);
+    assert.ok(fillReport, 'the match report is saved');
+    assert.equal(fillReport.data.orderLinesNotOnFacebook, 0);
+
+    // Only once: the next notice does not read Facebook again
+    const filledAt = ended.filledFromFacebookAt;
+    await call(C, '/api/meta/webhook', { body: { object: 'page', entry: [{ id: '109603071381200', messaging: [{ sender: { id: '7012345678901234' }, recipient: { id: '109603071381200' }, timestamp: Date.now(), message: { mid: 'm_after_fill', text: 'ok po' } }] }] } });
+    s = await call(C, '/api/state', { token: ownerToken });
+    assert.equal(s.data.lives.find((l: any) => l.id === live.id).filledFromFacebookAt, filledAt);
   } finally {
     graph.close();
   }

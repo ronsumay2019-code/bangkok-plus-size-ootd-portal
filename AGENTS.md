@@ -24,3 +24,9 @@
    - Every request starts with Reuse, Extend, Fork or New, answered from `kos/07-Releases/Releases.md`.
    - Nothing is called working without evidence checked against the source; only Production-ready entries are reused.
    - A lesson is closed only when it names the guard that catches it next time.
+9. **Memory (HARD RULE).** The `kos/` record is the memory; the conversation is not.
+   - Every answer starts from the latest record (Current-State, Releases, Known Issues, Open Loop), which hooks load at every message, session start and after every compression.
+   - Update the record in the same step as the change it describes (a merge, a failure, an owner decision), never later.
+   - Never call anything done, fixed or implemented unless it is on `main` (production). A fix on a branch is "Built, not in production".
+   - If the conversation and the record disagree, the record wins until checked against the real system; then correct the record the same day.
+   - What the owner asks not to record cannot be remembered after compression; say so when it matters.
