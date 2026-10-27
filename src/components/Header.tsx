@@ -6,8 +6,6 @@ import {
   Coins, 
   FileCheck, 
   ShieldCheck, 
-  Sparkles,
-  HelpCircle,
   ShoppingBag,
   Wallet,
   Activity,
@@ -24,7 +22,6 @@ interface HeaderProps {
   activeLive: LiveSession;
   summary: ReconciliationSummary | null;
   phpRate: number;
-  onOpenAnalysis: () => void;
   onOpenMobileAccessModal?: () => void;
   onOpenMetaTokenModal?: () => void;
   preOrdersCount?: number;
@@ -50,7 +47,6 @@ export const Header: React.FC<HeaderProps> = ({
   activeLive,
   summary,
   phpRate,
-  onOpenAnalysis,
   onOpenMobileAccessModal,
   onOpenMetaTokenModal,
   preOrdersCount = 0,
@@ -66,15 +62,13 @@ export const Header: React.FC<HeaderProps> = ({
   const readyToLeave = summary?.checklist.readyToLeaveStore;
 
   const navItems = [
-    { id: 'live_command', label: 'Live Session Command', icon: Radio, badge: isOnAir ? 'ON AIR' : 'READY' },
-    { id: 'messenger_adjustments', label: 'Page Messenger Orders', icon: ShieldCheck, badge: 'Direct DMs' },
-    { id: 'order_review', label: 'Order Review & Verification', icon: CheckCircle2, badge: activeLive.reconciliationStatus === 'awaiting_owner_review' ? 'Awaiting Review' : 'Verified Orders' },
-    { id: 'reconciliation', label: 'Reconciliation & Invoices', icon: FileCheck, badge: summary ? `${summary.buyerBags.length} Bags` : undefined },
-    { id: 'payments', label: 'Payments & Shipping', icon: Wallet, badge: `${awaitingPaymentCount} to pay` },
-    { id: 'pre_orders', label: 'Pre-Orders Lane', icon: ShoppingBag, badge: `${preOrdersCount} Pre-orders` },
-    { id: 'replay_studio', label: 'Replay Review Studio', icon: CheckCircle2 },
-    { id: 'buying_analytics', label: 'Sales & Demand Analytics', icon: Sparkles },
-    { id: 'pola_ai', label: 'Pola AI Co-Pilot', icon: Sparkles, badge: 'Gemini' },
+    { id: 'live_command', label: 'Live', icon: Radio, badge: isOnAir ? 'ON AIR' : 'READY' },
+    { id: 'replay_studio', label: 'Replay', icon: CheckCircle2 },
+    { id: 'order_review', label: 'Orders', icon: CheckCircle2, badge: activeLive.reconciliationStatus === 'awaiting_owner_review' ? 'To review' : undefined },
+    { id: 'pre_orders', label: 'Pre-orders', icon: ShoppingBag, badge: preOrdersCount ? `${preOrdersCount}` : undefined },
+    { id: 'reconciliation', label: 'Invoices', icon: FileCheck, badge: summary?.buyerBags.length ? `${summary.buyerBags.length}` : undefined },
+    { id: 'payments', label: 'Payments & Shipping', icon: Wallet, badge: awaitingPaymentCount ? `${awaitingPaymentCount} to pay` : undefined },
+    { id: 'messenger_adjustments', label: 'Messages', icon: ShieldCheck },
   ];
 
   return (
@@ -192,14 +186,6 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Executive Gap Analysis Button */}
-          <button
-            onClick={onOpenAnalysis}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-neutral-200 border border-neutral-700 transition"
-          >
-            <HelpCircle className="w-3.5 h-3.5 text-rose-400" />
-            <span>Gap Analysis & Checklists</span>
-          </button>
         </div>
       </div>
 

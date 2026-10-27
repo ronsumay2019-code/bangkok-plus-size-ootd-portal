@@ -113,6 +113,13 @@ test('SupabaseBackend speaks the REST API: paging, upsert, delete by id list', a
     await backend.upsertRecords(rows);
     const loaded = await backend.loadRecords();
     assert.equal(loaded.length, 1205, 'reads past the 1000-row page size');
+    await backend.upsertRecords([{ collection: 'raw_comments', id: 'c1', data: { text: 'mine T7' } }, { collection: 'transcripts', id: 'v1', data: { cues: [] } }]);
+    assert.equal((await backend.loadRecords(['orders'])).length, 1205, 'side collections stay out of the normal load');
+    assert.equal((await backend.loadRecords()).length, 1207);
+    assert.deepEqual((await backend.getRecord('raw_comments', 'c1'))?.data, { text: 'mine T7' });
+    assert.equal(await backend.getRecord('raw_comments', 'nope'), null);
+    await backend.deleteRecords('raw_comments', ['c1']);
+    await backend.deleteRecords('transcripts', ['v1']);
     await backend.deleteRecords('orders', ['o"0', 'o"1', 'o"2']);
     assert.equal((await backend.loadRecords()).length, 1202);
     await backend.upsertKv([{ key: 'phpPerThbRate', value: 1.7 }]);
@@ -137,4 +144,15 @@ test('a value set back to empty (null) is removed, not saved as null, and loads 
   assert.equal(db.kv.has('latestSummary'), false);
   await sync.load();
   assert.equal(state.summary, null);
+});
+
+test('the state sync loads only its own collections and never deletes side collections', async () => {
+  const db = new MemoryBackend();
+  await db.upsertRecords([{ collection: 'raw_comments', id: 'c1', data: { text: 'mine T7' } }]);
+  const a = makeCopy(db);
+  await a.sync.load();
+  a.state.orders.push({ id: 'o1' });
+  await a.sync.save();
+  assert.ok(await db.getRecord('raw_comments', 'c1'), 'raw comments survive a save');
+  assert.equal((await db.loadRecords(['orders'])).length, 1);
 });

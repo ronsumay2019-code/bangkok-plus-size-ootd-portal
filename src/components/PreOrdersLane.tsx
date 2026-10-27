@@ -161,7 +161,7 @@ export const PreOrdersLane: React.FC<PreOrdersLaneProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-white tracking-tight">
-                    Dedicated Pre-Orders Lane
+                    Pre-orders
                   </h2>
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30">
                     Isolated Lane

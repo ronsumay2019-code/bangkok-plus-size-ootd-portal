@@ -1,0 +1,245 @@
+---
+title: Live Selling Business (follow it like a bible)
+status: HARD RULE
+owner: Bangkok Plus Size OOTD (owner)
+recorded: 2026-10-24
+changed_by: owner only
+---
+
+# Live Selling Business: HARD RULE (follow it like a bible)
+
+> This page is how the business sells on a live. **Every agent follows it.** It sits at the top of every reading order. Only the owner can change it.
+> Where any doc, code or agent disagrees with it, the Live Selling Business wins. Log the conflict in [[Known-Issues]] and fix the doc or code to match.
+> An agent who finds a gap asks the owner. It never fills the gap with an assumption.
+
+## 1. The owner's words (recorded 2026-10-24, verbatim)
+
+> FORGET ABOUT CATALOGUE, RACKS, STOCK INVENTORY, PRE-DEFINED ITEM CODES, we operate complete opposite of those. we dont have real inventory, when we selected a store to do the liveselling, before we start, we check new items, old designs, gathers clothes we will be selling on live, sometimes stores keep track of inventory, most of the time they don't, we will only find out as checked by the store staff whether available or not, the items or clothers we gathered, we try to get each items stocks per size, color, etc, So everyday is unique as far as item codes, avalabilty etc
+>
+> START LIVE
+> 1st Event: (Hints not hard rule: Host holding a cloth or an item/items)
+> START LIVE - Capture the very first Item code that host will call as Price, Item Description, available colors, Sizes etc mentions before or after they call "ITEM CODE"-- THJS WAS AGENTS mistake, they find item code from the live chat, its the host who will tell those. AGENT SHOULD GATHER THOSE, then they will already have a real item code, sizes available, colors available, price, etc once everything is gathered (DO NOT CHECK, DO NOI START FINDING MINERS OR BUYERS, DO NOT INSPECT ANYTHING YET)
+>
+> 2nd Event: Do the same thing, - Capture the second or next Item code that host will call as Price, Item Description, available colors, Sizes etc mentions before or after they call "ITEM CODE"--Again they will already have a real item code, sizes available, colors available, price. (3rd event - Real work begins)
+>
+> REAL JOB: In between 1st Event and 2nd Event time stamped
+>
+> Job 1- Start finding Miners or buyers that chatted MINE + Item code, MINE only, Item code only, Item code + Size or Colors, (it doesn't have to be an exact match, as long as they contains any of those. (1st time capture: this is your buyer and order match) Job 1 is done at this point, Job 2 starts checks, and reviews live chat with 1st time capture: buyer and order match)
+>
+> Job 2: Reviews the entire live chat, and see and answers a question: How many times "1st time capture: buyer and order match" was mentioned or seen in the live chat? are those instances a color or size replacement request? Was that request granted, or denied? Was that an additional order request of the same item, or was that an item swap or replacement for another item, was the buyer only appreciating the item, Is 1st time capture: buyer and order match be the final or adjusted: on Messenger, (Messenger check applies the same)
+>
+> - color, item or size replacement request if approved: Update the order details remove the initial order and replace it with what buyer requested (will now become "2nd time capture: buyer and order match" - Live ends: Still 1 order only
+> - additional order request of the same item if approved: Update the order details (1st order + 2nd order - same item) sometimes exactly the same, different color and/or size - Live ends: 2 orders "2nd time capture: buyer and order match plus one"
+> - item swap or replacement for another item if approved: Update the order details remove the initial order and replace it with another item buyer requested (will now become "2nd time capture: buyer and order match" - Live ends: Still 1 order only
+> - buyer appreciation/side chatting/question only -price,size, color (sample: Maganda yan, malambot tela, magkano- DON't change anything Live ends 1st time capture: buyer and order match (no order - maybe a buyer previously bought the same item)
+>
+> 3rd Event - (REPEAT THE CYCLE + REAL JOBS) Until the live ends
+>
+> END LIVE
+
+## 2. Rules for agents (taken from §1; each one cites the owner's words)
+
+| # | Rule | From the owner's words |
+|---|---|---|
+| B1 | **There is no catalogue, rack, stock inventory or pre-defined item code.** Each live is unique. Its codes, prices, colours and sizes exist only because the host said them on that live. Codes belong to one live only. | "FORGET ABOUT CATALOGUE, RACKS, STOCK INVENTORY, PRE-DEFINED ITEM CODES … everyday is unique" |
+| B2 | **Availability is unknown until store staff confirm it.** Nothing is "in stock" or "sold out" because of a number in the portal. | "we will only find out as checked by the store staff whether available or not" |
+| B3 | **Item events come from the host, never from the chat.** An **Item Event** = item code, price, description, colours, sizes, and the time the host called the code. Details the host says before *or* after calling the code belong to that event. | "its the host who will tell those … THJS WAS AGENTS mistake, they find item code from the live chat" |
+| B4 | **While capturing an Item Event, do nothing else.** Don't look for buyers or check anything yet. | "DO NOT CHECK, DO NOI START FINDING MINERS OR BUYERS, DO NOT INSPECT ANYTHING YET" |
+| B5 | **No item window** *(changed 25 Oct, A2)*. Any item code the host has called can be ordered **at any point** in the live, even when the host is on the 9th item. "Between the 1st and 2nd event" is **when an agent starts processing** (the codes are known by then). It is **not** a limit on when buyers can order. | "an items window never really ends … all miners, all buyers are free and always welcome to like mine or order item codes before or called previously" |
+| B6 | **Job 1: 1st capture.** A buyer comment containing any of **MINE + code**, **code only**, or **code + size or colour** is a match. It doesn't have to be an exact match. That buyer's first matching comment is their **1st capture** for that code. **"MINE" with no code, or "mine + size/colour" with no code, is not a capture yet.** It becomes one when it is **clarified in the chat**: the buyer retypes "mine + code", or answers the admin's question ("madam, is that mine 2XL red for which item code?") with the code. If it is never clarified, it goes on the admin's review list: never dropped, never guessed. **"+1", "one more", "two more", or a number after the code** means additional pieces. *(Updated 25 Oct, A3)* | "MINE + Item code … Item code only, Item code + Size or Colors" (24 Oct); "A mine without an item code will be clarified during live session … putting a number at the end … would take it as another order" (25 Oct) |
+| B7 | **Job 2: review.** For every 1st capture, review the **entire** live chat **and Messenger**. Count how many times that buyer and order appear, and put each later mention into one of the types below. **A Messenger order placed during the live is a live order (live invoice)**, whatever the channel. **A Messenger adjustment of a chat order is the same order adjusted, never a second order.** That double entry is a known risk. A request is **denied only for out of stock**: "sorry, wala na po", "out of stock", "sold out". Otherwise it stands. *(Updated 25 Oct, A4)* | "Reviews the entire live chat … (Messenger check applies the same)" (24 Oct); "It should be considered as a live invoice because the order was placed during live session … if it's denied, only one reason why it's denied: it's out of stock" (25 Oct) |
+| B8 | **Repeat.** Event → event → jobs, until the live ends. | "3rd Event - (REPEAT THE CYCLE + REAL JOBS) Until the live ends" |
+| B9 | **A repeated "mine" with no request for another piece is 1 order.** Saying the quantity is the buyer's responsibility; the team's job is to clarify. | A7 |
+| B10 | **More buyers than pieces: the first miner gets the item.** The earliest confirmed order wins. | A5: "A policy is like first miner will get the item first" |
+| B11 | **Several items shown at once:** go by the item code the host calls for each. | A6 |
+| B12 | **There is no buying list.** The true inventory is only what is physically held in the store. Some stores give counts per code, colour and size before the live, on paper; most don't. Once the team leaves the store, it is not inventory any more. | A8 |
+| B13 | **Item codes are temporary.** They exist only to track who ordered what during one live. There is no link to past lives, even when the same garment was sold before. | A9 |
+| B14 | **How the team works today.** An **off-camera admin** writes each confirmed order on paper: buyer's Facebook name, code, description, size, colour. The order is bagged and the bag labelled with the buyer's Facebook name and order. Codes and descriptions are not recorded otherwise ("called by ear"). **Right after the live:** reconciliation, with one person on the live chat and one on Messenger (sometimes one person does both); then sorting. **At home:** a second review, then invoicing. The portal replaces the paper, and changes none of these steps without the owner. | A1, A4, A5 |
+| B15 | **Team:** the host; admin(s) in Bangkok; admins in the Philippines for local shipping (later, out of scope for now). | A9 |
+
+### Job 2 outcomes
+
+| Later mention | If granted | Orders at live end |
+|---|---|---|
+| Colour, size or item **replacement** | Remove the first order and replace it with what the buyer asked for. This becomes the **2nd capture**. | **1** |
+| **Additional order** of the same item (identical, or a different colour or size) | Keep the first order and add the second. This is the **2nd capture plus one**. | **2** |
+| **Swap** for another item | Remove the first order and replace it with the other item. This becomes the **2nd capture**. | **1** |
+| **Appreciation, side chat or question only** ("Maganda yan", "malambot tela", "magkano") | **Change nothing.** | The 1st capture stands; the comment itself adds no order |
+| Any request that was **denied** (the only reason is out of stock) | Change nothing; the item is not added. | The 1st capture stands |
+
+**Hint, not a rule:** an event usually shows the host holding a garment or several garments.
+
+## 3. The owner's answers (voice notes, 25 Oct 2026, verbatim transcript)
+
+> **A1. Who records.** "When the host calls for the item codes, all right, there's like a person on the back end, like an admin, right, who doesn't literally record the item code, but he keeps the orders, right, that is placed on live chat, all right? So off camera, if one person says, if a buyer says mine, then by its description, right, the admin will then get the order, write the item code on there, the size, color, and whoever that buyer miner is. And same goes with all other orders. So we never record our item codes. We never record, you know, descriptions. We all call it by ear, and we just review it by the end of the live session. Gather all records, gather all orders, and then sort them. And then another review when we get home for the invoicing."
+
+> **A2. Windows.** "So an items window never really ends, because an item can always be ordered during live session. It doesn't matter which part of the live session they would like order a specific item code, right? Even if you're on the 9th cloth that you are like presenting, and 9th item code, and all miners, all buyers are free and always welcome to like mine or order item codes before or called previously. So it's not, it doesn't have like a item window."
+
+> **A3. Mine without a code, and delay.** "A mine without an item code will be clarified during live session. If the miner confirms the item code, they sometimes retype it with a format like mine and then the item code. Sometimes they do mine and then size, color, and then they will be clarified which order you're mining. But sometimes admin would like rephrase it saying like, madam, is that mine, for example, is that mine 2XL red for this specific item code or for what for which item code? And that's what happens sometimes. And then the buyer will then, or the miner will then answer it plainly with just an item code, right? Delay will never be an issue, but sometimes it's never an issue with us. You can actually consider it as a count if they would say one more of this item code, two more of this item code, or they would say just like, you know, putting a number at the end, like mine, say mine plus and then item code, and then they will like add, you know, a number at the end. So basically, admin or the host would take it as another order, because they always confirm it during live. For a comment or an order that is not clear. So again, it's not an issue, but it could cause duplicates or missed order."
+
+> **A4. Granted or denied; Messenger.** "Okay, so this is where consolidation or reconciliation mechanism really need. Because they sometimes place an order, like I said, there's a different buying mechanism or buying behavior. They sometimes place an order, they watch the live silently, right? But they place an order via messenger, right? So the order, right? It should be considered, right? It should be considered as a live invoice because the order was placed during live session. It doesn't matter which channel, messenger, or in the live chat, as long as it's within that period. So that's also another issue that we're facing, because they place an order on live chat, let's say mine, and then the item code, and then the size, and then they would like adjust it in messenger. So what will happen then would be it would result to a multiple order or double entry, because an order was like, so whenever an order is confirmed, the admin off cam will gather, right, put it in a plastic bag, write it or name it after the buyer or the miner's Facebook name, what the order was, the description, say a size and color, and then if it's denied, only one reason why it's denied: it's out of stock. That's the only reason. So it's like, you know, it's no brainer. You would hear that, sorry, wala na po, or sorry, out of stock, sold out. That's how those are the keywords. And then, yeah, you would, like I said, if they would add a piece, right, the host will clarify, okay, add a piece with the same size that you just ordered, or same color, or you have same, or is it like a same item code with different size, different color, something like that. And again, you would know. And then if they would answer it like, yeah, it's a different color than my previous order, so it's actually counted as another order. So it's like an added piece of what he or she just ordered."
+
+> **A5. More buyers than pieces.** "Yes, it's actually a usual thing during live. That's why off cam or after the live session, here's what's happening off cam. They do the reconciliation right after the live session. But you have multiple person reconciliating. One would say, here's the order of this, and then because he's watching the live session, and then another person actually watching the live while monitoring the Facebook conversation. So like I said, one order on live session, one person, then another person not really in charge, but taking that initiative to check what's going on the messenger. Sometimes it's just one person doing both. So again, there's no blueprint. There's no blueprint of the business framework. Everything is called in the air, and that what makes this a portal build. It's because there's no blueprint. But I do know we can get it done. A policy is like first miner will get the item first. That's the policy. There are stores that before we start the live session, we can determine the number of stocks of that particular item code, and then the number colors, pieces, colors and sizes of that particular item code. So, but everything is done manually, written on a paper."
+
+> **A6. Several items at once.** "The host would like show multiple items or multiple pieces or multiple items, and the host will call different item codes. It is never an issue, and it will never be an issue because he would just say multiple items, but there's like a specific item code, so we base it off on the item code. So again, it's no brainer. We can easily determine who is what. So, but again, it's done manually, written on a paper."
+
+> **A7. Repeated mine.** "If a buyer types mine again for the same item without asking for another piece, well, that is not considered as another order. We would take it as just like one order. It's the buyer's or the miner's responsibility to actually, you know, let us know if he if she's like ordering two pieces or what. So again, our job is just to clarify, but it's the responsibility to let us know what they're ordering."
+
+> **A8. After the live.** "Buying lists never exist. It never exists. Like I said, that our true inventory happens only when we arrive at the store, right? Good if the store owners keep track of their inventory. We'll have like a glance of the stocks of the items that we will be presenting during live, but sometimes they're not keeping track of their inventory, and that's a usual thing in Bangkok. They don't do inventory, so we adapted to their that's how they do it. That's how they manage their stores. They don't do inventory. So yeah, we adapted to it. It's not our inventory. It's not our product. Anyways, we're just there to sell their items for Filipino viewers, Filipino followers of the page. It's not our inventory. So that's okay. So whatever we see, whatever we physically hold, that's a true inventory for us. But the moment we leave the store, that's not an inventory anymore. As long as we're not in the store, that's not our real inventory."
+
+> **A9. Repeat buyers; no permanent codes.** "Yes, we sometimes have followers or you know, repeated buyers wherein who ordered an item that was like presented before. It doesn't matter weeks, months, it doesn't matter. Like I said, every item can have different item codes. Our item code is just for us to keep track of who ordered and what was ordered, right, during live. But as far as keeping that item code forever, that's not how we operate. Like I said, this business is really different. There's no blueprint, no catalog, no warehouse, no item codes, nothing. Like nothing. Everything is called by the air during live. So if we are building this, right, forget about the traditional, right, clothing store that has an inventory, that has an item code per item, that keeps track of their orders, that keeps track of their inventory, their stocks. We don't have those. We don't have a physical store, right? We are just a team, right? A host, right? An admin, and then another set of admins in the Philippines, in charge of the local shipping. But don't worry about that yet, right? Let's focus on this live selling. So there, again, forget about the traditional clothing store that has inventory, warehouse, specific item codes, that when they call an item code for one clothes, that's going to be the item code forever. We don't do that."
+
+## 4. The owner's strategy, restated (voice note, 25 Oct 2026, verbatim transcript): **FOLLOW THE HOST**
+
+> "in my opinion, the best strategy here is, in a live session, right, do not look for buyers first. Do not look for specific item codes. Do not look for any mines just yet, right? Right? When the live starts at 0 seconds, right? Capture the host, right? Capture the first item code that the host will call, because whenever an item code is called, right, the description, right, the number of items available, sometimes they say it, sometimes they don't. But definitely before an item is called, or the item code is called, before or after, there will always be a size, a color, and the price. So that right there, right, we already have, right, the item codes, price. I mean, we already have an item with an item code, a price, a color, and those are just the most important things. And then again, capture that, right? And then again, do not look for any buyers yet, right? Or any miners. Now, second thing, capture again the next item code, right? The next or the second item code that the host will call for the next item, all right? And capture the same price, size, and color. Now, between that two item codes, right, there's one event already, right? In between, in that event, from the time that the first item code was called until the second or next item code was called, that's when the real job will begin. We will all find, right, who the buyers are, who the miners are, what was ordered, what size, what price, and what color, right? And then we will then see how many times that item code that was ordered by the buyer was mentioned or talked about in that live chat. Once, twice, right? Three times, couple of times, and then we will determine, are those price, are those item, are those conversations about price, size adjustments, color, adjustment requests, right? Or are they just asking a question? Are they just recommending it, right? And from there, once we have identified those, that it's an item change, or item size, or item color change request, then that's gonna be the final order, the latest one. The first one, we will drop it, but of course we will document it. We will keep track of the story of that item and its item code, right? And then from second item code, right, to the third one, or second item code to the next one, do the same cycle until the live ends. So again, I think that's where we are all getting confused. When I say look for the buyers, everyone just look for the buyers. Do not follow the buyers or the miners. Do not follow the order. Follow the host, right? Follow the where and when an item code was called, and then second, follow when an item code was called, and then in between, that's when buyers, right, or miners will place order during live or in messenger."
+
+**What this settles (agents read this before §2):**
+- **S1, follow the host.** Processing starts with the host, never with the buyers. At 0 seconds the agent captures each item code the host calls, with the **price, size and colour**, which the host always says just before or after the code. The description and the number available are captured when the host says them. No buyer or "mine" is looked at yet.
+- **S2, an event is a time segment.** Event N runs from the moment the host calls code N to the moment the host calls code N+1. The last event runs to the end of the live.
+- **S3, inside each event, find the orders placed.** Find the buyers and miners, and what they ordered (code, size, colour, price from the host's call), in the live chat **and Messenger** during that segment. *(Clarified 25 Oct, S6: counting and following the later mentions is done after the live, across all events.)*
+- **S4, the latest granted change is the final order.** The earlier capture is dropped from the final order but **kept in the item's story**: every capture and change, with its comment or message and time. Nothing is deleted.
+- **S5, repeat** event by event until the live ends.
+- **How this fits A2 (no item window).** An event is where the agent **looks**, not a limit on what buyers may order. An order placed in event 7 for a code called in event 3 is still an order for code 3.
+- **Price (follow-up 2): settled.** The price comes from the host's words when the item is called.
+
+### Clarification (voice note, 25 Oct 2026, verbatim transcript)
+
+> "When I say event, right, just so you can like filter your search, right, first event of the first item code was called until the second next item code was called, right? That's where you find the orders place in that session. But I did not say, right, that once an order was placed in or adjusted in that event, they can no longer be, right, adjusted or requested for anything, right, on the second event, third event, fourth event, until the live ends. No, that's not what I meant. What I'm just only saying is that you focus on certain events, and we get this count accurately. And then once we have like orders placed every event, right, of one live session, right, by the end of the live session, there should be one, right, agent reconciliating everything, setting aside final orders or setting aside item codes that was only ordered once, right? Ordered once, no requests, no any other conversation, side chats in Messenger. So that's a confirmed order, right? Second, an agent will then identify a buyer who ordered or a miner who ordered an item with an item code, right, and was acknowledged, right, at the time that it was placed, was like mentioned or like what do you call this? Like mentioned again on the second, mentioned again multiple times. Then the agent will then determine or follow that thread. Is this like an order change request, or is this just like a question? So there, if it's an order request and it was acknowledged and approved, then we will then consider it as the final order, and then we will drop the previous order. That's what I meant with that."
+
+- **S6, events are a search filter only.** Events say where to **find where an order was placed**, so the count is accurate. An order placed in one event **can still be adjusted or added to in any later event, or in Messenger, until the live ends.**
+- **S7, one reconciliation agent after the live, two passes.**
+  - **Pass 1, confirmed orders.** An order that was placed once, with no requests, no other conversation and no Messenger side chat, is **confirmed** and set aside as final.
+  - **Pass 2, followed threads.** An order that was acknowledged when placed and then **mentioned again**, once or many times, in any event or in Messenger: follow that thread to the end and decide whether it is a **change request** or **just a question**. A change request that was **acknowledged and approved** becomes the **final order**. The previous one is dropped from the total but kept in the item's story (S4). A question changes nothing.
+
+### Price and the store match (voice note, 25 Oct 2026, verbatim transcript)
+
+> "Well, of course, we will record of the item price. That's no brainer. I probably just missed mentioning it, but that's the most important thing. That's no brainer. We should know the price. So again, if I were to like say it again, all right. When we're writing an order, captured order in the live, right? We get the item immediately. Write the name of the person who ordered it, the size of that item, the color, and the price, and another what do you call this? Yeah, the price, because the staff owner is taking. I mean, the staff owner is keeping track of the number of items that we like that has been ordered. So by the end of the live session, it's not us tracking how much we how much are we paying. It's the staff owner. So by the end of the live session, we will do the matching. Is the staff owner's what do you call this? Total. Same as ours is an as a track is the staff owner's total number of items that will be purchased same as ours. So there,"
+
+- **B16, every captured order has:** the item (taken immediately), the buyer's name, size, colour and **price**. Price is always recorded.
+- **S8, the store match at the end of the live.** During the live, the **store owner** keeps their own count of the items ordered, and tracks what the team will pay; the team doesn't. At the end of the live, the team's **total number of items must equal the store owner's total**. If it doesn't, the difference is found before leaving the store.
+
+### No people during the live (voice note, 25 Oct 2026, verbatim transcript)
+
+> "as much as possible, there should be no human, no person, right, using this portal during live session. Everything should be done automatically. The only time a human, right, a human will use this portal is when an order is final, when everything is reconciliated already, confirmed. Then a human will will prepare an invoice, take a photo, and then send that to the buyer or seller in Messenger."
+
+- **B17, automatic during the live.** No person uses the portal during the live. Host capture, order capture and reconciliation are done automatically.
+- **B18, people come in at the invoice.** A person uses the portal only once the orders are final and reconciled. They prepare the invoice, take a photo of it, and send it to the buyer in Messenger. Anything the agents could not decide is shown to that person, marked unclear, at that point. It is never guessed.
+
+### Store match, replay and the live section (voice note, 25 Oct 2026, verbatim transcript)
+
+> "Do you compare only the total number of items with the store owner? Yeah, that's how the only way we have to compare it. And how the portal hears the host after live? Well, all right. With this one, I need you to be aligned with me. All right. The reason why we are doing the meta API graph is, you know, is for us to broadcast the live session during live. All right. Now, about the replay, the previous agent who sent us the, what do you call this, handover sheet, was able to produce like a broadcasted session. And then the portal that we previously used, right, that we previously used, they were able, the previous agent was able to download a copy of the live session and then get an agent who has a skill in transcribing, and then from the transcription they do the reconciliation. But that's from the old portal that I don't like. But it's up to you. If you're going to put these strategies together, it's up to you. But we need a replay section where the portal, I mean, the live session is just there for us to review. And for us to, for us to review. And then we also have a section where it dedicated for the live session. And I think we have an agreement already with that that session should be clean, live ready, no data, no everything. But when the live starts, the live session should automatically shows up there. And when the live ends, the live session will automatically shuts down the video and then clears all data."
+
+- **S8, updated: the store match compares the total number of items only.** It is the only comparison the store owner's tally allows.
+- **B19, host capture uses the method that worked before.**
+  - After the live, download the replay through the Graph API (`<videoId>?fields=source,length`, Page token on the server).
+  - Transcribe the host's speech.
+  - Take the item codes, prices, sizes and colours from the transcript.
+
+  The steps were proven in the old portal; see `bangkokplussizeootd/docs/REPLAY-ORDERS-PROCEDURE.md` step 3 (Whisper large-v3, language tl) and step 4 (lining up the comment clock with the replay clock). The old portal itself is not reused.
+- **B20, Replay section.** A page where each past live can be reviewed: the video, the transcript, the host's item calls on a timeline, the orders found in each event, and each item's story.
+- **B21, Live Session section.**
+  - Clean and live-ready, with no data, before a live.
+  - **When the live starts, it appears there automatically.**
+  - **When the live ends, the video closes and the section clears automatically.**
+
+  It clears from this section only (owner, 24 Oct). The live's data moves on to the Replay section and the order pipeline; nothing is deleted.
+
+### Evidence over accuracy (voice note, 25 Oct 2026, verbatim transcript)
+
+> "Well, I'm not that concerned about, you know, Croc's transcription accuracy, whether it's 100%, 90%, or, you know, 70, 80. Well, for us, it does not matter. Great if they have like a really high accuracy, but as long as we can create, right, a story, we can follow, right, a thread, and if, you know, a storyline that would tell us or justifying that this is really the customer's or the buyer's final order. Look at this. Here's that's why, right? Every order confirmed, right? Reconciliated should be backed by an evidence. Whenever we send, whenever we have an order for review, there should be, you know, a backup, right? Captured, what do you call this? Proof or evidence, right? Of the actual live, right? Or like actual live that that buyer or miner ordered that item, because there's like a screen, just like a timestamp. That timestamping with a screenshot of what was what was commented final."
+
+- **B22, transcription accuracy is not the bar; the story is.** Transcription (Groq Whisper) only has to be good enough to build each order's story and follow its thread to the final order.
+- **B23, every confirmed or reconciled order carries evidence.** Every order, and every order sent for review, has a proof pack:
+  - **the timestamp;**
+  - **a screenshot from the actual live at that moment;**
+  - **the comment or message that made it final;**
+  - the host's words from the transcript, with the replay time;
+  - the earlier steps of its story.
+
+  An order without evidence is not confirmed.
+
+### Store match timing and linking buyers (voice note, 25 Oct 2026, verbatim transcript)
+
+> "And for the store match timing, it doesn't literally mean that after the live ends, we should store owner would hand us the total invoice and we need to make that payment immediately and leave. No, after the live session, we can stay there like for an hour, 2 hours, you know. And these stores that we're doing this live selling, I mean, we have a good relationship with them, and even the new stores that we will be visiting, they do know how live selling works. That after live session, the team stays there for like an hour or two, you know, just to sort, right, and group orders together, right, just to make an accurate tally of how much, right, how much they would be paying against the staff owner's invoice. Linking the same buyer across the chat and messenger. Again, we never had an issue with this, your point is makes sense. But every time someone, Facebook gives a buyer different IDs in comments, but do Facebook know that they're really a buyer? It's just a live selling session. I mean, we never had this issue before, but again, I'm not sure what was on the back end, but previous agents was able to do it, so I know you can, you know, do better in that sense."
+
+- **B24, the store match happens within 1–2 hours after the live.** The team stays at the store for an hour or two after the live to sort, group orders, and tally against the store owner's invoice. **Target: the final orders and the item total are ready within 1 hour after the live ends.**
+- **B25, the buyer's name is the name of the person who chatted** (owner, 25 Oct). It is the name Facebook shows on their comment or message. Invoices and bags use that name. Real names don't matter, so don't overthink it. A buyer's chat order and Messenger message are linked by that name, as the old portal did.
+
+### The paper list (voice note, 25 Oct 2026, verbatim transcript)
+
+> "And as far as the paper order list, all right, there's nothing special about it, right? You just see like a scratch paper, just like a reference, right, of the person who ordered, what that person ordered, size, color. So just imagine, right, a person, right, a person or an admin who needs to write an information as quick as possible, right, on a sheet of paper, on a sheet of paper. And there's nothing special. It's just a reference for himself, not a reference for the team."
+
+- **B26, the paper list is the admin's personal scratch note.** It is written as fast as possible, as his own reference, not the team's. **It is not used as the source of truth for testing.**
+
+### Invoices, Messenger and the trial weeks (owner, 25 Oct 2026; key words verbatim)
+
+> "We don't send evidence and any photo to our miners and our buyers in Messenger. The only photo we are sending is a photo of their order inside a plastic bag."
+
+> "if a miner, right, makes an adjustment request inside the messenger during live … we respond and acknowledge on that in messenger, because the host doesn't have any visibility or any idea on what's going on inside the messenger … if a silent watcher … places an order in messenger, then he will get acknowledgement in messenger as well."
+
+> "Owner … will not look at the total … of what we have inside the portal for the first couple of weeks or first week maybe … We will do the traditional way until we like convince or show that this one is accurate."
+
+> "we don't want to send an invoice like in plain text." (sample invoice provided; sent inside Messenger "with no issue")
+
+> "one item code with 100 pieces … do not complicate things."
+
+- **B27, what a buyer receives:**
+  - **the invoice as a picture in the shop's template**, never plain text;
+  - **a photo of their order inside its plastic bag**, taken in the invoice generator;
+  - the shop's own message.
+
+  Sent inside Messenger. **Evidence is internal only and never sent.**
+- **B28, one invoice line per item** (code + size + colour), with a quantity. Invoices stay short.
+- **B29, Messenger during the live.** The team replies in Messenger. The host can't see Messenger. **A Page reply that acknowledges a Messenger change or order counts as its approval**, the same as the host's "noted" on the live.
+- **B30, trial weeks.**
+  - For the first week or weeks, the team keeps its traditional way and the portal runs alongside.
+  - After each live, a **match report** compares the portal's final orders with the invoices actually sent in Messenger and with the store owner's total.
+  - The owner switches over once the reports prove the portal accurate.
+
+### Pre-orders and the portal clean-up (voice note, 25 Oct 2026; key words verbatim)
+
+> "the pre-orders lane, it's definitely we will be keeping. It's another what do you call this revenue stream of the business … pre-orders, these are purchases made after live selling … once they get home, they will like re-watch the live session on our Facebook page, and they will place orders in Messenger … invoice during live session should be named and presented as live invoice, and orders made before or after live selling, these are pre-orders invoice. And but at the end of the day, if a miner or a buyer has invoice, live invoice, and pre-order invoice, then definitely it will just add up."
+
+> "Owner doesn't need any reason to override something … just like a tick box next to it inside inside the invoice generator."
+
+- **B31, two kinds of invoice.**
+  - An order placed **during** the live, in the chat or Messenger, gets a **Live invoice**.
+  - An order placed **before or after** the live, usually in Messenger after re-watching the replay, gets a **Pre-order invoice**.
+  - A buyer who has both: **the amounts add up** to what the buyer owes in total. The shop's template already titles them "LIVE ORDER INVOICE" and "PRE-ORDER INVOICE" (`invoice-artwork.ts`).
+- **B32, the owner overrides without giving a reason:** a tick box next to the line in the invoice generator.
+
+### Transcription works; use Facebook's own transcript first (voice note, 26 Oct 2026; key words verbatim)
+
+> "I know it will work because I saw it in my eyes that it worked, right? The previous agent who did the hand off recently made that work … I was even playing at it, scrolling it live … that live feed or live broadcast, it has a transcript. Okay, there's like an option, like a three dots at the very corner of the video screen where you can turn on the transcription … it doesn't matter if the accuracy is not that good, as long as we can create a story from order to invoice. And then another option in the first portal, but this is gonna be our last option."
+
+- **B33, where the host's words come from:**
+  1. **First choice: the live video's own Facebook transcript.** It's the one viewers turn on from the ⋯ menu on the video.
+  2. **Last resort only:** the old portal's method (download the replay, then transcribe).
+
+  Transcription is proven by the owner's own use; it isn't a risk to debate. Accuracy is not the bar (B22).
+
+### How it worked before (owner, 26 Oct 2026; key words verbatim)
+
+> "In the first version of the portal, we used Croc because we were like trying to downloaded the video and put it on the portal for a replay … because the agent couldn't get the Facebook Live activated or turned on like automatically. So we downloaded the video … and we ended up using Croc, and then it worked. But the most recent agent was able to do it. He was able to turn on the live broadcast, live session as it started, and it automatically ends as the host turned it off."
+
+- **"Croc" is Groq,** the transcription service named in the old procedure (Groq Whisper). It worked in the first portal: download the replay, then transcribe with Groq. This is the proven last resort (B33).
+- **Automatic live start and end worked in Antigravity's portal.** The code is still here: commit `89b82c8` finds the broadcast in the Page's video list by `live_status` (it works without Meta App Review), in `server.ts` live-sync. **Caveat (verified 26 Oct):** it runs from the browser every 30 seconds (`src/App.tsx`), so only while the portal is open on some screen. To be fully automatic with nobody using the portal (B17), the same check must also run from the server by itself (T-032).
+
+### Transcript during the live vs on the replay (owner, 26 Oct 2026; verbatim)
+
+> "I thnk FB full transcript is on;ly availabe during live. Replay, we need to download turn on the transcript"
+
+- **B34 (owner's understanding; being confirmed).** Facebook's full transcript is there **during** the live. For the **replay**, the video must be **downloaded and transcribed** (the proven Groq method). Evidence so far: after the live, Facebook's caption file for LINEN SHOP gave only 0:02–1:00 of a 5-hour video.
+
+### Lives have no fixed time (owner, 26 Oct 2026; verbatim)
+
+> "we don't have like a specific time. We start our live anytime we want, so it doesn't have like a specific time."
+
+- **B35, a live can start at any moment.** The portal must notice a live whenever it starts, with no schedule and no time set in advance. A "scheduler" in this build only ever means a **heartbeat**: a check every minute, all day, asking Facebook "is a live on air right now?". It never means a planned live time.
+
+## 5. Still open
+
+1. ~~When is the host captured?~~ **Answered by B17: automatically.** No admin entry during the live. Host capture comes from the live's video and audio, by an agent. Whether this works on a real replay (fetching the video, then accuracy on Taglish speech) is being tested (T-031). The test is paid, so it needs the owner's approval of its exact cost first.
+2. ~~The store match (S8)~~ **Answered: total count only.**
+3. ~~What the screenshot shows.~~ **Answered 25 Oct:** the side-by-side card is approved ("I really like it"); see [[Screens]].
+   *Original question:* A frame taken from the replay at the comment's time shows what the host was holding. It does **not** show the comments, because Facebook doesn't burn comments into the video. The comment itself comes from Facebook's data: name, text, time and a link that opens it on Facebook. Our plan is to show both side by side as the evidence card. A real screenshot of the comment as it looked on Facebook would need a browser logged in to Facebook, which is fragile. Is the evidence card enough?

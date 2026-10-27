@@ -165,6 +165,16 @@ test('the same live comment delivered to two copies at once creates one order', 
   const made = s.data.orders.filter((o: any) => o.sourceCommentId === 'cmt_dup_1');
   assert.equal(made.length, 1);
   assert.equal(made[0].buyerName, 'Joy Tuazon', 'name kept as written');
+  const raw = db.tables.portal_records.filter((r: any) => r.collection === 'raw_comments' && r.id === 'cmt_dup_1');
+  assert.equal(raw.length, 1, 'the comment is also kept exactly as written, once');
+  assert.equal(raw[0].data.text, 'Mine rustans pink');
+  assert.equal(raw[0].data.name, 'Joy Tuazon');
+  const other = { object: 'page', entry: [{ changes: [{ field: 'feed', value: { item: 'comment', verb: 'add', comment_id: 'cmt_reel_1', post_id: '109603071381200_reel9', message: 'pa-mine po', from: { id: '9', name: 'Lea' } } }] }] };
+  await call(A, '/api/meta/webhook', { body: other });
+  const unlinked = db.tables.portal_records.find((r: any) => r.collection === 'raw_comments' && r.id === 'cmt_reel_1');
+  assert.ok(unlinked, 'a comment on a post not linked to a live is still kept (R-004 #2)');
+  assert.equal(unlinked.data.liveId, null);
+  assert.equal(unlinked.data.postId, '109603071381200_reel9');
 });
 
 test('only real order comments on the live become orders, pending and with no made-up price', async () => {
@@ -239,6 +249,15 @@ test('owner creates admin and co-owner links; admins cannot create links or see 
   assert.equal((await call(A, '/api/auth/invite', { token: coLogin.data.token, body: { staffId: 'admin3' } })).status, 200, 'the co-owner can create admin links');
   const override = await call(B, '/api/owner/order-override', { token: adminToken, body: { orderId: 'ord_live_2', role: 'staff', reason: 'size fix', overrides: { size: '3XL' } } });
   assert.equal(override.status, 200, 'the role comes from the sign-in, not from the request body');
+  const noReason = await call(B, '/api/owner/order-override', { token: ownerToken, body: { orderId: 'ord_live_2', overrides: { size: '4XL' } } });
+  assert.equal(noReason.status, 200, 'the owner overrides without giving a reason');
+  const tx = await call(A, '/api/live/transcript-check?video=3310662652470857', { token: ownerToken, method: 'GET' });
+  assert.equal(tx.status, 503, 'without a Page token the transcript check says so instead of guessing');
+  assert.ok(!JSON.stringify(tx.data).includes('gsk_'), 'no key value is ever returned');
+  assert.equal((await call(A, '/api/live/transcript-check?video=abc', { token: ownerToken, method: 'GET' })).status, 400, 'only numeric video IDs');
+  assert.equal((await call(A, '/api/facebook/page-notices', { token: ownerToken, method: 'GET' })).status, 503, 'without a Page token the notices check says so');
+  assert.equal((await call(B, '/api/facebook/page-notices', { token: adminToken, body: {} })).status, 403, 'only an owner changes which notices Facebook sends');
+  assert.equal((await call(A, '/api/ai/chat', { token: ownerToken, body: { messages: [{ role: 'user', text: 'hi' }] } })).status, 410, 'buyer data is never sent to an outside AI (Pola removed)');
 });
 
 test('reset is disabled once data lives in the database', async () => {
@@ -365,6 +384,61 @@ test('owner can start fresh from one Facebook live; admins cannot; Messenger cha
   assert.equal(s.data.lives[0].fbVideoId, '3310662652470857', 'the video id is read from the link');
   assert.equal(s.data.lives[0].status, 'live');
   assert.equal(s.data.messengerThreads.length, threadsBefore, 'Messenger chats are kept');
+});
+
+test('26 Oct lesson: with no screen open and no "live started" notice, a comment on a LIVE video starts the session and its end closes it', async () => {
+  const http = await import('http');
+  const statuses: Record<string, string> = { '8800001': 'LIVE' };
+  const fbComments: any[] = [];
+  const graph = http.createServer((req, res) => {
+    const id = decodeURIComponent((req.url || '').split('?')[0].slice(1));
+    res.setHeader('Content-Type', 'application/json');
+    if (id.endsWith('/comments')) { res.end(JSON.stringify({ data: fbComments, paging: {} })); return; }
+    if (statuses[id]) res.end(JSON.stringify({ id, live_status: statuses[id] }));
+    else { res.statusCode = 400; res.end(JSON.stringify({ error: { message: 'Unsupported get request' } })); }
+  });
+  await new Promise<void>((r) => graph.listen(4399, '127.0.0.1', () => r()));
+  try {
+    for (const r of db.tables.portal_records) if (r.collection === 'lives') r.data = { ...r.data, status: 'ended' };
+    const C = await startCopy(4317, { META_PAGE_ACCESS_TOKEN: 'test-page-token', META_GRAPH_BASE: 'http://127.0.0.1:4399' });
+    const comment = (id: string, post: string, message: string) => ({ object: 'page', entry: [{ id: '109603071381200', changes: [{ field: 'feed', value: { item: 'comment', verb: 'add', comment_id: id, post_id: post, message, from: { id: '77', name: 'Aleni Alarilla' } } }] }] });
+
+    await call(C, '/api/meta/webhook', { body: comment('photo_c1', '109603071381200_5500001', 'hm') });
+    let s = await call(C, '/api/state', { token: ownerToken });
+    assert.ok(!s.data.lives.some((l: any) => l.status === 'live'), 'a comment on a photo post does not start a live');
+
+    await call(C, '/api/meta/webhook', { body: comment('8800001_c1', '109603071381200_8800001', 'Mine bilog yellow') });
+    s = await call(C, '/api/state', { token: ownerToken });
+    const live = s.data.lives.find((l: any) => l.status === 'live');
+    assert.ok(live, 'the session started by itself');
+    assert.equal(live.fbVideoId, '8800001');
+    const made = s.data.orders.filter((o: any) => o.sourceCommentId === '8800001_c1');
+    assert.equal(made.length, 1, 'the comment that started it is captured too');
+    assert.equal(made[0].liveId, live.id);
+
+    // The self-check: every order line must come from a real comment on the live; "mine" comments without an order are listed
+    fbComments.push({ id: '8800001_c1', message: 'Mine bilog yellow', created_time: '2026-10-26T10:54:19+0000', from: { name: 'Aleni Alarilla' } });
+    fbComments.push({ id: '8800001_c2', message: 'ganda po', created_time: '2026-10-26T10:55:00+0000' });
+    fbComments.push({ id: '8800001_c3', message: 'Mine KD Brown', created_time: '2026-10-26T10:55:34+0000', from: { name: 'Gold Asetre' } });
+    const report = await call(C, `/api/live/match-report?live=${live.id}`, { token: ownerToken });
+    assert.equal(report.status, 200);
+    assert.equal(report.data.facebookComments, 3);
+    assert.equal(report.data.commentsSayingMine, 2);
+    assert.equal(report.data.captured, 1);
+    assert.equal(report.data.missing, 1, 'the "mine" comment that never reached the portal is listed');
+    assert.equal(report.data.missingList[0].id, '8800001_c3');
+    assert.equal(report.data.orderLinesNotOnFacebook, 0, 'no order line exists without its Facebook comment');
+    assert.ok(!JSON.stringify(report.data).includes('test-page-token'));
+
+    statuses['8800001'] = 'VOD';
+    await new Promise((r) => setTimeout(r, 61_000)); // Facebook's answer is re-read at most once a minute
+    await call(C, '/api/meta/webhook', { body: { object: 'page', entry: [{ id: '109603071381200', messaging: [{ sender: { id: '7012345678901234' }, recipient: { id: '109603071381200' }, timestamp: Date.now(), message: { mid: 'm_after_live', text: 'salamat po' } }] }] } });
+    s = await call(C, '/api/state', { token: ownerToken });
+    const ended = s.data.lives.find((l: any) => l.id === live.id);
+    assert.equal(ended.status, 'ended', 'the session closed by itself once Facebook reports the live over');
+  } finally {
+    graph.close();
+  }
 });
 
 test('if the database is down the portal says so and changes nothing', async () => {

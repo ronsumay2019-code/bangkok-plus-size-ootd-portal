@@ -22,9 +22,7 @@ import {
 import { runIntegrationTestSuite } from './src/services/reconciliationEngine.test';
 import {
   ai,
-  chatWithGemini,
   generateSpeechAudio,
-  analyzeLiveVideoContent,
   transcribeHostSpeech,
   CHATBOT_ROLES,
 } from './src/services/geminiService';
@@ -42,6 +40,9 @@ import {
 import { AsyncLock, ProofStore, StateSync, SupabaseBackend, storeConfigFromEnv } from './server/portalStore';
 import { DEFAULT_STAFF, PortalAuth, PortalUser, SESSION_HEADER } from './server/auth';
 import { orderComment } from './server/orderIntent';
+import { mergeCues, parseSrt } from './server/liveEngine/srt';
+import { fillBlanks } from './server/fillBlanks';
+import { insideMessengerWindow, OUTSIDE_WINDOW_DETAIL } from './server/messengerWindow';
 import { cleanBuyerName } from './src/utils/buyerName';
 
 dotenv.config();
@@ -478,9 +479,9 @@ type DeliveryStatus = 'sent' | 'failed' | 'not_sent';
  * Sends a Messenger text through the Graph API and reports what happened. Never throws.
  * 'not_sent' means it was saved in the portal only (no token, or the buyer has no real Page-scoped ID).
  */
-async function sendMessengerText(psid: string, text: string, timeoutMs = 20000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
+async function sendMessengerText(thread: { psid: string; messages?: Array<{ sender: string; timestamp?: string }> }, text: string, timeoutMs = 20000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
   const fbToken = getMetaPageAccessToken();
-  const cleanPsid = String(psid || '').trim();
+  const cleanPsid = String(thread.psid || '').trim();
   if (!fbToken) {
     return { status: 'not_sent', detail: 'No Meta Page Access Token configured. Add META_PAGE_ACCESS_TOKEN in Vercel or connect via the header.' };
   }
@@ -490,6 +491,7 @@ async function sendMessengerText(psid: string, text: string, timeoutMs = 20000):
       detail: `This buyer has no real Messenger ID yet (${cleanPsid || 'none'}). They must message the Page first — use 'Open in Messenger' instead.`,
     };
   }
+  if (!insideMessengerWindow(thread.messages)) return { status: 'not_sent', detail: OUTSIDE_WINDOW_DETAIL };
   try {
     const metaRes = await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${encodeURIComponent(fbToken)}`, {
       method: 'POST',
@@ -510,13 +512,14 @@ async function sendMessengerText(psid: string, text: string, timeoutMs = 20000):
 }
 
 /** Sends one photo (a data: URL from the phone camera, already shrunk in the browser) to a buyer in Messenger. */
-async function sendMessengerImage(psid: string, imageDataUrl: string, timeoutMs = 30000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
+async function sendMessengerImage(thread: { psid: string; messages?: Array<{ sender: string; timestamp?: string }> }, imageDataUrl: string, timeoutMs = 30000): Promise<{ status: DeliveryStatus; detail: string; messageId?: string }> {
   const fbToken = getMetaPageAccessToken();
-  const cleanPsid = String(psid || '').trim();
+  const cleanPsid = String(thread.psid || '').trim();
   if (!fbToken) return { status: 'not_sent', detail: 'No Meta Page Access Token configured.' };
   if (!/^\d{10,25}$/.test(cleanPsid)) {
     return { status: 'not_sent', detail: "This buyer has no real Messenger ID yet. They must message the Page first — use 'Open in Messenger' instead." };
   }
+  if (!insideMessengerWindow(thread.messages)) return { status: 'not_sent', detail: OUTSIDE_WINDOW_DETAIL };
   const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(imageDataUrl || ''));
   if (!match) return { status: 'not_sent', detail: 'The photo could not be read. Take it again.' };
   const bytes = Buffer.from(match[2], 'base64');
@@ -2119,7 +2122,7 @@ app.post('/api/invoices/generate', async (req, res) => {
   for (let i = 0; i < pendingSends.length; i += 5) {
     await Promise.all(
       pendingSends.slice(i, i + 5).map(async ({ thread, text, idx, invoice }) => {
-        const delivery = await sendMessengerText(thread.psid, text, 8000);
+        const delivery = await sendMessengerText(thread, text, 8000);
         thread.messages.push({
           id: `m_inv_${Date.now()}_${idx}`,
           sender: 'page_agent',
@@ -2271,6 +2274,100 @@ function captureLiveComment(c: {
   return { captured, detail: captured ? `Order comment saved for review: "${message}" by ${who}` : `Not an order: "${message}" by ${who}` };
 }
 
+/**
+ * 26 Oct live: Facebook's "live started" notice never came and the portal page would not open, so comments were
+ * logged but not captured for ~35 minutes. Now the comments themselves start and end the live session: a comment on a
+ * video Facebook reports LIVE opens a session for that video, and a later notice that finds it no longer LIVE closes it.
+ * No screen, no notice and no person needed (live acceptance test 1).
+ */
+const GRAPH_BASE = process.env.META_GRAPH_BASE || 'https://graph.facebook.com/v22.0';
+const liveStatusSeen = new Map<string, { at: number; status: string }>();
+async function videoLiveStatus(videoId: string, token: string): Promise<string> {
+  const seen = liveStatusSeen.get(videoId);
+  if (seen && Date.now() - seen.at < 60_000) return seen.status;
+  let status = 'ERROR';
+  try {
+    const r = await fetch(`${GRAPH_BASE}/${encodeURIComponent(videoId)}?fields=id,live_status&access_token=${encodeURIComponent(token)}`, { signal: AbortSignal.timeout(8000) });
+    const j: any = await r.json().catch(() => ({}));
+    status = r.ok ? String(j?.live_status || 'NONE') : 'ERROR';
+  } catch {}
+  liveStatusSeen.set(videoId, { at: Date.now(), status });
+  return status;
+}
+
+async function startLiveFromComment(postId?: string, commentId?: string): Promise<LiveSession | null> {
+  const token = getMetaPageAccessToken();
+  if (!token || lives.some((l) => l.status === 'live')) return null;
+  const post = String(postId || '');
+  const object = post ? post.split('_').pop() || '' : String(commentId || '').split('_')[0];
+  // A known live's video: comments on its replay stay with that live
+  if (!/^\d{5,25}$/.test(object) || lives.some((l) => l.fbVideoId === object)) return null;
+  if ((await videoLiveStatus(object, token)) !== 'LIVE') return null;
+  const live = createLiveSession(lives[0], object);
+  (live as any).startedBy = 'automatic: a comment arrived on a video Facebook reports LIVE';
+  return live;
+}
+
+async function endLiveIfStopped(nowIso: string): Promise<LiveSession | null> {
+  const token = getMetaPageAccessToken();
+  const onAir = lives.find((l) => l.status === 'live');
+  if (!token || !onAir?.fbVideoId) return null;
+  const status = await videoLiveStatus(onAir.fbVideoId, token);
+  if (status !== 'LIVE_STOPPED' && status !== 'VOD' && status !== 'ENDED') return null;
+  onAir.status = 'ended';
+  onAir.endedAt = nowIso;
+  onAir.autoReconcileTriggeredAt = nowIso;
+  (onAir as any).endedBy = `automatic: Facebook reports the video ${status}`;
+  return onAir;
+}
+
+/** Every comment on a live, kept exactly as written (T-010): the order finder and the evidence need the
+ * whole chat, not only order-like comments. Side collection "raw_comments": never loaded by the state sync. */
+const rawKeptIds = new Set<string>();
+// liveId is null when the comment's live (or post) is not linked yet: it is still kept, and linked at review (R-004 #2).
+interface RawComment { id: string; liveId: string | null; videoId?: string; postId?: string; at: string; name?: string; fromId?: string; text: string; source: 'webhook' | 'graph' }
+async function keepRawComments(rows: RawComment[]): Promise<number> {
+  if (!portalBackend) return 0;
+  const fresh = rows.filter((r) => r.id && !rawKeptIds.has(r.id));
+  if (!fresh.length) return 0;
+  // Graph reads hide names (KI-009) while webhooks carry them: a field already kept is never blanked by a later read (R-004 #3).
+  const kept = new Map((await portalBackend.getRecords('raw_comments', fresh.map((r) => r.id))).map((k) => [k.id, k.data || {}]));
+  const merged = fresh.map((r) => fillBlanks(kept.get(r.id) as RawComment | undefined, r));
+  await portalBackend.upsertRecords(merged.map((r) => ({ collection: 'raw_comments', id: r.id, data: r })));
+  for (const r of fresh) rawKeptIds.add(r.id);
+  return fresh.length;
+}
+
+/** While a live is on air, Facebook's own captions are read every ~3 minutes and every new line is kept
+ * (T-031 path A, B34: after the live Facebook keeps only a short file). The replay job is the backup. */
+const captionReadAt = new Map<string, number>();
+async function keepLiveCaptions(videoId: string, liveId: string, token: string): Promise<number | null> {
+  if (!portalBackend || Date.now() - (captionReadAt.get(videoId) || 0) < 170_000) return null;
+  captionReadAt.set(videoId, Date.now());
+  try {
+    const r = await fetch(`https://graph.facebook.com/v22.0/${encodeURIComponent(videoId)}/captions?access_token=${encodeURIComponent(token)}`, { signal: AbortSignal.timeout(15000) });
+    const j: any = await r.json().catch(() => ({}));
+    const list: any[] = Array.isArray(j?.data) ? j.data : [];
+    const pick = list.find((c) => c?.is_auto_generated) || list[0];
+    if (!pick?.uri) return null;
+    const file = await fetch(String(pick.uri), { signal: AbortSignal.timeout(20000) });
+    if (!file.ok) return null;
+    const incoming = parseSrt(await file.text());
+    // Each read is also kept on its own (never overwritten), so two servers reading at once can't lose a line (R-004 #1).
+    const readAt = new Date().toISOString();
+    await portalBackend.upsertRecords([{ collection: 'caption_reads', id: `${videoId}@${readAt}`, data: { videoId, liveId, readAt, cues: incoming } }]);
+    const kept = await portalBackend.getRecord('transcripts', videoId);
+    const cues = mergeCues(kept?.data?.cues || [], incoming);
+    await portalBackend.upsertRecords([{ collection: 'transcripts', id: videoId, data: {
+      ...(kept?.data || {}), id: videoId, videoId, liveId, locale: pick.locale || null, isAutoGenerated: !!pick.is_auto_generated,
+      lastReadAt: new Date().toISOString(), reads: (kept?.data?.reads || 0) + 1, cueCount: cues.length, cues,
+    } }]);
+    return cues.length;
+  } catch {
+    return null;
+  }
+}
+
 app.post('/api/meta/webhook', async (req, res) => {
   const appSecret = process.env.META_APP_SECRET;
   const signatureHeader = req.headers['x-hub-signature-256'] as string | undefined;
@@ -2295,6 +2392,7 @@ app.post('/api/meta/webhook', async (req, res) => {
   const nowIso = new Date().toISOString();
 
   let eventType = 'unknown';
+  const rawFromWebhook: RawComment[] = [];
   let eventDetails = 'Received webhook event payload';
 
   if (body?.entry && Array.isArray(body.entry)) {
@@ -2406,6 +2504,13 @@ app.post('/api/meta/webhook', async (req, res) => {
             }
             eventType = 'comment';
             if (String(v.from?.id || '') !== String(entry.id || '')) rememberCommenter(v.comment_id || v.id, v.from?.name);
+            const autoStarted = await startLiveFromComment(v.post_id, v.comment_id || v.id);
+            const rawLive = liveForComment(v.post_id, v.comment_id || v.id);
+            if (v.comment_id || v.id) rawFromWebhook.push({
+              id: String(v.comment_id || v.id), liveId: rawLive?.id ?? null, videoId: rawLive?.fbVideoId, postId: v.post_id ? String(v.post_id) : undefined, text: String(v.message || ''),
+              at: v.created_time ? new Date(Number(v.created_time) * 1000 || v.created_time).toISOString() : nowIso,
+              name: v.from?.name, fromId: v.from?.id ? String(v.from.id) : undefined, source: 'webhook',
+            });
             const result = captureLiveComment({
               commentId: v.comment_id || v.id,
               postId: v.post_id,
@@ -2415,12 +2520,15 @@ app.post('/api/meta/webhook', async (req, res) => {
               createdTime: v.created_time ? new Date(Number(v.created_time) * 1000 || v.created_time).toISOString() : nowIso,
               pageId: entry.id,
             });
-            eventDetails = result.detail;
+            eventDetails = autoStarted ? `Live session started by itself (${autoStarted.id}). ${result.detail}` : result.detail;
           }
         }
       }
     }
   }
+  // Any notice during a live (comments, messages, reactions) also checks whether the live has stopped
+  const autoEnded = await endLiveIfStopped(nowIso);
+  if (autoEnded) eventDetails += ` Live session ended by itself (${autoEnded.id}).`;
 
   const logEntry = {
     id: eventId,
@@ -2431,6 +2539,14 @@ app.post('/api/meta/webhook', async (req, res) => {
     payload: body,
   };
 
+  await keepRawComments(rawFromWebhook).catch((err) => console.error('Raw comments not kept:', err?.message));
+  // Comments arrive every few seconds during a live, so they also keep Facebook's captions read (at most every ~3 min),
+  // with no portal screen open (B35: lives start at any time).
+  for (const liveId of new Set(rawFromWebhook.map((r) => r.liveId).filter(Boolean))) {
+    const live = lives.find((l) => l.id === liveId);
+    const token = getMetaPageAccessToken();
+    if (live?.status === 'live' && live.fbVideoId && token) await keepLiveCaptions(live.fbVideoId, live.id, token);
+  }
   webhookEventsLog.unshift(logEntry);
   if (webhookEventsLog.length > 50) {
     webhookEventsLog.pop();
@@ -2441,6 +2557,154 @@ app.post('/api/meta/webhook', async (req, res) => {
 });
 
 // 8d. Periodic Facebook Graph API v22.0 Sync (POST /api/facebook/live-sync)
+// Facebook's own transcript for a live video (B33): read with the Page token on the server; the token never leaves it.
+app.get('/api/live/transcript-check', async (req, res) => {
+  if (!requireRole(req, res, ['owner', 'admin'])) return;
+  const videoId = String(req.query.video || '').trim();
+  if (!/^\d{5,25}$/.test(videoId)) return res.status(400).json({ error: 'Give the Facebook video ID (numbers only).' });
+  const token = getMetaPageAccessToken();
+  if (!token) return res.status(503).json({ error: 'The Facebook Page token is not set on the server.' });
+  const read = async (pathAndQuery: string) => {
+    const sep = pathAndQuery.includes('?') ? '&' : '?';
+    try {
+      const r = await fetch(`https://graph.facebook.com/v22.0/${pathAndQuery}${sep}access_token=${encodeURIComponent(token)}`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      return { status: r.status, body: await r.json().catch(() => null) };
+    } catch (err: any) {
+      return { status: 0, body: { error: { message: err?.message || 'network error' } } };
+    }
+  };
+  const [captions, video] = await Promise.all([
+    read(`${videoId}/captions`),
+    read(`${videoId}?fields=id,title,length,live_status,created_time,source`),
+  ]);
+  // With save=1 the caption file is fetched here (the server can reach Facebook's file host) and kept as
+  // collection "transcripts", which the state sync never loads or deletes.
+  let saved: any = null;
+  if (req.query.save === '1') {
+    const list: any[] = Array.isArray(captions.body?.data) ? captions.body.data : [];
+    const pick = list.find((c) => c?.is_auto_generated) || list[0];
+    if (!pick?.uri) saved = { error: 'Facebook returned no caption file for this video.' };
+    else if (!portalBackend) saved = { error: 'No database is connected, so the transcript cannot be kept.' };
+    else {
+      try {
+        const r = await fetch(String(pick.uri), { signal: AbortSignal.timeout(30000) });
+        if (!r.ok) throw new Error(`caption file HTTP ${r.status}`);
+        const raw = await r.text();
+        const cues = parseSrt(raw);
+        // What the file itself holds, so a short transcript can be told apart from a reading problem
+        const file = { bytes: raw.length, timeLines: (raw.match(/-->/g) || []).length, contentType: r.headers.get('content-type'), tail: raw.slice(-400) };
+        const kept = await portalBackend.getRecord('transcripts', videoId);
+        const merged = mergeCues(kept?.data?.cues || [], cues);
+        const record = {
+          ...(kept?.data || {}), id: videoId, videoId, locale: pick.locale || null, isAutoGenerated: !!pick.is_auto_generated,
+          videoLengthSec: video.body?.length ?? null, fetchedAt: new Date().toISOString(), cueCount: merged.length, file, cues: merged,
+          // The replay's download link (a signed Facebook file link, not the token) for the replay job (T-031 path B); it expires
+          ...(video.body?.source ? { replaySource: String(video.body.source), replaySourceAt: new Date().toISOString() } : {}),
+        };
+        await portalBackend.upsertRecords([{ collection: 'transcripts', id: videoId, data: record }]);
+        saved = { cueCount: merged.length, newFromThisFile: cues.length, file, firstLines: merged.slice(0, 5), lastLine: merged[merged.length - 1] || null };
+      } catch (err: any) {
+        saved = { error: `Could not fetch or keep the caption file: ${err?.message || 'unknown error'}` };
+      }
+    }
+  }
+  // Facebook's paging links carry the token; never send it to the browser.
+  // Whether the replay-transcription key is configured (never its value)
+  const transcriptionKey = process.env.GROQ_API_KEY ? 'set' : 'missing';
+  // Where the Page token comes from: Vercel settings (env) or the copy kept in the database (KI-005)
+  const envToken = process.env.META_PAGE_ACCESS_TOKEN || process.env.FB_PAGE_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || process.env.PAGE_ACCESS_TOKEN || process.env.FB_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || process.env.FACEBOOK_ACCESS_TOKEN || process.env.META_TOKEN || process.env.FB_TOKEN;
+  const tokenSource = envToken ? 'vercel settings' : 'database copy';
+  const safe = JSON.stringify({ videoId, checkedAt: new Date().toISOString(), transcriptionKey, tokenSource, captions, video, saved })
+    .split(token).join('[token]')
+    .split(encodeURIComponent(token)).join('[token]')
+    .replace(/access_token=[^&"\\]+/g, 'access_token=[token]');
+  res.type('application/json').send(safe);
+});
+
+// Live acceptance test 5: the portal checks its own orders against Facebook's comments on the live, so nobody has to take
+// an agent's word for a count (26 Oct). "Not on Facebook" must be 0: an order whose comment Facebook doesn't have was not
+// captured from the live. "Missing" lists "mine" comments with no order.
+const ORDER_WORD = /\b(mine|pa-?mine|namine|minine)\b/i;
+app.get('/api/live/match-report', async (req, res) => {
+  if (!requireRole(req, res, ['owner', 'admin'])) return;
+  const live = lives.find((l) => l.id === String(req.query.live || '')) || lives.find((l) => l.status === 'live') || lives[0];
+  if (!live?.fbVideoId) return res.status(400).json({ error: 'This live has no Facebook video linked.' });
+  const token = getMetaPageAccessToken();
+  if (!token) return res.status(503).json({ error: 'The Facebook Page token is not set on the server.' });
+  const comments: Array<{ id: string; at: string; name: string | null; text: string }> = [];
+  let after = '';
+  for (let page = 0; page < 60; page++) {
+    const r = await fetch(`${GRAPH_BASE}/${encodeURIComponent(live.fbVideoId)}/comments?filter=stream&order=chronological&fields=id,message,created_time,from&limit=100${after ? `&after=${encodeURIComponent(after)}` : ''}&access_token=${encodeURIComponent(token)}`, { signal: AbortSignal.timeout(15000) }).catch(() => null);
+    const j: any = r ? await r.json().catch(() => null) : null;
+    if (!r?.ok || !Array.isArray(j?.data)) return res.status(502).json({ error: `Facebook did not return the live's comments: ${j?.error?.message || `HTTP ${r?.status ?? 'no answer'}`}`, read: comments.length });
+    for (const c of j.data) comments.push({ id: String(c.id), at: String(c.created_time || ''), name: c.from?.name || null, text: String(c.message || '') });
+    after = j.paging?.next ? String(j.paging?.cursors?.after || '') : '';
+    if (!after) break;
+  }
+  const onFacebook = new Set(comments.map((c) => c.id));
+  const liveOrders = orders.filter((o) => o.liveId === live.id);
+  const ordered = new Set(liveOrders.map((o) => String(o.sourceCommentId || '')));
+  const withOrderWord = comments.filter((c) => ORDER_WORD.test(c.text));
+  const missing = withOrderWord.filter((c) => !ordered.has(c.id));
+  const notOnFacebook = liveOrders.filter((o) => !o.sourceCommentId || !onFacebook.has(String(o.sourceCommentId)));
+  const report = {
+    id: `${live.id}@${new Date().toISOString()}`, liveId: live.id, videoId: live.fbVideoId, checkedAt: new Date().toISOString(),
+    facebookComments: comments.length, commentsSayingMine: withOrderWord.length,
+    captured: withOrderWord.length - missing.length, missing: missing.length,
+    orderLines: liveOrders.length, orderLinesFromFacebookComments: liveOrders.length - notOnFacebook.length, orderLinesNotOnFacebook: notOnFacebook.length,
+    missingList: missing.slice(0, 200), notOnFacebookList: notOnFacebook.slice(0, 200).map((o) => ({ id: o.id, buyer: o.buyerName, comment: o.sourceCommentId || null })),
+  };
+  if (portalBackend) await portalBackend.upsertRecords([{ collection: 'match_reports', id: report.id, data: report }]).catch(() => {});
+  res.type('application/json').send(JSON.stringify(report).split(token).join('[token]'));
+});
+
+// Which Facebook notices the Page sends this app (OL-22). "live_videos" is what turns the live session on and off
+// with no screen open (B35). GET only reads; POST (owner only) adds live_videos while keeping every field already on.
+const PAGE_NOTICES_NEEDED = ['feed', 'messages', 'live_videos'];
+app.all('/api/facebook/page-notices', async (req, res) => {
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'GET or POST only.' });
+  if (!requireRole(req, res, req.method === 'POST' ? ['owner'] : ['owner', 'admin'])) return;
+  const token = getMetaPageAccessToken();
+  if (!token) return res.status(503).json({ error: 'The Facebook Page token is not set on the server.' });
+  const pageId = getMetaPageId();
+  const graph = async (method: 'GET' | 'POST', query: string) => {
+    try {
+      const r = await fetch(`https://graph.facebook.com/v22.0/${encodeURIComponent(pageId)}/subscribed_apps?${query}${query ? '&' : ''}access_token=${encodeURIComponent(token)}`, {
+        method,
+        signal: AbortSignal.timeout(15000),
+      });
+      return { status: r.status, body: await r.json().catch(() => null) };
+    } catch (err: any) {
+      return { status: 0, body: { error: { message: err?.message || 'network error' } } };
+    }
+  };
+  const fieldsOf = (body: any): string[] => {
+    const apps: any[] = Array.isArray(body?.data) ? body.data : [];
+    return [...new Set(apps.flatMap((a) => (Array.isArray(a?.subscribed_fields) ? a.subscribed_fields : [])).map(String))].sort();
+  };
+  const before = await graph('GET', '');
+  let change: any = null;
+  let after = before;
+  if (req.method === 'POST') {
+    if (before.status !== 200) change = { skipped: 'Facebook did not say which notices are on, so nothing was changed.' };
+    else {
+      // Facebook replaces the whole list on each subscribe, so every field already on is sent again.
+      const wanted = [...new Set([...fieldsOf(before.body), ...PAGE_NOTICES_NEEDED])].sort();
+      change = await graph('POST', `subscribed_fields=${encodeURIComponent(wanted.join(','))}`);
+      after = await graph('GET', '');
+    }
+  }
+  const on = fieldsOf(after.body);
+  const safe = JSON.stringify({
+    pageId, checkedAt: new Date().toISOString(), noticesOn: on,
+    missing: PAGE_NOTICES_NEEDED.filter((f) => !on.includes(f)),
+    liveStartEndOn: on.includes('live_videos'), facebook: { before, change, after: req.method === 'POST' ? after : undefined },
+  }).split(token).join('[token]').split(encodeURIComponent(token)).join('[token]');
+  res.type('application/json').send(safe);
+});
+
 app.post('/api/facebook/live-sync', async (req, res) => {
   const { liveId, forceStatus, fbVideoId, fbPageId, accessToken } = req.body || {};
   let targetLive = lives.find((l) => l.id === (liveId || activeLive.id)) || lives[0];
@@ -2576,7 +2840,13 @@ app.post('/api/facebook/live-sync', async (req, res) => {
             }
           }
           targetLive.totalMined = orders.filter((o) => o.liveId === targetLive.id).length;
+          await keepRawComments(commentsList.filter((c) => c.id).map((c) => ({
+            id: String(c.id), liveId: targetLive.id, videoId, text: String(c.message || ''),
+            at: c.created_time ? new Date(c.created_time).toISOString() : nowIso,
+            name: c.from?.name || commenterNames[c.id], fromId: c.from?.id ? String(c.from.id) : undefined, source: 'graph' as const,
+          }))).catch((err) => console.error('Raw comments not kept:', err?.message));
         }
+        if (effectiveStatus === 'LIVE' || targetLive.status === 'live') await keepLiveCaptions(videoId, targetLive.id, fbToken);
       }
 
       const convUrl = `https://graph.facebook.com/v22.0/${encodeURIComponent(
@@ -2929,7 +3199,7 @@ app.post('/api/meta/messenger/reply', async (req, res) => {
   }
 
   // The token comes only from the server (Vercel setting or the owner's saved token), never from the browser
-  const delivery = await sendMessengerText(thread.psid, String(text));
+  const delivery = await sendMessengerText(thread, String(text));
 
   // Reuse the browser's id so its instant "sending…" bubble is replaced, not duplicated
   const safeClientId = typeof clientMessageId === 'string' && /^[\w-]{6,80}$/.test(clientMessageId) ? clientMessageId : '';
@@ -2968,7 +3238,7 @@ app.post('/api/meta/messenger/send-photo', async (req, res) => {
   if (!thread) return res.status(404).json({ error: 'Messenger conversation not found' });
   if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl is required' });
 
-  const delivery = await sendMessengerImage(thread.psid, String(imageDataUrl));
+  const delivery = await sendMessengerImage(thread, String(imageDataUrl));
   const safeClientId = typeof clientMessageId === 'string' && /^[\w-]{6,80}$/.test(clientMessageId) ? clientMessageId : '';
   // The photo itself is not stored in the portal; the conversation shows that one was sent
   const newMsg = {
@@ -3092,11 +3362,8 @@ app.post('/api/owner/order-override', (req, res) => {
     });
   }
 
-  if (!reason || !reason.trim()) {
-    return res.status(400).json({
-      error: 'Override reason is mandatory for operational audit compliance.',
-    });
-  }
+  // The owner overrides without giving a reason (owner, 25 Oct); a note is kept only if one was typed.
+  const note = typeof reason === 'string' ? reason.trim() : '';
 
   const nowIso = new Date().toISOString();
 
@@ -3134,7 +3401,7 @@ app.post('/api/owner/order-override', (req, res) => {
       version: currentVersion,
       by: author || `${role.toUpperCase()} (Authorized)`,
       at: nowIso,
-      reason: reason.trim(),
+      reason: note,
       before: beforeState,
       after: {
         itemCode: preOrder.itemCode,
@@ -3189,7 +3456,7 @@ app.post('/api/owner/order-override', (req, res) => {
     version: currentVersion,
     by: author || `${role.toUpperCase()} (Authorized)`,
     at: nowIso,
-    reason: reason.trim(),
+    reason: note,
     before: beforeState,
     after: {
       itemCode: order.itemCode,
@@ -3272,42 +3539,9 @@ app.post('/api/pre-orders/update-status', (req, res) => {
 });
 
 // 9. Gemini Multi-Turn AI Chat (Roles: Reconciler, Auditor, Sourcing, Triage; Models: gemini-4-argon, gemini-3.8-flash, gemini-3.1-flash-lite)
-app.post('/api/ai/chat', async (req, res) => {
-  const { messages, context, model, role, customInstruction } = req.body;
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: 'messages array is required' });
-  }
-
-  try {
-    const contextData = context || JSON.stringify({
-      activeLive: lives[0],
-      reconciliation: latestSummary ? {
-        accuracy: latestSummary.accuracy,
-        totalPurchasedCostThb: latestSummary.totalPurchasedCostThb,
-        projectedRevenuePhp: latestSummary.projectedRevenuePhp,
-        extraStockCostThb: latestSummary.extraStockCostThb,
-        lostSalesPhp: latestSummary.projectedLostSalesPhp,
-        affectedShortageBuyers: latestSummary.affectedShortageBuyers,
-        readyToLeaveStore: latestSummary.checklist.readyToLeaveStore,
-      } : null,
-    });
-
-    const result = await chatWithGemini(messages, {
-      model,
-      role,
-      contextData,
-      customInstruction,
-    });
-
-    res.json({
-      success: true,
-      reply: result.reply,
-      usedModel: result.usedModel,
-      role: result.role,
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+// Pola AI was removed by the owner (25 Oct). Buyer names and live data are never sent to an outside AI (Meta-Compliance C4).
+app.post('/api/ai/chat', (_req, res) => {
+  res.status(410).json({ error: 'Removed: Pola AI is no longer part of the portal.' });
 });
 
 // 9b. Get available Chatbot Roles with system instructions
@@ -3331,18 +3565,9 @@ app.post('/api/ai/speak', async (req, res) => {
 });
 
 // 10. Gemini Video Analysis (Video Understanding for Live Selling Replay)
-app.post('/api/ai/video-analysis', async (req, res) => {
-  const { prompt, videoBase64, mimeType } = req.body;
-  try {
-    const analysis = await analyzeLiveVideoContent(
-      prompt || 'Inspect this live selling segment, identify garment item codes, host verbal prices and confirmations.',
-      videoBase64,
-      mimeType
-    );
-    res.json({ success: true, analysis });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+// Pola AI was removed by the owner (25 Oct). Buyer names and live data are never sent to an outside AI (Meta-Compliance C4).
+app.post('/api/ai/video-analysis', (_req, res) => {
+  res.status(410).json({ error: 'Removed: Pola AI is no longer part of the portal.' });
 });
 
 // 11. Gemini Audio Transcription (Speech-to-Text for Host Calls)
