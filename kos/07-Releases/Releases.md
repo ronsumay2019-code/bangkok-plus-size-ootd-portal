@@ -14,6 +14,6 @@ At a real live, with no person and no agent touching it:
 2. Every comment is kept exactly as written. *(In production since 27 Oct 17:23 (PR #11); proven when tonight's comments appear in `raw_comments`.)*
 3. The host's item calls (code, price, size, colour) are captured from the host's words.
 4. Orders are found inside each host event (Job 1) and reviewed across chat and Messenger (Job 2).
-5. The portal makes its own match report against Facebook's comments. *(26 Oct: built on the work branch: Replay tab → "Check orders against Facebook"; automatic test passes; in production since 27 Oct 17:23 (PR #11); not yet run on a real live.)*
+5. The portal makes its own match report against Facebook's comments. *(26 Oct: built on the work branch: Replay tab → "Check orders against Facebook"; automatic test passes; in production since 27 Oct 17:23 (PR #11). 27 Oct: now runs by itself once after each live and fills missing comments and orders from Facebook's own list (27 Oct live: 99 of 138 had arrived).)*
 
 Then, for Production-ready: the invoice, payment and shipping steps run on real orders, and the story is documented end to end.

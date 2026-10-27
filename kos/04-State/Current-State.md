@@ -28,7 +28,7 @@ Updated: Tue 27 Oct 2026, ~00:30 Manila, by Claude.
 | 10 | Host's item calls (code, price, size, colour) taken from the host's words | **Not built** | — | No extractor yet: Job 1 needs these as input |
 | 11 | Orders found inside each host item call (Job 1) | **Built** | work branch | Unit tests incl. 6 R-003 regressions; never run on real host calls (step 10 missing) |
 | 12 | Review across the whole chat and Messenger (Job 2) | **Not built** | — | — |
-| 13 | Portal checks its own orders against Facebook's comments | **Built** | production since 27 Oct (PR #11) | Test passes (`faf9c9d`): lists "mine" comments with no order; order lines with no Facebook comment must be 0. Never run on a real live |
+| 13 | Portal checks its own orders against Facebook's comments | **Built** | production since 27 Oct (PR #11) | Test passes (`faf9c9d`): lists "mine" comments with no order; order lines with no Facebook comment must be 0. Never run on a real live. **27 Oct: runs by itself after every live** (once, within 24 h of the end): reads Facebook's full comment list, keeps missing comments, captures missing orders, moves the start to the first comment, saves the report. Test "27 Oct lesson" fails on PR #11's code, passes now (67/67) |
 | 14 | Invoice picture in the shop's template | **Built** | work branch | Unit tests (Codex, PR #10); never used for a real invoice |
 | 15 | Invoice sent in Messenger, 24 hours from mark-sent, payments with proof | **Built** | production | Tests; a Messenger reply from the portal was verified 24 Oct; a real invoice end to end: not yet |
 | 16 | Messenger sends only within Meta's 24-hour window | **Built** | production since 27 Oct (PR #11) | Unit test; not yet seen on a real send |

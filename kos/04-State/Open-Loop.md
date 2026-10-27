@@ -70,7 +70,7 @@ Platform sweep, 24 Oct (Claude):
 | OL-50 | Privacy policy must name the services that receive Facebook data: Supabase (database), Vercel (server), Groq (replay audio) | Claude, 26 Oct | **Waiting on owner** (part of O5) | — |
 | OL-51 | Who makes the 8.4k `business_management` API calls on the app? Not the new portal by code search | Claude, 26 Oct | **Open** | Check the app's API call details in the dashboard |
 | OL-52 | When tonight's live ends: mark `live_2026_10_26_1850` ended and correct its start time to the real one | Claude, 26 Oct | **Done** 27 Oct 17:24 Manila: the system ended it by itself ("Facebook reports the video VOD"). Start time correction still open | — |
-| OL-53 | Recover the "mine" comments from before 19:24 (Graph read of the live's comments + replay check) | Claude, 26 Oct | **Open** (after the live) | — |
+| OL-53 | Recover the "mine" comments from before 19:24 (Graph read of the live's comments + replay check) | Claude, 26 Oct | **Automated 27 Oct**: the end-of-live fill reads Facebook's list and captures missing "mine" comments by itself, for the 26 and 27 Oct lives too (both ended within 24 h) | Evidence: `filledFromFacebook` on each live + `match_reports` |
 | OL-54 | Supabase usage: which limit is over? Fix before 24 Nov | Claude, 26 Oct | **Waiting on owner** for the "Review usage" screenshot | KI-016 |
 | OL-55 | Website: pick one of the three looks; buy the domain; legal name, address, phone, email; bio photos with consent | Owner, 26 Oct | **Waiting on owner** | Design canvas |
 | OL-56 | Why didn't the "live started" notice arrive? Check the app-level webhook fields | Claude, 26 Oct | **Open** (after the live) | KI-015 |
