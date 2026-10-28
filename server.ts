@@ -1081,10 +1081,13 @@ app.use('/api', async (req, res, next) => {
   // One request at a time per server copy: load → handle → save, then the next request
   const release = await stateLock.acquire();
   let released = false;
+  let saving = false;
   const done = () => {
     if (!released) {
       released = true;
       clearTimeout(safety);
+      // A response that never saved (not JSON, or cut off) may have left unsaved changes in memory
+      if (!saving) stateSync.invalidate();
       release();
     }
   };
@@ -1093,8 +1096,9 @@ app.use('/api', async (req, res, next) => {
   res.on('close', done);
 
   try {
-    await stateSync.load();
-    assembleMessengerThreads();
+    // Reads only the state version unless another server copy saved since (a full load per request exhausted the database, 28 Oct)
+    const reloaded = await stateSync.load();
+    if (reloaded) assembleMessengerThreads();
     // The database returns rows in save order: the newest live must come first (it is the active one)
     lives.sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime());
     sortMessengerThreads();
@@ -1111,7 +1115,6 @@ app.use('/api', async (req, res, next) => {
   }
 
   const sendJson = res.json.bind(res);
-  let saving = false;
   res.json = ((body: any) => {
     if (saving) return sendJson(body);
     saving = true;

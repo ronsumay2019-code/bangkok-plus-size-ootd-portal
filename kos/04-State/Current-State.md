@@ -16,7 +16,7 @@ Updated: Tue 27 Oct 2026, ~00:30 Manila, by Claude.
 
 | # | Step | Status | Runs where | Evidence |
 |---|---|---|---|---|
-| 1 | Facebook sends each live comment to the portal, with the buyer's name | **Working** | production | 26 Oct live: comment notices 18:45–21:11 Manila, names included (notice log query 10:51Z, 11:24Z) |
+| 1 | Facebook sends each live comment to the portal, with the buyer's name | **Failed** (28 Oct) | production | 26 Oct live: comment notices 18:45–21:11 Manila, names included (notice log query 10:51Z, 11:24Z) **28 Oct live: Facebook's notices arrived but every one failed: the database was exhausted (KI-018); nothing was saved from ~16:00 Manila.** |
 | 2 | Facebook sends each Messenger message to the portal | **Working** | production | 2,779 messages / 479 conversations saved, newest seconds old (query 11:01Z, 26 Oct) |
 | 3 | Facebook's "live started / ended" notice reaches the portal | **Failed** | production | Page set to send `live_videos` at 11:30 (owner screenshot); at the 26 Oct live none arrived (KI-015) |
 | 4 | Live session turns on and off by itself, no screen and no person | **Built** | **production since 27 Oct 17:23 Manila** (PR #11, `main` f7ababf; **deploy confirmed 17:25**: `raw_comments` writes resumed). **Automatic end seen in production 27 Oct**: 17:23:56 ended `live_2026_10_27` and 17:24:13 ended the open 26 Oct session ("Facebook reports the video VOD"); owner to confirm the broadcast had ended. **Resolved 27 Oct (owner): the end was correct**: the broadcast had ended hours earlier; the comments arriving 17:25–19:01 Manila were written 14:45–16:10 Manila (the real live) and delivered late by Facebook. 99 kept (1 by the Page), 54 orders, 40 commenters; Facebook shows 138 (owner), gap 39 unexplained. The hand-added session's start (16:58) is wrong; the live began by ~14:45 Automatic start not yet seen (tonight's session was added by hand) | Regression test "26 Oct lesson…" passes; fails on the old code (`7c1a0c9`). **Failed in production 26 Oct**: Claude had to add the session by hand at 19:24 with the owner's OK. **Failed again in production 27 Oct**: the fix was never merged to `main`; from ~16:58 Manila every comment on post …1112620411686989 got "Comment outside a live, not captured" (notice log); Claude added `live_2026_10_27` by hand at 17:14. Owner GO 27 Oct: merge right after the live |
@@ -41,7 +41,7 @@ Updated: Tue 27 Oct 2026, ~00:30 Manila, by Claude.
 | Anonymous database access removed | **Working** | `pg_policies` empty; server requests 200/201 (26 Oct ~10:05) |
 | Page key copy in the database (KI-005) | **Open** | Portal reads the Vercel copy ("vercel settings", 26 Oct 12:29); delete needs owner OK (OL-47) |
 | Webhook signature check (`META_APP_SECRET`) | **Not set** | KI-008 |
-| Supabase free-plan limits | **Over** last cycle; restriction from 24 Nov | Owner screenshot 26 Oct (KI-016) |
+| Supabase free-plan limits | **Exhausted 28 Oct** (KI-018): database too slow to answer from ~16:00 Manila; restriction from 24 Nov if it stays over | Supabase logs 28 Oct; owner screenshot 26 Oct (KI-016) |
 | Claude's access to Vercel logs and deployments | **Refused (403)** | 26 Oct (OL-61) |
 
 ## History: truth audit of 24 Oct

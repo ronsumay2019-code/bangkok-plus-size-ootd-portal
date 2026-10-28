@@ -77,9 +77,52 @@ test('a failed load keeps the default values and never deletes data', async () =
   a.state.orders.push({ id: 'o1' });
   await a.sync.save();
 
+  a.sync.invalidate();
   db.failNextLoad = true;
   await assert.rejects(a.sync.load());
   assert.equal(db.records.size, 1);
+});
+
+test('28 Oct lesson: a copy reads only the state version when nothing changed, and everything when another copy saved', async () => {
+  const db = new MemoryBackend();
+  const a = makeCopy(db);
+  const b = makeCopy(db);
+  await a.sync.load();
+  a.state.orders.push({ id: 'o1', status: 'pending' });
+  await a.sync.save();
+  const fullBefore = a.sync.fullLoads;
+
+  // Many requests on the same copy with no change elsewhere: no full load
+  for (let i = 0; i < 5; i++) assert.equal(await a.sync.load(), false);
+  assert.equal(a.sync.fullLoads, fullBefore, 'no full load while nothing changed');
+  assert.equal(a.state.orders.length, 1);
+
+  // Its own saves keep it current too
+  a.state.orders.push({ id: 'o2', status: 'pending' });
+  await a.sync.save();
+  assert.equal(await a.sync.load(), false);
+
+  // Another copy saves: the next load reads everything and sees the change
+  await b.sync.load();
+  b.state.orders.find((o) => o.id === 'o1').status = 'confirmed';
+  await b.sync.save();
+  assert.equal(await a.sync.load(), true);
+  assert.equal(a.state.orders.find((o) => o.id === 'o1').status, 'confirmed');
+});
+
+test('a failed save makes the next load read everything again', async () => {
+  const db = new MemoryBackend();
+  const a = makeCopy(db);
+  await a.sync.load();
+  const original = db.upsertRecords.bind(db);
+  db.upsertRecords = async () => {
+    throw new Error('Simulated write failure');
+  };
+  a.state.orders.push({ id: 'lost' });
+  await assert.rejects(a.sync.save());
+  db.upsertRecords = original;
+  assert.equal(await a.sync.load(), true);
+  assert.equal(a.state.orders.length, 0, 'memory matches the database again');
 });
 
 test('values missing from the database fall back to their defaults', async () => {
