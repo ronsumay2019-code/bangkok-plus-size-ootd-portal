@@ -17,7 +17,7 @@ awk '/^## History/{exit} /^\| [0-9]+ \||^\| [A-Z]/' kos/04-State/Current-State.m
 echo "## Releases (entry | version | status | latest evidence)"
 awk -F'|' '/^\| [A-Z]/ && !/^\| Entry/ { e = $7; s = length(e) > 260 ? "…" substr(e, length(e) - 259) : e; print "|" $2 "|" $3 "|" $4 "|" s "|" }' kos/07-Releases/Releases.md
 echo "## Open known issues"
-grep '^| KI-' kos/04-State/Known-Issues.md | grep -v 'FIXED' | cut_to 110
+grep '^| KI-' kos/04-State/Known-Issues.md | grep -v 'FIXED' | cut_to 90
 echo "## Open loops"
-grep '^| OL-' kos/04-State/Open-Loop.md | grep -v '\*\*Done\*\*\|\*\*Answered\*\*\|\*\*Withdrawn' | cut_to 85
+grep '^| OL-' kos/04-State/Open-Loop.md | grep -v '\*\*Done\*\*\|\*\*Answered\*\*\|\*\*Withdrawn' | cut_to 70
 } | head -c 8800
