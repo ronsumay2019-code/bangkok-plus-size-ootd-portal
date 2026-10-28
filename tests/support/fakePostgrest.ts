@@ -33,16 +33,19 @@ export interface FakeDb {
   /** Supabase Storage stand-in: "bucket/path" -> bytes */
   objects: Map<string, Buffer>;
   requests: number;
+  /** Every request as "METHOD path?query", in order. */
+  log: string[];
   close(): Promise<void>;
 }
 
 export async function startFakePostgrest(seed: Partial<Record<string, Row[]>> = {}): Promise<FakeDb> {
   const tables: Record<string, Row[]> = { portal_records: [], portal_kv: [], portal_staff: [], portal_sessions: [] };
   for (const [t, rows] of Object.entries(seed)) tables[t] = JSON.parse(JSON.stringify(rows));
-  const db: FakeDb = { url: '', tables, objects: new Map(), requests: 0, close: async () => {} };
+  const db: FakeDb = { url: '', tables, objects: new Map(), requests: 0, log: [], close: async () => {} };
 
   const server = http.createServer((req, res) => {
     db.requests++;
+    db.log.push(`${req.method} ${decodeURIComponent(req.url || '')}`);
     let body = '';
     const chunks: Buffer[] = [];
     req.on('data', (c) => {

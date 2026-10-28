@@ -465,6 +465,26 @@ test('26 Oct lesson: with no screen open and no "live started" notice, a comment
   }
 });
 
+test('28 Oct lesson: comment notices and page refreshes do not reload the whole database each time', async () => {
+  const D = await startCopy(4318);
+  await call(D, '/api/state', { token: ownerToken }); // first request on a copy loads everything once
+  const start = db.log.length;
+  const comment = (id: string) => ({ object: 'page', entry: [{ id: '109603071381200', changes: [{ field: 'feed', value: { item: 'comment', verb: 'add', comment_id: id, post_id: '109603071381200_9900001', message: 'ganda', from: { id: '78', name: 'Test Buyer' } } }] }] });
+  for (let i = 0; i < 5; i++) {
+    const r = await call(D, '/api/meta/webhook', { body: comment(`9900001_q${i}`) });
+    assert.equal(r.status, 200);
+    await call(D, '/api/state', { token: ownerToken });
+  }
+  const fullLoads = db.log.slice(start).filter((l) => l.startsWith('GET /rest/v1/portal_records?select=collection,id,data&collection=in.'));
+  assert.equal(fullLoads.length, 0, `10 requests on one copy must not reload every row (they did ${fullLoads.length} times)`);
+
+  // A change saved by another copy is still seen
+  const added = await call(A, '/api/orders/add', { token: ownerToken, body: { liveId: LIVE_ID, buyerName: 'Seen Everywhere', itemCode: 'Z9', statedPrice: 100 } });
+  assert.equal(added.status, 200);
+  const seen = await call(D, '/api/state', { token: ownerToken });
+  assert.ok(seen.data.orders.some((o: any) => o.buyerName === 'Seen Everywhere'), 'copy D sees what copy A saved');
+});
+
 test('if the database is down the portal says so and changes nothing', async () => {
   const before = JSON.stringify(db.tables.portal_records);
   const url = db.url;

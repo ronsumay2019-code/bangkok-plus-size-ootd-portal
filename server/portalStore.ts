@@ -44,6 +44,8 @@ export interface PortalBackend {
   /** The stored rows among these ids (missing ids are left out). */
   getRecords(collection: string, ids: string[]): Promise<StoredRecord[]>;
   loadKv(): Promise<StoredKv[]>;
+  /** One stored value, or null when the key is not stored. */
+  getKv(key: string): Promise<any>;
   upsertRecords(rows: StoredRecord[]): Promise<void>;
   deleteRecords(collection: string, ids: string[]): Promise<void>;
   upsertKv(entries: StoredKv[]): Promise<void>;
@@ -124,6 +126,12 @@ export class SupabaseBackend implements PortalBackend {
 
   loadKv() {
     return this.selectAll<StoredKv>('portal_kv', 'key,value');
+  }
+
+  async getKv(key: string) {
+    const res = await this.request(`portal_kv?select=value&key=eq.${encodeURIComponent(key)}`);
+    const rows = (await res.json()) as { value: any }[];
+    return rows.length ? rows[0].value : null;
   }
 
   async upsertRecords(rows: StoredRecord[]) {
@@ -231,6 +239,9 @@ export class MemoryBackend implements PortalBackend {
   async loadKv() {
     return [...this.kv.entries()].map(([key, value]) => this.clone({ key, value }));
   }
+  async getKv(key: string) {
+    return this.kv.has(key) ? this.clone(this.kv.get(key)) : null;
+  }
   async upsertRecords(rows: StoredRecord[]) {
     for (const r of rows) this.records.set(`${r.collection}:${r.id}`, this.clone(r));
   }
@@ -278,21 +289,56 @@ export interface StateBindings {
   values: Record<string, Accessor<any>>;
 }
 
+/** portal_kv key that changes on every save, so a server copy knows when its in-memory state is out of date. */
+export const STATE_VERSION_KEY = '__stateVersion';
+
+function newStateVersion() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /**
  * Loads the bound state from the backend and saves only what changed.
  * One instance per server process; requests must be serialized (see withStateLock).
+ *
+ * A full load reads every bound row, which is heavy (all Messenger messages, orders, seen ids).
+ * Each request first reads only the state version; the full load runs only when another server
+ * copy saved since this copy last loaded or saved. (28 Oct: a full load on every request exhausted
+ * the database and every comment notice during the live failed.)
  */
 export class StateSync {
   private recordSnapshot = new Map<string, string>();
   private kvSnapshot = new Map<string, string>();
   private defaults = new Map<string, string>();
+  private version: string | null = null;
   loaded = false;
+  /** How many full loads ran (for tests and diagnostics). */
+  fullLoads = 0;
 
   constructor(private backend: PortalBackend, private bindings: StateBindings) {
     for (const [key, acc] of Object.entries(bindings.values)) this.defaults.set(key, JSON.stringify(acc.get()));
   }
 
-  async load() {
+  /** Forget the in-memory state: the next load reads everything again. */
+  invalidate() {
+    this.loaded = false;
+  }
+
+  /** Returns true when a full load ran, false when the in-memory state was already current. */
+  async load(): Promise<boolean> {
+    const current = await this.backend.getKv(STATE_VERSION_KEY);
+    if (this.loaded && current !== null && current === this.version) return false;
+    await this.fullLoad();
+    if (current === null) {
+      this.version = newStateVersion();
+      await this.backend.upsertKv([{ key: STATE_VERSION_KEY, value: this.version }]);
+    } else {
+      this.version = current;
+    }
+    return true;
+  }
+
+  private async fullLoad() {
+    this.fullLoads++;
     const [records, kv] = await Promise.all([this.backend.loadRecords(Object.keys(this.bindings.collections)), this.backend.loadKv()]);
     const byCollection = new Map<string, any[]>();
     for (const name of Object.keys(this.bindings.collections)) byCollection.set(name, []);
@@ -363,11 +409,23 @@ export class StateSync {
       this.kvSnapshot.set(key, json);
     }
 
-    await this.backend.upsertRecords(upserts);
-    for (const [collection, ids] of deletes) await this.backend.deleteRecords(collection, ids);
-    await this.backend.upsertKv(kvUpserts);
-    if (kvDeletes.length) await this.backend.deleteKv(kvDeletes);
-    return upserts.length + kvUpserts.length + kvDeletes.length + [...deletes.values()].reduce((n, ids) => n + ids.length, 0);
+    const written = upserts.length + kvUpserts.length + kvDeletes.length + [...deletes.values()].reduce((n, ids) => n + ids.length, 0);
+    try {
+      await this.backend.upsertRecords(upserts);
+      for (const [collection, ids] of deletes) await this.backend.deleteRecords(collection, ids);
+      await this.backend.upsertKv(kvUpserts);
+      if (kvDeletes.length) await this.backend.deleteKv(kvDeletes);
+      if (written) {
+        const next = newStateVersion();
+        await this.backend.upsertKv([{ key: STATE_VERSION_KEY, value: next }]);
+        this.version = next;
+      }
+    } catch (err) {
+      // Memory may now differ from the database: read everything again next time
+      this.loaded = false;
+      throw err;
+    }
+    return written;
   }
 }
 
